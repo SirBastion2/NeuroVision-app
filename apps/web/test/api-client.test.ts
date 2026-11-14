@@ -200,7 +200,24 @@ describe("typed API client", () => {
     await assert.rejects(() => pollProcessingState(client, "session-1"), ApiOfflineError);
     await assert.rejects(() => exportParticipant(client, "part-1"), ApiOfflineError);
     await assert.rejects(() => deleteParticipant(client, "part-1"), ApiOfflineError);
+    await assert.rejects(() => client.deleteSession("session-1"), ApiOfflineError);
     assert.equal(called, 0);
+  });
+
+  it("deletes a session through DELETE /api/v1/sessions/:sessionId", async () => {
+    const { fetchImpl, calls } = mockFetch((call) => {
+      return jsonResponse(200, { sessionId: "session-1", deleted: true, idempotent: false });
+    });
+    const client = createApiClient({
+      baseUrl: "https://api.example.test",
+      fetch: fetchImpl,
+      getCsrfToken: () => "csrf-session",
+    });
+    const deleted = await client.deleteSession("session-1");
+    assert.equal(deleted.deleted, true);
+    assert.equal(calls[0]?.method, "DELETE");
+    assert.equal(calls[0]?.url, "https://api.example.test/api/v1/sessions/session-1");
+    assert.equal(calls[0]?.headers["x-csrf-token"], "csrf-session");
   });
 
   it("exposes dashboard polling, export, and delete on createAppServices", async () => {

@@ -185,7 +185,7 @@ Screens talk to domain, gaze, storage, and the HTTP API through `apps/web/src/se
 | `startSession` | Create a live assessment `SessionRecord` with the fixed target-selection layout and five line-bisection trials |
 | `recordClick` / `finishTrial` | Append a classified `ResponseEvent` and close a trial |
 | `completeSession` / `score` | Mark the record complete and run `scoreSession` |
-| `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write). When the API client is on, `listHistory` merges server sessions and falls back to the browser store. |
+| `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write). `remove` also drops any pending upload job and, when the API client is on, `DELETE`s `/api/v1/sessions/:sessionId` for the signed-in participant (a missing server row is treated as already gone). When the API client is on, `listHistory` merges server sessions and falls back to the browser store. |
 | `listBatteries` / `uploadBattery` / `scoringNorms` / `sessionActivity` | Battery records and a daily activity bucket from `GET /api/v1/sessions`. `scoringNorms` is `GET /api/v1/norms` (Table 2 until n ≥ 5, then Eq. (9)). Full live batteries also save locally. The hidden-scene demo is never stored. |
 | `comparableHistory` | `summarizeAssessmentTrend` / `areSessionsComparable` over saved records |
 | `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
@@ -228,6 +228,7 @@ The client matches the routes `apps/api` registers. Requests use `credentials: "
 | `createTraceUpload` | `POST /api/v1/sessions/:sessionId/trace-uploads` |
 | `putTraceContent` | `PUT /api/v1/sessions/:sessionId/trace-uploads/:traceId/content` |
 | `getSession` / `getProcessingState` / `pollProcessingState` | `GET /api/v1/sessions/:sessionId` (processing field + `processingDetail`) |
+| `deleteSession` | `DELETE /api/v1/sessions/:sessionId` (owner only; incomplete, interrupted, and pending rows included; missing rows are idempotent) |
 | `exportParticipant` | `POST /api/v1/participants/:participantId/exports` |
 | `deleteParticipant` | `DELETE /api/v1/participants/:participantId` (`{ confirm: true }`) |
 

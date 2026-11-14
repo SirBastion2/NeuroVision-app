@@ -12,6 +12,7 @@ import {
 import { migrate, one } from "../src/db.js";
 import { shouldPersistBattery } from "../src/sessions.js";
 import { authed, createHarness, login, seed, uploadSession, world } from "./harness.js";
+import { batchPayload, manifestFor, sampleSession } from "./fixture-session.js";
 
 function fullBattery(id: string): BatteryRecord {
   const seedValue = 21;
@@ -134,5 +135,127 @@ describe("session persistence", { concurrency: false }, () => {
       payload: demo,
     });
     assert.equal(stored.statusCode, 400);
+  });
+
+  it("lets the signed-in participant delete interrupted and pending sessions", async () => {
+    const auth = await login(harness.app, world.participantSubject, world.orgA);
+    const pendingId = "pending-open";
+    const pendingRecord = { ...sampleSession(pendingId), status: "incomplete" as const };
+    const admin = await login(harness.app, world.adminA, world.orgA);
+    const assignment = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/assignments",
+      headers: authed(admin),
+      payload: { participantId: world.participantId, exposureStatus: "unseen", manifest: manifestFor(pendingRecord) },
+    });
+    assert.equal(assignment.statusCode, 200, assignment.body);
+    const created = assignment.json() as { id: string; revision: number };
+    const pendingPut = await harness.app.inject({
+      method: "PUT",
+      url: `/api/v1/sessions/${pendingId}`,
+      headers: authed(auth),
+      payload: {
+        participantId: world.participantId,
+        assignmentId: created.id,
+        assignmentRevision: created.revision,
+        startedAt: pendingRecord.startedAt,
+        completion: "interrupted",
+      },
+    });
+    assert.equal(pendingPut.statusCode, 200, pendingPut.body);
+    assert.equal((pendingPut.json() as { processing: string }).processing, "pending");
+
+    const pendingDelete = await harness.app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${pendingId}`,
+      headers: authed(auth),
+    });
+    assert.equal(pendingDelete.statusCode, 200, pendingDelete.body);
+    assert.deepEqual(pendingDelete.json(), { sessionId: pendingId, deleted: true, idempotent: false });
+    const pendingGone = await harness.app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${pendingId}`,
+      headers: authed(auth),
+    });
+    assert.equal(pendingGone.statusCode, 404);
+
+    const sealedId = "interrupted-sealed";
+    const sealedRecord = { ...sampleSession(sealedId), status: "incomplete" as const };
+    const sealedAssignment = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/assignments",
+      headers: authed(admin),
+      payload: { participantId: world.participantId, exposureStatus: "unseen", manifest: manifestFor(sealedRecord) },
+    });
+    assert.equal(sealedAssignment.statusCode, 200, sealedAssignment.body);
+    const sealedCreated = sealedAssignment.json() as { id: string; revision: number };
+    const sealedPut = await harness.app.inject({
+      method: "PUT",
+      url: `/api/v1/sessions/${sealedId}`,
+      headers: authed(auth),
+      payload: {
+        participantId: world.participantId,
+        assignmentId: sealedCreated.id,
+        assignmentRevision: sealedCreated.revision,
+        startedAt: sealedRecord.startedAt,
+        completion: "interrupted",
+      },
+    });
+    assert.equal(sealedPut.statusCode, 200, sealedPut.body);
+    const sealedBatch = await harness.app.inject({
+      method: "PUT",
+      url: `/api/v1/sessions/${sealedId}/batches/batch-1`,
+      headers: authed(auth),
+      payload: batchPayload(sealedRecord),
+    });
+    assert.equal(sealedBatch.statusCode, 200, sealedBatch.body);
+    const sealedFinal = await harness.app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sealedId}/finalize`,
+      headers: authed(auth),
+    });
+    assert.equal(sealedFinal.statusCode, 200, sealedFinal.body);
+    const listedBefore = await harness.app.inject({ method: "GET", url: "/api/v1/sessions", headers: authed(auth) });
+    assert.equal(
+      (listedBefore.json() as { sessions: Array<{ id: string }> }).sessions.some((session) => session.id === sealedId),
+      true,
+    );
+
+    const sealedDelete = await harness.app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${sealedId}`,
+      headers: authed(auth),
+    });
+    assert.equal(sealedDelete.statusCode, 200, sealedDelete.body);
+    const listedAfter = await harness.app.inject({ method: "GET", url: "/api/v1/sessions", headers: authed(auth) });
+    assert.equal(
+      (listedAfter.json() as { sessions: Array<{ id: string }> }).sessions.some((session) => session.id === sealedId),
+      false,
+    );
+
+    const repeat = await harness.app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${sealedId}`,
+      headers: authed(auth),
+    });
+    assert.equal(repeat.statusCode, 200, repeat.body);
+    assert.equal((repeat.json() as { idempotent: boolean }).idempotent, true);
+
+    const missing = await harness.app.inject({
+      method: "DELETE",
+      url: "/api/v1/sessions/never-uploaded",
+      headers: authed(auth),
+    });
+    assert.equal(missing.statusCode, 200, missing.body);
+    assert.equal((missing.json() as { idempotent: boolean }).idempotent, true);
+
+    await uploadSession(harness.app, auth, "owned-by-a");
+    const other = await login(harness.app, world.otherSubject, world.orgA);
+    const hidden = await harness.app.inject({
+      method: "DELETE",
+      url: "/api/v1/sessions/owned-by-a",
+      headers: authed(other),
+    });
+    assert.equal(hidden.statusCode, 404);
   });
 });

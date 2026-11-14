@@ -61,6 +61,7 @@ export interface UploadQueue {
   subscribe(listener: (state: UploadQueueState) => void): () => void;
   drain(): Promise<UploadQueueState>;
   peek(sessionId: string): UploadJob | undefined;
+  cancel(sessionId: string): void;
 }
 
 export interface CreateUploadQueueOptions {
@@ -148,6 +149,13 @@ function isConflict(error: unknown): boolean {
   return error instanceof ApiError && error.status === 409;
 }
 
+class UploadJobCancelled extends Error {
+  constructor() {
+    super("Upload job was cancelled.");
+    this.name = "UploadJobCancelled";
+  }
+}
+
 /**
  * Persist pending session and trace uploads, retry with backoff while online,
  * and stay idempotent by session id and batch id across reloads.
@@ -178,7 +186,7 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
     jobs = jobs.map((job) => (job.id === id ? { ...job, ...patch } : job));
     persist();
     const current = jobs.find((job) => job.id === id);
-    if (!current) throw new Error(`Unknown upload job ${id}`);
+    if (!current) throw new UploadJobCancelled();
     return current;
   };
 
@@ -279,6 +287,7 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
         update(current.id, { step: "done", status: "acknowledged", lastError: null });
       }
     } catch (error) {
+      if (error instanceof UploadJobCancelled) return;
       fail(current, error);
     }
   };
@@ -357,6 +366,13 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
 
     peek(sessionId) {
       return jobs.find((job) => job.sessionId === sessionId);
+    },
+
+    cancel(sessionId) {
+      const next = jobs.filter((job) => job.sessionId !== sessionId);
+      if (next.length === jobs.length) return;
+      jobs = next;
+      persist();
     },
   };
 }

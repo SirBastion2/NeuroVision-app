@@ -82,6 +82,15 @@ export function saveSession(store: KeyValueStore, value: unknown, options: SaveS
   return next;
 }
 
+/** Drop every stored record with this session id and write the envelope back. */
+export function removeSession(store: KeyValueStore, id: string): Envelope {
+  const current = loadEnvelope(store);
+  const sessions = current.sessions.filter((item) => item.id !== id);
+  const next: Envelope = { ...current, sessions };
+  store.setItem(ENVELOPE_KEY, JSON.stringify(next));
+  return next;
+}
+
 /**
  * Same save/load/list shape as the web HistoryStore (`kind: "package"`).
  * Agent F can pass this to `createAppServices({ store })`. This package does not import apps/web.
@@ -91,6 +100,7 @@ export interface PackageHistoryStore {
   save(record: SessionRecord): Promise<SessionRecord>;
   load(id: string): Promise<SessionRecord | null>;
   list(): Promise<SessionRecord[]>;
+  remove(id: string): Promise<void>;
 }
 
 export function createPackageHistoryStore(store: KeyValueStore, options: SaveSessionOptions = {}): PackageHistoryStore {
@@ -109,6 +119,9 @@ export function createPackageHistoryStore(store: KeyValueStore, options: SaveSes
     },
     async list() {
       return loadEnvelope(store).sessions.map((item) => structuredClone(item));
+    },
+    async remove(id) {
+      removeSession(store, id);
     },
   };
 }

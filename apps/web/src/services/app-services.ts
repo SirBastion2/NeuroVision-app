@@ -35,6 +35,7 @@ import {
   simulatedTrace,
 } from "@neurovision/gaze";
 import {
+  ApiError,
   createApiClient,
   type ApiClient,
   type DeleteResult,
@@ -346,8 +347,16 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       return store.load(id);
     },
 
-    remove(id) {
-      return store.remove(id);
+    async remove(id) {
+      queue.cancel(id);
+      if (api.enabled) {
+        try {
+          await api.deleteSession(id);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+        }
+      }
+      await store.remove(id);
     },
 
     async listHistory() {

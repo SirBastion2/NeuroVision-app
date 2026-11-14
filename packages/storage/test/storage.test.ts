@@ -134,4 +134,22 @@ describe("browser envelope", () => {
     assert.equal((await history.load("hist"))?.source, "live");
     assert.equal((await history.list()).length, 2);
   });
+
+  it("removes a session by id, including an incomplete record", async () => {
+    const store = memoryStore();
+    const history = createPackageHistoryStore(store);
+    const live = session("kept", "live");
+    const incomplete = { ...session("pending-open", "live"), status: "incomplete" as const };
+    await history.save(live);
+    await history.save(incomplete);
+    assert.equal((await history.list()).length, 2);
+    await history.remove("pending-open");
+    assert.equal((await history.load("pending-open")), null);
+    assert.deepEqual(
+      (await history.list()).map((item) => item.id),
+      ["kept"],
+    );
+    await history.remove("pending-open");
+    assert.equal((await history.list()).length, 1);
+  });
 });

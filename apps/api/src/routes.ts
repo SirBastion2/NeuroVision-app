@@ -16,6 +16,7 @@ import {
   createMembership,
   createParticipant,
   deleteParticipant,
+  deleteSession,
   exportParticipant,
   finalizeSession,
   listParticipants,
@@ -218,6 +219,11 @@ export async function registerRoutes(app: FastifyInstance, deps: Deps): Promise<
   app.get("/api/v1/sessions/:sessionId", async (request) => {
     const { sessionId } = z.object({ sessionId: id }).parse(request.params);
     return readSession(deps, actorOf(request), sessionId);
+  });
+
+  app.delete("/api/v1/sessions/:sessionId", async (request) => {
+    const { sessionId } = z.object({ sessionId: id }).parse(request.params);
+    return deleteSession(deps, actorOf(request), sessionId);
   });
 
   app.get("/api/v1/sessions/:sessionId/summaries", async (request) => {

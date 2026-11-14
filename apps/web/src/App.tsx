@@ -599,9 +599,17 @@ export function App() {
             activity={activity}
             onOpen={(s) => dispatch({ type: "open", session: s })}
             onDelete={async (id) => {
+              setActionError(null);
               const result = await store.remove(id);
+              if (result.error) setActionError(result.error);
               setSaveError(result.error);
               setStored(await store.load());
+              setProcessing((current) => {
+                if (!(id in current)) return current;
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
             }}
             onHome={home}
             apiEnabled={apiEnabled}
