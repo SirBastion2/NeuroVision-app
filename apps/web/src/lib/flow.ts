@@ -15,6 +15,7 @@ export type Screen =
   | "gaze"
   | "assessment"
   | "starry"
+  | "scene"
   | "rings"
   | "lines"
   | "demo";

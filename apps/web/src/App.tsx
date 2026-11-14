@@ -18,6 +18,7 @@ import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
+import { HiddenScenePage } from "./checks/HiddenScene";
 import { BatteryPage } from "./checks/pages";
 import "./styles.css";
 
@@ -148,6 +149,9 @@ export function App() {
               <button className={screen === "lines" || isLinesPage ? "on" : ""} onClick={() => go("lines")}>
                 Line bisection
               </button>
+              <button className={screen === "scene" ? "on" : ""} onClick={() => go("scene")}>
+                Hidden scene
+              </button>
               <button className={screen === "demo" ? "on" : ""} onClick={() => go("demo")}>
                 Demo
               </button>
@@ -179,6 +183,7 @@ export function App() {
         {screen === "starry" && <BatteryPage from="starry" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
         {screen === "rings" && <BatteryPage from="rings" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
         {screen === "lines" && <BatteryPage from="lines" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "scene" && <HiddenScenePage onHome={home} onRunning={setCheckRunning} />}
         {screen === "demo" && <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
         {screen === "target-task" && session && trial && (
