@@ -47,6 +47,11 @@ describe("Home hero", () => {
     assert.match(html, /History/);
     assert.match(html, /Sessions over time/);
     assert.match(html, /Demo run/);
+    assert.match(html, /Begin assessment/);
+    assert.match(html, />Input</);
+    assert.doesNotMatch(html, /Board layout/);
+    assert.doesNotMatch(html, /Layout A/);
+    assert.doesNotMatch(html, /Layout B/);
   });
 });
 

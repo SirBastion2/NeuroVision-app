@@ -6,7 +6,6 @@ import {
   createTargetSelectionLayout,
   viewportClass,
   type InputModality,
-  type LayoutVariant,
 } from "@neurovision/domain";
 import { STIMULUS_RADIUS } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
@@ -19,7 +18,7 @@ const INPUT_LABELS: Record<InputModality, string> = {
 };
 
 interface Props {
-  onStart: (input: InputModality, variant: LayoutVariant) => void;
+  onStart: (input: InputModality) => void;
   onHistory: () => void;
   apiEnabled?: boolean;
   onDemo?: () => void;
@@ -59,7 +58,6 @@ function HeroBoard() {
 
 export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) {
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
-  const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
 
   return (
@@ -96,7 +94,7 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           className="card start-card"
           onSubmit={(e) => {
             e.preventDefault();
-            onStart(input, variant);
+            onStart(input);
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
@@ -109,18 +107,6 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
                 <label key={m} className={input === m ? "on" : ""}>
                   <input type="radio" name="input" value={m} checked={input === m} onChange={() => setInput(m)} />
                   {INPUT_LABELS[m]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="field">
-            <legend>Board layout</legend>
-            <div className="segmented">
-              {(["fixed-a", "fixed-b"] as const).map((v) => (
-                <label key={v} className={variant === v ? "on" : ""}>
-                  <input type="radio" name="variant" checked={variant === v} onChange={() => setVariant(v)} />
-                  Layout {v === "fixed-a" ? "A" : "B"}
                 </label>
               ))}
             </div>

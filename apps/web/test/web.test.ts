@@ -85,9 +85,10 @@ describe("session building", () => {
 
 describe("flow", () => {
   test("walks intro → target → lines → review", () => {
-    let st = flowReducer(initialFlow, { type: "start", session: fresh(), variant: "fixed-b" });
+    let st = flowReducer(initialFlow, { type: "start", session: fresh() });
     assert.equal(st.screen, "target-intro");
-    st = flowReducer(st, { type: "trial-finished", trial: { ...newTargetSelectionTrial(st.session!, "fixed-b", VP), end: "done" } });
+    assert.equal(st.variant, "fixed-a");
+    st = flowReducer(st, { type: "trial-finished", trial: { ...newTargetSelectionTrial(st.session!, "fixed-a", VP), end: "done" } });
     assert.equal(st.screen, "line-intro");
     for (let i = 0; i < 5; i++) {
       assert.equal(st.lineIndex, i);
