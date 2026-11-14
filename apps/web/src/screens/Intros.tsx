@@ -54,7 +54,7 @@ export function TargetIntro({
           Cancel
         </button>
         <button className="primary large" onClick={onBegin} autoFocus>
-          Start target selection
+          Start hollow rings
         </button>
       </div>
     </section>

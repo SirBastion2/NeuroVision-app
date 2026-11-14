@@ -18,17 +18,14 @@ import { scoredBatteryName, scoredBatteryStep } from "./lib/battery-labels";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
 import {
   TIME_LIMIT_MS,
-  createSession,
   newLineTrial,
   newPracticeTrial,
   newTargetSelectionTrial,
   sessionAliasForParticipant,
 } from "./lib/session";
-import { ProfileDashboard } from "./profile/ProfileDashboard";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
-import { MyProfile } from "./screens/MyProfile";
 import { ParticipantStart } from "./screens/ParticipantStart";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
@@ -122,6 +119,8 @@ export function App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkRunning, setCheckRunning] = useState(false);
   const [activity, setActivity] = useState<Array<{ bucket: string; count: number }>>([]);
+  const [runInput, setRunInput] = useState<InputModality>("mouse-trackpad");
+  const [runVariant, setRunVariant] = useState<LayoutVariant>("fixed-a");
   const main = useRef<HTMLElement>(null);
   const enqueued = useRef(new Set<string>());
   const { session, screen } = state;
@@ -226,7 +225,7 @@ export function App() {
   }, [state.ended, session, store, services, apiEnabled, signedIn, participantId]);
 
   useEffect(() => {
-    if (screen === "history" || screen === "my-profile") {
+    if (screen === "history") {
       void store.load().then(setStored);
       void services.sessionActivity().then(setActivity);
     }
@@ -262,12 +261,11 @@ export function App() {
   }, [apiEnabled, services, queue]);
 
   const participantLabel = sessionAliasForParticipant(signedIn?.subject ?? participantId);
-  const start = (input: InputModality, variant: LayoutVariant) =>
-    dispatch({
-      type: "start",
-      session: createSession({ alias: participantLabel, input, viewport: currentViewport() }),
-      variant,
-    });
+  const beginAssessment = (input: InputModality, variant: LayoutVariant) => {
+    setRunInput(input);
+    setRunVariant(variant);
+    dispatch({ type: "go", screen: "assessment" });
+  };
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
   const onPractice = useCallback((trial: TrialRecord) => dispatch({ type: "practice-finished", trial }), []);
   const home = () => dispatch({ type: "home" });
@@ -476,8 +474,6 @@ export function App() {
             {!needsParticipant && !checkingAuth && (
               <ProfileMenu
                 initials={signedIn?.subject ? signedIn.subject.slice(0, 2).toUpperCase() : avatarInitials(stored.sessions)}
-                onMyProfile={() => go("my-profile")}
-                onClinicianDashboard={() => go("profile")}
                 onSwitchParticipant={localIdentity && signedIn ? onSwitchParticipant : undefined}
               />
             )}
@@ -494,7 +490,7 @@ export function App() {
         {checkingAuth && (
           <section className="intro card narrow">
             <h1>Opening session</h1>
-            <p className="lede">Checking this browser for a signed-in participant.</p>
+            <p className="lede">Checking for a signed-in participant.</p>
           </section>
         )}
         {needsParticipant && (
@@ -514,26 +510,59 @@ export function App() {
         )}
         {screen === "home" && (
           <Home
-            onStart={start}
+            onStart={beginAssessment}
             onHistory={() => go("history")}
-            onProfile={() => go("my-profile")}
             apiEnabled={apiEnabled}
             onDemo={() => go("demo")}
           />
         )}
         {screen === "assessment" && (
-          <BatteryPage from="starry" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+          <BatteryPage
+            from="starry"
+            alias={participantLabel}
+            input={runInput}
+            variant={runVariant}
+            onHome={home}
+            onRunning={setCheckRunning}
+            onSave={saveRun}
+          />
         )}
         {screen === "starry" && (
-          <BatteryPage from="starry" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+          <BatteryPage
+            from="starry"
+            alias={participantLabel}
+            input={runInput}
+            variant={runVariant}
+            onHome={home}
+            onRunning={setCheckRunning}
+            onSave={saveRun}
+          />
         )}
         {screen === "rings" && (
-          <BatteryPage from="rings" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+          <BatteryPage
+            from="rings"
+            alias={participantLabel}
+            input={runInput}
+            variant={runVariant}
+            onHome={home}
+            onRunning={setCheckRunning}
+            onSave={saveRun}
+          />
         )}
         {screen === "lines" && (
-          <BatteryPage from="lines" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+          <BatteryPage
+            from="lines"
+            alias={participantLabel}
+            input={runInput}
+            variant={runVariant}
+            onHome={home}
+            onRunning={setCheckRunning}
+            onSave={saveRun}
+          />
         )}
-        {screen === "demo" && <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />}
+        {screen === "demo" && (
+          <BatteryPage from="starry" demo input={runInput} variant={runVariant} onHome={home} onRunning={setCheckRunning} />
+        )}
         {screen === "scene" && <HiddenScenePage onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
         {screen === "target-task" && session && trial && (
@@ -614,7 +643,6 @@ export function App() {
               setStored(await store.load());
             }}
             onHome={home}
-            onClinicianDashboard={() => go("profile")}
             apiEnabled={apiEnabled}
             processing={processing}
             queue={queue}
@@ -623,16 +651,6 @@ export function App() {
             onDeleteParticipant={apiEnabled ? () => void onDeleteParticipant() : undefined}
           />
         )}
-        {screen === "my-profile" && (
-          <MyProfile
-            sessions={stored.sessions}
-            onHome={home}
-            onHistory={() => go("history")}
-            onOpen={(s) => dispatch({ type: "open", session: s })}
-            onClinicianDashboard={() => go("profile")}
-          />
-        )}
-        {screen === "profile" && <ProfileDashboard onBackToPatient={() => go("my-profile")} />}
         </>
         )}
       </main>
@@ -641,8 +659,10 @@ export function App() {
         <footer className="footer">
           <span>NeuroVision · Spatial Attention Lab</span>
           <span>
-            Research tool · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this
-            browser
+            Research tool · not a diagnostic tool · contracts {CONTRACTS_VERSION}
+            {apiEnabled
+              ? " · assessments sync with this participant ID when the server is reachable"
+              : " · data stays in this browser"}
           </span>
         </footer>
       )}

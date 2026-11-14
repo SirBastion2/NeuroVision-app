@@ -242,7 +242,10 @@ function CombinedReport({
           <Eyebrow>Combined report</Eyebrow>
           <h1>{tests.length === 1 ? "One test, one picture" : `${tests.length} tests, one picture`}</h1>
           <p className="meta">
-            {demo ? "Demonstration run · not saved" : "Saved to History (hollow rings and lines)"} · research tool, not a diagnosis
+            {demo
+              ? "Demonstration run · not saved"
+              : "Hollow rings and line bisection save to History; Starry Night is shown on this report"}{" "}
+            · research tool, not a diagnosis
           </p>
         </div>
         <div className="badges">
@@ -317,6 +320,9 @@ function CombinedReport({
           <p className="small dev-key">
             <i className="key centre" /> True centre <i className="key mark" /> Mark placed. Positive = right of centre.
           </p>
+          {lb.healthyRange ? (
+            <p className={lb.healthyRange.status === "outside" ? "notice warn" : "notice"}>{lb.healthyRange.text}</p>
+          ) : null}
         </section>
       )}
 

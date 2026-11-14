@@ -132,18 +132,23 @@ describe("session review board", () => {
     assert.doesNotMatch(html, /Disks selected/);
   });
 
-  it("keeps the clinician dashboard reachable from History", () => {
+  it("keeps History as the session list with trend columns, and no clinician dashboard", () => {
     const html = renderToStaticMarkup(
       createElement(History, {
         stored: { sessions: [session], rejected: 0, error: null },
         onOpen() {},
         onDelete() {},
         onHome() {},
-        onClinicianDashboard() {},
       }),
     );
-    assert.match(html, />Clinician Dashboard</);
+    assert.match(html, /Sessions over time/);
+    assert.match(html, />Participant</);
+    assert.match(html, />Rings found</);
+    assert.match(html, />Practice</);
     assert.match(html, /Left vs right/);
+    assert.doesNotMatch(html, />Alias</);
+    assert.doesNotMatch(html, /My Profile/);
+    assert.doesNotMatch(html, /Clinician Dashboard/);
     assert.doesNotMatch(html, /Omission gap/);
   });
 });

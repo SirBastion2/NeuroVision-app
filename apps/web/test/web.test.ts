@@ -122,6 +122,11 @@ describe("flow", () => {
     assert.equal(st.screen, "practice-reflection");
     assert.equal(st.session!.practice.length, 1);
   });
+
+  test("my-profile and profile screens redirect to history", () => {
+    assert.equal(flowReducer(initialFlow, { type: "go", screen: "my-profile" }).screen, "history");
+    assert.equal(flowReducer(initialFlow, { type: "go", screen: "profile" }).screen, "history");
+  });
 });
 
 describe("history", () => {

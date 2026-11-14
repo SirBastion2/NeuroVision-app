@@ -103,7 +103,7 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
       {ts && tsTrial ? (
         <>
           <section className="stat-row">
-            <Stat label="Targets found" value={`${ts.hits} / ${ts.available}`} sub={pct(ts.hitRate)} />
+            <Stat label="Rings found" value={`${ts.hits} / ${ts.available}`} sub={pct(ts.hitRate)} />
             <Stat
               label={LEFT_RIGHT_MISSES_LABEL}
               value={missShareGap(ts.omissionAsymmetry)}
@@ -142,7 +142,7 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
           </section>
         </>
       ) : (
-        <p className="notice">No target-selection trial was recorded.</p>
+        <p className="notice">No hollow-ring trial was recorded.</p>
       )}
 
       <section className="card">

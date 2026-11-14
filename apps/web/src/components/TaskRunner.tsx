@@ -174,7 +174,7 @@ export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, inst
       <div className="board-frame">
         <Board
           ref={board}
-          label={isLine ? "Line bisection board" : "Target selection board: select hollow rings"}
+          label={isLine ? "Line bisection board" : "Hollow rings board: select hollow rings"}
           role="application"
           tabIndex={0}
           stimuli={trial.layout.stimuli}

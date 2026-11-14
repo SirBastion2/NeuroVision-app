@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HOME_JOURNEY_STEPS } from "../src/lib/battery-labels.ts";
 import { Home } from "../src/screens/Home.tsx";
+import { TargetIntro } from "../src/screens/Intros.tsx";
 
 Object.defineProperty(globalThis, "window", {
   value: { innerWidth: 1400, innerHeight: 900 },
@@ -15,7 +16,6 @@ function renderHome() {
     createElement(Home, {
       onStart() {},
       onHistory() {},
-      onProfile() {},
       onDemo() {},
     }),
   );
@@ -26,6 +26,7 @@ describe("Home hero", () => {
     const html = renderHome();
     assert.match(html, /Three short tasks record every response/);
     assert.match(html, /it is not a diagnosis/);
+    assert.match(html, /Starry Night, hollow rings, then line bisection/);
     assert.doesNotMatch(html, /Two short board tasks/);
     for (const step of HOME_JOURNEY_STEPS) {
       assert.match(html, new RegExp(`>${step.n}<`));
@@ -37,8 +38,26 @@ describe("Home hero", () => {
     assert.doesNotMatch(html, /Gaze lab/);
     assert.doesNotMatch(html, /Spatial battery/);
     assert.doesNotMatch(html, /Three patterns/);
+    assert.doesNotMatch(html, /My Profile/);
+    assert.doesNotMatch(html, /Clinician/);
+    assert.doesNotMatch(html, /from this browser/);
     assert.match(html, /History/);
-    assert.match(html, /My Profile/);
+    assert.match(html, /Sessions over time/);
     assert.match(html, /Demo run/);
+  });
+});
+
+describe("hollow rings intro", () => {
+  it("does not use the old Target selection name", () => {
+    const html = renderToStaticMarkup(
+      createElement(TargetIntro, {
+        input: "mouse-trackpad",
+        onBegin() {},
+        onCancel() {},
+      }),
+    );
+    assert.match(html, /Start hollow rings/);
+    assert.match(html, /Test 2 of 3/);
+    assert.doesNotMatch(html, /Target selection/);
   });
 });

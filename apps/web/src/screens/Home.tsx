@@ -21,7 +21,6 @@ const INPUT_LABELS: Record<InputModality, string> = {
 interface Props {
   onStart: (input: InputModality, variant: LayoutVariant) => void;
   onHistory: () => void;
-  onProfile: () => void;
   apiEnabled?: boolean;
   onDemo?: () => void;
 }
@@ -58,7 +57,7 @@ function HeroBoard() {
   );
 }
 
-export function Home({ onStart, onHistory, onProfile, apiEnabled = false, onDemo }: Props) {
+export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) {
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
@@ -137,9 +136,9 @@ export function Home({ onStart, onHistory, onProfile, apiEnabled = false, onDemo
             <span aria-hidden> →</span>
           </button>
           <p className="fineprint">
-            About three minutes.{" "}
+            Starry Night, hollow rings, then line bisection. A few minutes.{" "}
             {apiEnabled
-              ? "Completed runs save to the server when it is reachable; this browser is the offline fallback."
+              ? "Completed runs save to this participant ID when the server is reachable; this browser is the offline fallback."
               : "Data stays in this browser."}
           </p>
         </form>
@@ -148,15 +147,7 @@ export function Home({ onStart, onHistory, onProfile, apiEnabled = false, onDemo
           <button className="card link-card" onClick={onHistory}>
             <Eyebrow plain>History</Eyebrow>
             <h3>Sessions over time</h3>
-            <p>Saved sessions and the trend across comparable assessments.</p>
-            <span className="link-arrow" aria-hidden>
-              →
-            </span>
-          </button>
-          <button className="card link-card" onClick={onProfile}>
-            <Eyebrow plain>My Profile</Eyebrow>
-            <h3>Your saved assessments</h3>
-            <p>See live sessions from this browser. Clinician tools stay under the account menu.</p>
+            <p>Your saved assessments, the trend across comparable runs, and practice rounds.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>

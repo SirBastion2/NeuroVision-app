@@ -38,7 +38,7 @@ export interface FlowState {
   practice: PracticeRoundSetup | null;
   /** Starting point for the next setup screen (the faded config after a round). */
   nextSuggestion: PracticeSuggestion | null;
-  /** True when line bisection was started on its own, without target selection first. */
+  /** True when line bisection was started on its own, without hollow rings first. */
   linesOnly: boolean;
 }
 
@@ -64,12 +64,18 @@ export const initialFlow: FlowState = {
   linesOnly: false,
 };
 
+/** My Profile was folded into History after demonstration sessions went away. */
+export function resolveScreen(screen: Screen): Screen {
+  if (screen === "my-profile" || screen === "profile") return "history";
+  return screen;
+}
+
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
   switch (action.type) {
     case "home":
       return initialFlow;
     case "go":
-      return { ...state, screen: action.screen };
+      return { ...state, screen: resolveScreen(action.screen) };
     case "start":
       return { ...initialFlow, screen: "target-intro", session: action.session, variant: action.variant };
     case "start-lines":

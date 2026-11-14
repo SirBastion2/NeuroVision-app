@@ -20,7 +20,6 @@ interface Props {
   onOpen: (session: SessionRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
-  onClinicianDashboard?: () => void;
   apiEnabled?: boolean;
   processing?: Record<string, ProcessingSnapshot>;
   queue?: UploadQueueState;
@@ -42,7 +41,6 @@ export function History({
   onOpen,
   onDelete,
   onHome,
-  onClinicianDashboard,
   apiEnabled = false,
   processing = {},
   queue,
@@ -78,6 +76,8 @@ export function History({
     () => [...liveSessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     [liveSessions],
   );
+  const activeAlias = profiles.find(([id]) => id === activeProfile)?.[1] ?? null;
+  const latest = rows.find((s) => s.profileId === activeProfile) ?? rows[0] ?? null;
 
   const trendCell = (s: SessionRecord) => {
     if (s.source === "demonstration") return EXCLUDED.demonstration;
@@ -92,6 +92,13 @@ export function History({
         <div>
           <Eyebrow>History</Eyebrow>
           <h1>Sessions over time</h1>
+          <p className="meta">
+            {activeAlias ? `${activeAlias} · ` : ""}
+            {latest ? `last completed ${dateTime(latest.completedAt || latest.startedAt)} · ` : ""}
+            {apiControls
+              ? "saved assessments sync with this participant ID when the server is reachable"
+              : "saved assessments stay in this browser"}
+          </p>
         </div>
         {profiles.length > 1 && (
           <label className="field inline">
@@ -159,7 +166,7 @@ export function History({
             <h3>The trend starts at two sessions</h3>
             <p className="small">
               Charts join a participant’s comparable live assessments. {trend.points.length === 1 ? "One is recorded so far." : "None are recorded yet."}{" "}
-              Demonstration and practice records never enter the trend.
+              Practice records never enter the trend.
             </p>
           </div>
         </section>
@@ -174,11 +181,12 @@ export function History({
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Alias</th>
+                <th>Participant</th>
                 <th>Source</th>
-                <th>Found</th>
+                <th>Rings found</th>
                 <th>Left vs right</th>
                 <th>Pattern</th>
+                <th>Practice</th>
                 <th>Trend</th>
                 {apiControls && <th>Server</th>}
                 <th />
@@ -187,8 +195,8 @@ export function History({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={apiControls ? 9 : 8} className="empty">
-                    No sessions yet. Run an assessment from Home.
+                  <td colSpan={apiControls ? 10 : 9} className="empty">
+                    No sessions yet. Run an assessment from Home to build this history.
                   </td>
                 </tr>
               )}
@@ -202,11 +210,19 @@ export function History({
                       <strong>{session.alias}</strong>
                     </td>
                     <td>
-                      <span className={`badge ${session.source}`}>{sessionSourceLabel(session.source)}</span>
+                      <span className={`badge ${session.source}`}>{sessionSourceLabel(session.source)}</span>{" "}
+                      <span className={`badge ${session.status}`}>
+                        {session.status === "complete" ? "Complete" : "Incomplete"}
+                      </span>
                     </td>
                     <td>{ts ? `${ts.hits}/${ts.available}` : "n/a"}</td>
                     <td>{missShareGap(ts?.omissionAsymmetry ?? null)}</td>
                     <td>{result.spatialPattern.kind.replace("-", " ")}</td>
+                    <td className="small">
+                      {session.practice.length
+                        ? `${session.practice.length} round${session.practice.length === 1 ? "" : "s"}`
+                        : "—"}
+                    </td>
                     <td className="small">{trendCell(session)}</td>
                     {apiControls && (
                       <td className="small">
@@ -267,11 +283,6 @@ export function History({
               Delete participant
             </button>
           ))}
-        {onClinicianDashboard && (
-          <button className="ghost" type="button" onClick={onClinicianDashboard}>
-            Clinician Dashboard
-          </button>
-        )}
         <button onClick={onHome}>Home</button>
       </div>
     </div>

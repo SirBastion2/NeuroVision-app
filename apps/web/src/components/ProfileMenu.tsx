@@ -2,18 +2,17 @@ import { useEffect, useId, useRef, useState } from "react";
 
 interface Props {
   initials: string;
-  onMyProfile: () => void;
-  onClinicianDashboard: () => void;
   onSwitchParticipant?: () => void;
   disabled?: boolean;
 }
 
-/** Circular account control with My Profile + Clinician Dashboard. */
-export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, onSwitchParticipant, disabled }: Props) {
+/** Circular account control; Switch participant appears when local identity is on. */
+export function ProfileMenu({ initials, onSwitchParticipant, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const buttonId = useId();
+  const hasMenu = Boolean(onSwitchParticipant);
 
   useEffect(() => {
     if (!open) return;
@@ -37,16 +36,18 @@ export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, onSwi
         type="button"
         id={buttonId}
         className="profile-avatar"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-label="Account menu"
+        aria-haspopup={hasMenu ? "menu" : undefined}
+        aria-expanded={hasMenu ? open : undefined}
+        aria-controls={hasMenu ? menuId : undefined}
+        aria-label={hasMenu ? "Account menu" : "Signed-in participant"}
         disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (hasMenu) setOpen((value) => !value);
+        }}
       >
         <span aria-hidden>{initials}</span>
       </button>
-      {open ? (
+      {open && hasMenu ? (
         <ul id={menuId} className="profile-menu-list" role="menu" aria-labelledby={buttonId}>
           <li role="none">
             <button
@@ -54,38 +55,12 @@ export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, onSwi
               role="menuitem"
               onClick={() => {
                 setOpen(false);
-                onMyProfile();
+                onSwitchParticipant?.();
               }}
             >
-              My Profile
+              Switch participant
             </button>
           </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onClinicianDashboard();
-              }}
-            >
-              Clinician Dashboard
-            </button>
-          </li>
-          {onSwitchParticipant ? (
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onSwitchParticipant();
-                }}
-              >
-                Switch participant
-              </button>
-            </li>
-          ) : null}
         </ul>
       ) : null}
     </div>
