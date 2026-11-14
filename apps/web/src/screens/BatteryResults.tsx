@@ -69,9 +69,12 @@ export function batteryDisplay(record: BatteryRecord, patientExample = false) {
   const scored = scoreBatteryRecord(record);
   const scene = generateScene({ seed: record.seed, hide: record.hide });
   const induced = scored.scene.observationInduced;
+  const sceneRan = record.scene.taps.length > 0;
   const observations: TestObservation[] = [];
-  if (patientExample && induced) observations.push(induced);
-  else observations.push(scored.scene.observationVisible);
+  if (sceneRan) {
+    if (patientExample && induced) observations.push(induced);
+    else observations.push(scored.scene.observationVisible);
+  }
   observations.push(scored.clock.observation);
   if (scored.greyscales) observations.push(scored.greyscales.observation);
   if (scored.bisection) observations.push(scored.bisection.observation);
@@ -85,6 +88,7 @@ export function batteryDisplay(record: BatteryRecord, patientExample = false) {
     observations,
     counted,
     hasInduced: induced != null,
+    sceneRan,
     usedDefaultNorms: usedDefaultNorms(record, evidence),
   };
 }
@@ -197,7 +201,7 @@ function SceneMap({ scene, foundIds }: { scene: Scene; foundIds: readonly string
 export function BatteryResults({ record, onExport, onBack }: Props) {
   const [patientExample, setPatientExample] = useState(false);
   const display = useMemo(() => batteryDisplay(record, patientExample), [record, patientExample]);
-  const { evidence, counted, scene, scored, hasInduced } = display;
+  const { evidence, counted, scene, scored, hasInduced, sceneRan } = display;
   const posteriors: Array<{ key: Hypothesis; pct: number }> = [
     { key: "left", pct: percent(evidence.posterior.left) },
     { key: "none", pct: percent(evidence.posterior.none) },
@@ -330,10 +334,16 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
           <div className="card-head">
             <h3>Scene map</h3>
             <span className="small">
-              {scored.scene.foundVisible} of {scored.scene.visibleTargets} visible lanterns found
+              {sceneRan
+                ? `${scored.scene.foundVisible} of ${scored.scene.visibleTargets} visible lanterns found`
+                : "Scene search was skipped for this run"}
             </span>
           </div>
-          <SceneMap scene={scene} foundIds={scored.scene.foundIds} />
+          {sceneRan ? (
+            <SceneMap scene={scene} foundIds={scored.scene.foundIds} />
+          ) : (
+            <p className="notice">Scene search is a placeholder in the step order and was not run.</p>
+          )}
         </section>
 
         <section className="card">

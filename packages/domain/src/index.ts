@@ -229,3 +229,6 @@ export type { BisectionLine, BisectionResponse } from "./bisection.js";
 
 export { BATTERY_CONTRACT_VERSION, BATTERY_MODES, isBatteryRecord, parseBatteryRecord, scoreBatteryRecord } from "./battery.js";
 export type { BatteryMode, BatteryRecord, BatteryScore } from "./battery.js";
+
+export { generateStarryTrials, scoreStarry, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
+export type { StarrySide, StarryTrial, StarryResponse, StarryPress, StarryScore, StarrySideSummary } from "./starry.js";

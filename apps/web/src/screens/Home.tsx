@@ -27,6 +27,10 @@ interface Props {
   onHistory: () => void;
   onProfile: () => void;
   onGaze: () => void;
+  showBattery?: boolean;
+  onBattery?: () => void;
+  onStarry?: () => void;
+  onDemo?: () => void;
 }
 
 /** The real assessment board with one half fading away, circled by the logo's orbit and star. */
@@ -68,7 +72,17 @@ const STEPS = [
   ["04", "Practice", "An explained cue suggestion, then up to three rounds."],
 ] as const;
 
-export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
+export function Home({
+  onStart,
+  onOpen,
+  onHistory,
+  onProfile,
+  onGaze,
+  showBattery = false,
+  onBattery,
+  onStarry,
+  onDemo,
+}: Props) {
   const [alias, setAlias] = useState("");
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
@@ -180,6 +194,36 @@ export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
               →
             </span>
           </button>
+          {showBattery && onBattery && (
+            <button className="card link-card" onClick={onBattery}>
+              <Eyebrow plain>Spatial battery</Eyebrow>
+              <h3>Clock, greyscales, and lines</h3>
+              <p>A combined reading against the healthy range. Scene search is skipped until that screen is ready.</p>
+              <span className="link-arrow" aria-hidden>
+                →
+              </span>
+            </button>
+          )}
+          {onStarry && (
+            <button className="card link-card" onClick={onStarry}>
+              <Eyebrow plain>Starry Night</Eyebrow>
+              <h3>Detection among flashing dots</h3>
+              <p>Press whenever a red dot flashes among blinking green ones, then hollow rings and lines.</p>
+              <span className="link-arrow" aria-hidden>
+                →
+              </span>
+            </button>
+          )}
+          {onDemo && (
+            <button className="card link-card" onClick={onDemo}>
+              <Eyebrow plain>Demo run</Eyebrow>
+              <h3>Every test, back to back</h3>
+              <p>Starry Night, hollow rings and line bisection. Each starts by itself when the last one ends.</p>
+              <span className="link-arrow" aria-hidden>
+                →
+              </span>
+            </button>
+          )}
         </div>
       </section>
 
