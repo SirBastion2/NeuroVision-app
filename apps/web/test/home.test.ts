@@ -26,7 +26,7 @@ describe("Home hero", () => {
     const html = renderHome();
     assert.match(html, /Three short tasks record every response/);
     assert.match(html, /it is not a diagnosis/);
-    assert.match(html, /Starry Night, hollow rings, then line bisection/);
+    assert.match(html, /Starry Night, hollow rings and line bisection/);
     assert.doesNotMatch(html, /Two short board tasks/);
     for (const step of HOME_JOURNEY_STEPS) {
       assert.match(html, new RegExp(`>${step.n}<`));
@@ -47,6 +47,17 @@ describe("Home hero", () => {
     assert.match(html, /History/);
     assert.match(html, /Sessions over time/);
     assert.match(html, /Demo run/);
+    assert.match(html, /Begin assessment/);
+    assert.match(html, /New session/);
+    assert.doesNotMatch(html, /Start an assessment/);
+    assert.doesNotMatch(html, /A few minutes/);
+    assert.doesNotMatch(html, /Data stays in this browser/);
+    assert.doesNotMatch(html, />Input</);
+    assert.doesNotMatch(html, /Mouse or trackpad/);
+    assert.doesNotMatch(html, /Keyboard cursor/);
+    assert.doesNotMatch(html, /Board layout/);
+    assert.doesNotMatch(html, /Layout A/);
+    assert.doesNotMatch(html, /Layout B/);
   });
 });
 

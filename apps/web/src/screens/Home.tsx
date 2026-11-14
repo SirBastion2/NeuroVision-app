@@ -1,27 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  INPUT_MODALITIES,
   createTargetSelectionLayout,
   viewportClass,
-  type InputModality,
-  type LayoutVariant,
 } from "@neurovision/domain";
 import { STIMULUS_RADIUS } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
 import { HOME_JOURNEY_STEPS } from "../lib/battery-labels";
 
-const INPUT_LABELS: Record<InputModality, string> = {
-  "mouse-trackpad": "Mouse or trackpad",
-  keyboard: "Keyboard cursor",
-  touch: "Touch",
-};
-
 interface Props {
-  onStart: (input: InputModality, variant: LayoutVariant) => void;
+  onStart: () => void;
   onHistory: () => void;
-  apiEnabled?: boolean;
   onDemo?: () => void;
 }
 
@@ -57,9 +47,7 @@ function HeroBoard() {
   );
 }
 
-export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) {
-  const [input, setInput] = useState<InputModality>("mouse-trackpad");
-  const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
+export function Home({ onStart, onHistory, onDemo }: Props) {
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
 
   return (
@@ -96,36 +84,10 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           className="card start-card"
           onSubmit={(e) => {
             e.preventDefault();
-            onStart(input, variant);
+            onStart();
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
-          <h2>Start an assessment</h2>
-
-          <fieldset className="field">
-            <legend>Input</legend>
-            <div className="segmented">
-              {INPUT_MODALITIES.map((m) => (
-                <label key={m} className={input === m ? "on" : ""}>
-                  <input type="radio" name="input" value={m} checked={input === m} onChange={() => setInput(m)} />
-                  {INPUT_LABELS[m]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="field">
-            <legend>Board layout</legend>
-            <div className="segmented">
-              {(["fixed-a", "fixed-b"] as const).map((v) => (
-                <label key={v} className={variant === v ? "on" : ""}>
-                  <input type="radio" name="variant" checked={variant === v} onChange={() => setVariant(v)} />
-                  Layout {v === "fixed-a" ? "A" : "B"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
           {!supported && (
             <p className="notice warn" role="status">
               This window is smaller than 1024×768, so the session will be recorded with an “unsupported” screen class.
@@ -135,12 +97,6 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
             Begin assessment
             <span aria-hidden> →</span>
           </button>
-          <p className="fineprint">
-            Starry Night, hollow rings, then line bisection. A few minutes.{" "}
-            {apiEnabled
-              ? "Completed runs save to this participant ID when the server is reachable; this browser is the offline fallback."
-              : "Data stays in this browser."}
-          </p>
         </form>
 
         <div className="side-cards">

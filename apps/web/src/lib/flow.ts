@@ -35,7 +35,7 @@ export interface FlowState {
 export type FlowAction =
   | { type: "home" }
   | { type: "go"; screen: Screen }
-  | { type: "start"; session: SessionRecord; variant: LayoutVariant }
+  | { type: "start"; session: SessionRecord; variant?: LayoutVariant }
   | { type: "start-lines"; session: SessionRecord }
   | { type: "trial-finished"; trial: TrialRecord }
   | { type: "open"; session: SessionRecord };
@@ -65,7 +65,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "go":
       return { ...state, screen: resolveScreen(action.screen, Boolean(state.session)) };
     case "start":
-      return { ...initialFlow, screen: "target-intro", session: action.session, variant: action.variant };
+      return { ...initialFlow, screen: "target-intro", session: action.session, variant: action.variant ?? "fixed-a" };
     case "start-lines":
       return { ...initialFlow, screen: "line-intro", session: action.session, linesOnly: true };
     case "open":

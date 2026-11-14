@@ -59,9 +59,10 @@ describe("session building", () => {
     assert.equal(profileIdFor(""), "anonymous");
     assert.equal(sessionAliasForParticipant(null), "");
     assert.equal(sessionAliasForParticipant("P-014"), "P-014");
-    const unnamed = createSession({ alias: "", input: "mouse-trackpad", viewport: VP });
+    const unnamed = createSession({ alias: "", viewport: VP });
     assert.equal(unnamed.alias, "Anonymous");
     assert.equal(unnamed.profileId, "anonymous");
+    assert.equal(unnamed.input, "mouse-trackpad");
   });
 
   test("a full run completes after five lines and carries the domain practice suggestion", () => {
@@ -85,9 +86,10 @@ describe("session building", () => {
 
 describe("flow", () => {
   test("walks intro → target → lines → review", () => {
-    let st = flowReducer(initialFlow, { type: "start", session: fresh(), variant: "fixed-b" });
+    let st = flowReducer(initialFlow, { type: "start", session: fresh() });
     assert.equal(st.screen, "target-intro");
-    st = flowReducer(st, { type: "trial-finished", trial: { ...newTargetSelectionTrial(st.session!, "fixed-b", VP), end: "done" } });
+    assert.equal(st.variant, "fixed-a");
+    st = flowReducer(st, { type: "trial-finished", trial: { ...newTargetSelectionTrial(st.session!, "fixed-a", VP), end: "done" } });
     assert.equal(st.screen, "line-intro");
     for (let i = 0; i < 5; i++) {
       assert.equal(st.lineIndex, i);
