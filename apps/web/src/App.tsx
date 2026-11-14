@@ -295,9 +295,6 @@ export function App() {
             <button type="button" className={centerNavOn === "history" ? "on" : ""} onClick={() => go("history")}>
               History
             </button>
-            <button type="button" className={centerNavOn === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
-              Gaze Lab
-            </button>
             <button type="button" className={screen === "starry" ? "on" : ""} onClick={() => go("starry")}>
               Starry Night
             </button>
