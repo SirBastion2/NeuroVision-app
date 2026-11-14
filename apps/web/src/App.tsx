@@ -298,6 +298,15 @@ export function App() {
             <button type="button" className={centerNavOn === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
               Gaze Lab
             </button>
+            <button type="button" className={screen === "starry" ? "on" : ""} onClick={() => go("starry")}>
+              Starry Night
+            </button>
+            <button type="button" className={screen === "rings" ? "on" : ""} onClick={() => go("rings")}>
+              Hollow rings
+            </button>
+            <button type="button" className={screen === "lines" ? "on" : ""} onClick={() => go("lines")}>
+              Line bisection
+            </button>
             <button type="button" className={screen === "scene" ? "on" : ""} onClick={() => go("scene")}>
               Hidden scene
             </button>
