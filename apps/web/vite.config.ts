@@ -5,9 +5,11 @@ import react from "@vitejs/plugin-react";
 import { storagePackageAlias } from "../../scripts/storage-alias.mjs";
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
+const repoRoot = dirname(dirname(webRoot));
 
 export default defineConfig({
   plugins: [react()],
+  envDir: repoRoot,
   resolve: {
     alias: storagePackageAlias(webRoot),
   },

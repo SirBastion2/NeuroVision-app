@@ -15,6 +15,7 @@ import {
   participantIdForExport,
   processingLabel,
   shouldEnqueueUpload,
+  shouldPersistSession,
   showApiControls,
 } from "../src/services/screen-wiring.ts";
 import type { UploadQueueState } from "../src/services/upload-queue.ts";
@@ -45,6 +46,8 @@ describe("screen wiring", () => {
       shouldEnqueueUpload({ ended: false, session: liveSession(), apiEnabled: true }),
       false,
     );
+    assert.equal(shouldPersistSession(liveSession()), true);
+    assert.equal(shouldPersistSession({ ...liveSession(), source: "demonstration" }), false);
   });
 
   it("labels processing and queue state for history rows", () => {

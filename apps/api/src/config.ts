@@ -73,12 +73,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
 }
 
 /** Local identity and the memory object store are development adapters. */
-export function assertRuntimeSafe(config: AppConfig, objectStore: "memory" | "s3"): void {
+export function assertRuntimeSafe(config: AppConfig, objectStore: "memory" | "s3" | "postgres"): void {
   if (config.env !== "production") return;
   if (config.identityMode !== "oidc" || !config.oidc) {
     throw new Error("Production requires OIDC identity configuration.");
   }
   if (objectStore === "memory") {
-    throw new Error("Production requires the S3 object store. The memory adapter is local only.");
+    throw new Error("Production requires a durable object store (S3 or Postgres). The memory adapter is local only.");
   }
 }

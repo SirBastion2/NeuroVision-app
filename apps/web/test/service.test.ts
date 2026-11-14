@@ -9,6 +9,7 @@ import {
   SCORER_ID,
   parseSessionRecord,
 } from "@neurovision/domain";
+import { assembleBatteryRecord } from "../src/data/batterySession.ts";
 import {
   createAppServices,
   createMemoryKeyValueStore,
@@ -220,5 +221,57 @@ describe("app service layer", () => {
     });
     assert.equal(services.storeKind, "memory");
     assert.equal(services.apiEnabled, false);
+  });
+
+  it("reads history and batteries from the API when configured, with local fallback", async () => {
+    const kv = createMemoryKeyValueStore();
+    const localServices = createAppServices({ keyValueStore: kv });
+    const local = localServices.startSession({
+      id: "local-1",
+      alias: "Local",
+      startedAt: "2026-11-14T17:00:00.000Z",
+    });
+    await localServices.save(local);
+    const remote = localServices.startSession({
+      id: "remote-1",
+      alias: "Remote",
+      startedAt: "2026-11-14T18:00:00.000Z",
+    });
+    const battery = assembleBatteryRecord(
+      { mode: "full", hide: "none", seed: 7, readingDirection: "left-to-right", consent: true },
+      {
+        scene: { taps: [] },
+        clock: { trials: [], responses: [] },
+        greyscales: { trials: [], responses: [] },
+        bisection: { lines: [], responses: [] },
+      },
+      { id: "bat-1", startedAt: "2026-11-14T18:00:00.000Z", completedAt: "2026-11-14T18:08:00.000Z" },
+    );
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/api/v1/sessions") && !url.includes("/sessions/remote") && !url.includes("/battery")) {
+        return new Response(
+          JSON.stringify({
+            sessions: [remote],
+            batteries: [battery],
+            activity: [{ bucket: "2026-11-14T00:00:00.000Z", count: 3 }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("{}", { status: 404 });
+    };
+    const services = createAppServices({
+      keyValueStore: kv,
+      config: { apiBaseUrl: "https://api.example.test", standalone: false },
+      fetch: fetchImpl,
+    });
+    const history = await services.listHistory();
+    assert.equal(history.some((row) => row.id === "local-1"), true);
+    assert.equal(history.some((row) => row.id === "remote-1"), true);
+    const batteries = await services.listBatteries();
+    assert.equal(batteries.some((row) => row.id === "bat-1"), true);
+    const activity = await services.sessionActivity();
+    assert.equal(activity[0]?.count, 3);
   });
 });

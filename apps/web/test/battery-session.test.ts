@@ -16,6 +16,7 @@ import {
   batteryStepOrder,
   runnableBatterySteps,
   saveBatterySession,
+  shouldPersistBattery,
   type BatteryIntroConfig,
   type BatteryTaskOutputs,
 } from "../src/data/batterySession.ts";
@@ -78,12 +79,13 @@ describe("batterySession", () => {
       completedAt: "2026-11-14T12:08:00.000Z",
     });
 
-    const demoLoaded = parseBatteryRecord(await store.load(demoSaved.id));
+    assert.equal(await store.load(demoSaved.id), null);
     const fullLoaded = parseBatteryRecord(await store.load(fullSaved.id));
-    assert.deepEqual(scoreBatteryRecord(demoLoaded), scoreBatteryRecord(demoSaved));
     assert.deepEqual(scoreBatteryRecord(fullLoaded), scoreBatteryRecord(fullSaved));
-    assert.deepEqual(demoLoaded, demoSaved);
     assert.deepEqual(fullLoaded, fullSaved);
+    assert.equal(scoreBatteryRecord(demoSaved).clock.observation.test, "clock");
+    assert.equal(shouldPersistBattery(demoSaved), false);
+    assert.equal(shouldPersistBattery(fullSaved), true);
 
     assert.equal(demoSaved.source, "demonstration");
     assert.equal(demoSaved.mode, "demo");
@@ -119,8 +121,8 @@ describe("batterySession", () => {
     assert.deepEqual(runnableBatterySteps("full", true), ["scene", "clock", "greyscales", "bisection"]);
   });
 
-  it("returns false from batteryEnabled when the API client is on", () => {
-    assert.equal(batteryEnabled(true), false);
+  it("keeps the battery visible when the API client is on", () => {
+    assert.equal(batteryEnabled(true), true);
     assert.equal(batteryEnabled(false), true);
   });
 });

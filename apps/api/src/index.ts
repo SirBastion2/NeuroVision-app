@@ -1,6 +1,8 @@
+import { loadRootEnv } from "./env.js";
 import { buildServer } from "./server.js";
 import { openRuntime } from "./runtime.js";
 
+loadRootEnv();
 const runtime = await openRuntime(process.env);
 const app = await buildServer(runtime);
 try {

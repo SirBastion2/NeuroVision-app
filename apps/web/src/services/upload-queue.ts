@@ -209,6 +209,28 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
     try {
       if (current.step === "session") {
         try {
+          const assignment = await options.api.createAssignment({
+            id: current.assignmentId,
+            participantId: current.participantId,
+            exposureStatus: "seen",
+            manifest: {
+              protocol: current.session.protocol,
+              scorer: current.session.scorer,
+              taskIds: current.session.taskIds,
+              source: current.session.source,
+              input: current.session.input,
+              accessibilityId: "default",
+              configHash: current.session.id,
+            },
+          });
+          current = update(current.id, {
+            assignmentId: assignment.id,
+            assignmentRevision: assignment.revision,
+          });
+        } catch {
+          /* Demo seed or a caller-supplied assignment is used when this is not allowed. */
+        }
+        try {
           await options.api.putSession({
             sessionId,
             participantId: current.participantId,

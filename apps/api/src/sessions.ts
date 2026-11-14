@@ -1,10 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { parseSessionRecord, type PracticeRound, type SessionRecord, type TrialRecord } from "@neurovision/domain";
+import {
+  parseBatteryRecord,
+  parseSessionRecord,
+  type BatteryRecord,
+  type PracticeRound,
+  type SessionRecord,
+  type TrialRecord,
+} from "@neurovision/domain";
 import { ANALYSIS_VERSION } from "./analysis.js";
 import { assertCanAssign, assertMeasurementRead, audit, requireAdmin, requireLiveParticipant } from "./access.js";
 import type { AssignmentManifest, BatchPayload, CompletionState, ProcessingState, SyncState } from "./contracts.provisional.js";
 import type { Actor, Deps } from "./deps.js";
-import { asJson, isUniqueViolation, one } from "./db.js";
+import { asJson, isUniqueViolation, one, sessionActivity } from "./db.js";
 import { HttpError } from "./errors.js";
 import { contentHash, sha256Hex } from "./hash.js";
 
@@ -386,7 +393,7 @@ export async function authorizeTrace(
             method: "PUT" as const,
             url: `/api/v1/sessions/${sessionId}/trace-uploads/${traceId}/content`,
             headers: { "content-type": body.contentType },
-            adapter: "memory" as const,
+            adapter: deps.objects.kind,
             localOnly: true,
           };
     return { traceId, objectKey, expiresAt: expires.toISOString(), upload };
@@ -608,11 +615,25 @@ export async function readSession(deps: Deps, actor: Actor, sessionId: string) {
   if (!session || session.deleted_at) throw new HttpError(404, "not_found", "Not found.");
   const participant = await requireLiveParticipant(deps, actor.orgId, session.participant_id);
   await assertMeasurementRead(deps, actor, participant);
-  const document = await one<{ record: unknown }>(deps.db, "SELECT record FROM session_documents WHERE session_id = $1", [sessionId]);
+  const document = await one<{ record: unknown; provenance: unknown }>(
+    deps.db,
+    "SELECT record, provenance FROM session_documents WHERE session_id = $1",
+    [sessionId],
+  );
+  const batteryRow = await one<{ record: unknown }>(deps.db, "SELECT record FROM battery_records WHERE session_id = $1", [sessionId]);
+  let record: SessionRecord | null = null;
+  if (document && !batteryRow) {
+    try {
+      record = parseSessionRecord(asJson(document.record));
+    } catch {
+      record = null;
+    }
+  }
   return {
     ...presentSession(session),
     processingDetail: await processingView(deps, session),
-    record: document ? asJson<SessionRecord>(document.record) : null,
+    record,
+    battery: batteryRow ? asJson<BatteryRecord>(batteryRow.record) : null,
   };
 }
 
@@ -652,7 +673,7 @@ export async function readTraceDownload(deps: Deps, actor: Actor, sessionId: str
     traceId,
     checksum: trace.checksum,
     byteCount: trace.byte_count,
-    adapter: "memory" as const,
+    adapter: deps.objects.kind,
     localOnly: true,
     url: `/api/v1/sessions/${sessionId}/trace-uploads/${traceId}/content`,
   };
@@ -871,4 +892,230 @@ export async function listParticipants(deps: Deps, actor: Actor) {
     [actor.orgId, actor.role, actor.subject],
   );
   return rows.rows.map((row) => ({ id: row.id, label: row.label }));
+}
+
+export function shouldPersistBattery(record: BatteryRecord): boolean {
+  return record.mode === "full" && record.source === "live";
+}
+
+function batteryManifest(record: BatteryRecord): AssignmentManifest {
+  return {
+    protocol: record.contract,
+    scorer: "battery-events-v1",
+    taskIds: ["target-selection", "line-bisection"],
+    source: record.source,
+    input: "mouse-trackpad",
+    accessibilityId: "battery",
+    configHash: record.id,
+  };
+}
+
+function batteryTrials(record: BatteryRecord): Array<{
+  trialId: string;
+  payload: unknown;
+  events: Array<{ seq: number; elapsed: number; x: number; y: number; kind: string; objectId: string | null }>;
+}> {
+  const trials: Array<{
+    trialId: string;
+    payload: unknown;
+    events: Array<{ seq: number; elapsed: number; x: number; y: number; kind: string; objectId: string | null }>;
+  }> = [
+    {
+      trialId: `${record.id}-scene`,
+      payload: { task: "scene", taps: record.scene.taps },
+      events: record.scene.taps.map((tap, index) => ({
+        seq: index + 1,
+        elapsed: tap.t,
+        x: tap.x,
+        y: tap.y,
+        kind: "background",
+        objectId: null,
+      })),
+    },
+    {
+      trialId: `${record.id}-clock`,
+      payload: { task: "clock", trials: record.clock.trials, responses: record.clock.responses },
+      events: record.clock.responses.map((response, index) => ({
+        seq: index + 1,
+        elapsed: response.rtMs ?? 0,
+        x: response.choice === "top" ? 0 : response.choice === "bottom" ? 1 : -1,
+        y: 0,
+        kind: "target",
+        objectId: response.trialId,
+      })),
+    },
+  ];
+  if (record.greyscales) {
+    trials.push({
+      trialId: `${record.id}-greyscales`,
+      payload: { task: "greyscales", trials: record.greyscales.trials, responses: record.greyscales.responses },
+      events: record.greyscales.responses.map((response, index) => ({
+        seq: index + 1,
+        elapsed: response.rtMs ?? 0,
+        x: response.choice === "top" ? 0 : response.choice === "bottom" ? 1 : -1,
+        y: 0,
+        kind: "target",
+        objectId: response.trialId,
+      })),
+    });
+  }
+  if (record.bisection) {
+    trials.push({
+      trialId: `${record.id}-bisection`,
+      payload: { task: "line-bisection", lines: record.bisection.lines, responses: record.bisection.responses },
+      events: record.bisection.responses.map((response, index) => {
+        const line = record.bisection?.lines.find((item) => item.id === response.lineId);
+        return {
+          seq: index + 1,
+          elapsed: index * 1000,
+          x: response.x ?? 0,
+          y: line?.y ?? 0,
+          kind: "bisection",
+          objectId: response.lineId,
+        };
+      }),
+    });
+  }
+  return trials;
+}
+
+export async function putBattery(deps: Deps, actor: Actor, sessionId: string, raw: unknown) {
+  let record: BatteryRecord;
+  try {
+    record = parseBatteryRecord({ ...(raw as object), id: sessionId });
+  } catch {
+    throw new HttpError(400, "validation", "Battery record does not match the contract.");
+  }
+  if (record.id !== sessionId) {
+    throw new HttpError(400, "validation", "Battery id does not match the session.");
+  }
+  if (!shouldPersistBattery(record)) {
+    throw new HttpError(400, "validation", "The hidden scene demo is not saved.");
+  }
+  const bound = await one<{ id: string; subject: string | null }>(
+    deps.db,
+    "SELECT id, subject FROM participants WHERE org_id = $1 AND subject = $2 AND deleted_at IS NULL",
+    [actor.orgId, actor.subject],
+  );
+  if (!bound || actor.role !== "participant") {
+    throw new HttpError(403, "forbidden", "Only the participant can store this battery.");
+  }
+  const participant = await requireLiveParticipant(deps, actor.orgId, bound.id);
+  const manifest = batteryManifest(record);
+  const assignment = await createAssignment(deps, actor, {
+    id: `assign-battery-${participant.id}`,
+    participantId: participant.id,
+    exposureStatus: "seen",
+    manifest,
+  });
+  return deps.db.transaction(async (tx) => {
+    const txDeps = { ...deps, db: tx };
+    const existing = await one<{ id: string; request_hash: string }>(tx, "SELECT id, request_hash FROM sessions WHERE id = $1 FOR UPDATE", [
+      sessionId,
+    ]);
+    const requestHash = contentHash(record);
+    if (existing) {
+      if (existing.request_hash === requestHash) {
+        return { sessionId, sealed: true, idempotent: true, battery: true };
+      }
+      throw new HttpError(409, "conflict", "Session identifier was reused with different content.", { reason: "session_content" });
+    }
+    await tx.query(
+      `INSERT INTO sessions (
+         id, org_id, participant_id, assignment_id, assignment_revision, started_at,
+         completion, sync_state, processing_state, request_hash, sealed_at, session_revision, input_hash
+       ) VALUES ($1, $2, $3, $4, $5, $6, 'complete', 'acknowledged', 'ready', $7, $8, 1, $7)`,
+      [
+        sessionId,
+        actor.orgId,
+        participant.id,
+        assignment.id,
+        assignment.revision,
+        record.startedAt,
+        requestHash,
+        deps.now().toISOString(),
+      ],
+    );
+    for (const trial of batteryTrials(record)) {
+      const trialHash = contentHash(trial.payload);
+      await tx.query("INSERT INTO trials (session_id, trial_id, payload, content_hash) VALUES ($1, $2, $3::jsonb, $4)", [
+        sessionId,
+        trial.trialId,
+        JSON.stringify(trial.payload),
+        trialHash,
+      ]);
+      for (const event of trial.events) {
+        const eventHash = contentHash(event);
+        await tx.query(
+          `INSERT INTO response_events (session_id, trial_id, seq, elapsed_ms, object_id, kind, x, y, content_hash)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [sessionId, trial.trialId, event.seq, event.elapsed, event.objectId, event.kind, event.x, event.y, eventHash],
+        );
+      }
+    }
+    await tx.query("INSERT INTO battery_records (session_id, record) VALUES ($1, $2::jsonb)", [sessionId, JSON.stringify(record)]);
+    await tx.query(
+      `INSERT INTO session_documents (session_id, record, provenance)
+       VALUES ($1, $2::jsonb, $3::jsonb)`,
+      [
+        sessionId,
+        JSON.stringify(record),
+        JSON.stringify({ kind: "battery", contractsVersion: record.contract, sealedBy: actor.subject }),
+      ],
+    );
+    await audit(txDeps, actor, "battery.store", "session", sessionId, { mode: record.mode });
+    return { sessionId, sealed: true, idempotent: false, battery: true };
+  });
+}
+
+export async function listSessions(deps: Deps, actor: Actor) {
+  const rows = await deps.db.query<{
+    id: string;
+    started_at: Date | string;
+    completion: CompletionState;
+    processing_state: ProcessingState;
+    record: unknown;
+    battery: unknown;
+    participant_id: string;
+  }>(
+    `SELECT s.id, s.started_at, s.completion, s.processing_state, d.record, b.record AS battery, s.participant_id
+     FROM sessions s
+     JOIN participants p ON p.id = s.participant_id
+     LEFT JOIN session_documents d ON d.session_id = s.id
+     LEFT JOIN battery_records b ON b.session_id = s.id
+     WHERE s.org_id = $1 AND p.deleted_at IS NULL
+       AND (
+         ($2 = 'participant' AND p.subject = $3)
+         OR ($2 = 'reviewer' AND EXISTS (
+           SELECT 1 FROM reviewer_assignments ra
+           WHERE ra.org_id = s.org_id AND ra.subject = $3 AND ra.participant_id = s.participant_id
+         ))
+       )
+     ORDER BY s.started_at DESC`,
+    [actor.orgId, actor.role, actor.subject],
+  );
+  const sessions: SessionRecord[] = [];
+  const batteries: BatteryRecord[] = [];
+  for (const row of rows.rows) {
+    if (row.battery) {
+      try {
+        batteries.push(parseBatteryRecord(asJson(row.battery)));
+        continue;
+      } catch {
+        /* fall through to session record */
+      }
+    }
+    if (row.record) {
+      try {
+        sessions.push(parseSessionRecord(asJson(row.record)));
+      } catch {
+        /* skip rows that are not domain session records */
+      }
+    }
+  }
+  return {
+    sessions,
+    batteries,
+    activity: await sessionActivity(deps.db, actor.orgId),
+  };
 }
