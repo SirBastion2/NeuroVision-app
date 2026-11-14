@@ -9,7 +9,8 @@ Later agents should read `docs/ARCHITECTURE.md` as the repository map, then use 
 | `apps/web` | Agents D+E | Task runner, screens, board, review, practice, history. Must match the UI reference design. |
 | `apps/web` boot shell | Agent A (initial) | Minimal React + Vite app that boots. D+E replace the shell with the product UI. |
 | `packages/storage` | Agent B | Browser storage, validated session I/O, identity / profile. |
-| `packages/gaze` | Agent C | Gaze streams, replay, heatmaps, calibration. |
+| `packages/gaze` | Agent C | Gaze streams, replay, heatmaps, calibration, quality gates, analysis. |
+| `apps/web` gaze lab shell | Agent C | Minimal gaze-lab wiring only; D+E own full product UI. |
 | Root workspace (`package.json`, `tsconfig.base.json`) | Agent A (initial), then Agent F | Shared scripts (`npm test`, `npm run build`) and TypeScript baseline. |
 
 Cross-cutting integration (static build, standalone HTML, wiring domain + storage + gaze + UI) is Agent F.
