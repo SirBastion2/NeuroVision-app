@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LINE_BISECTION_TRIAL_COUNT,
   type InputModality,
-  type LayoutVariant,
   STARRY_DEFAULTS,
   describeViewport,
   findTargetSelectionTrial,
@@ -81,10 +80,9 @@ interface BatteryProps {
   /** Signed-in participant ID; live runs store this as the session alias. */
   alias?: string;
   input?: InputModality;
-  variant?: LayoutVariant;
 }
 
-export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, alias = "", input = "mouse-trackpad", variant = "fixed-a" }: BatteryProps) {
+export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, alias = "", input = "mouse-trackpad" }: BatteryProps) {
   const tests = ORDER.slice(ORDER.indexOf(from));
   const [step, setStep] = useState<Step>({ kind: "intro" });
   const [starryTrials, setStarryTrials] = useState<StarryTrial[]>(() =>
@@ -136,7 +134,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
   // Board trials are created once per test/line so the runner gets a stable record.
   const boardTrial = useMemo(() => {
     if (step.kind !== "run") return null;
-    if (step.test === "rings") return newTargetSelectionTrial(session, variant, viewport());
+    if (step.test === "rings") return newTargetSelectionTrial(session, "fixed-a", viewport());
     if (step.test === "lines") return newLineTrial(session, lineIndex, viewport());
     return null;
   }, [step, lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps -- session updates mid-trial must not reset the runner

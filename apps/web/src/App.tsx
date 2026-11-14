@@ -3,8 +3,6 @@ import {
   CONTRACTS_VERSION,
   LINE_BISECTION_TRIAL_COUNT,
   describeViewport,
-  type InputModality,
-  type LayoutVariant,
   type SessionRecord,
   type TrialRecord,
 } from "@neurovision/domain";
@@ -117,8 +115,6 @@ export function App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkRunning, setCheckRunning] = useState(false);
   const [activity, setActivity] = useState<Array<{ bucket: string; count: number }>>([]);
-  const [runInput, setRunInput] = useState<InputModality>("mouse-trackpad");
-  const [runVariant, setRunVariant] = useState<LayoutVariant>("fixed-a");
   const main = useRef<HTMLElement>(null);
   const enqueued = useRef(new Set<string>());
   const { session, screen } = state;
@@ -259,9 +255,7 @@ export function App() {
   }, [apiEnabled, services, queue]);
 
   const participantLabel = sessionAliasForParticipant(signedIn?.subject ?? participantId);
-  const beginAssessment = (input: InputModality, variant: LayoutVariant) => {
-    setRunInput(input);
-    setRunVariant(variant);
+  const beginAssessment = () => {
     dispatch({ type: "go", screen: "assessment" });
   };
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
@@ -507,7 +501,6 @@ export function App() {
           <Home
             onStart={beginAssessment}
             onHistory={() => go("history")}
-            apiEnabled={apiEnabled}
             onDemo={() => go("demo")}
           />
         )}
@@ -515,8 +508,6 @@ export function App() {
           <BatteryPage
             from="starry"
             alias={participantLabel}
-            input={runInput}
-            variant={runVariant}
             onHome={home}
             onRunning={setCheckRunning}
             onSave={saveRun}
@@ -526,8 +517,6 @@ export function App() {
           <BatteryPage
             from="starry"
             alias={participantLabel}
-            input={runInput}
-            variant={runVariant}
             onHome={home}
             onRunning={setCheckRunning}
             onSave={saveRun}
@@ -537,8 +526,6 @@ export function App() {
           <BatteryPage
             from="rings"
             alias={participantLabel}
-            input={runInput}
-            variant={runVariant}
             onHome={home}
             onRunning={setCheckRunning}
             onSave={saveRun}
@@ -548,15 +535,13 @@ export function App() {
           <BatteryPage
             from="lines"
             alias={participantLabel}
-            input={runInput}
-            variant={runVariant}
             onHome={home}
             onRunning={setCheckRunning}
             onSave={saveRun}
           />
         )}
         {screen === "demo" && (
-          <BatteryPage from="starry" demo input={runInput} variant={runVariant} onHome={home} onRunning={setCheckRunning} />
+          <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />
         )}
         {screen === "scene" && <HiddenScenePage onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}

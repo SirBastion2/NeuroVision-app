@@ -286,6 +286,8 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .start-card h2 { margin-bottom: 20px; }
 .start-card .primary { width: 100%; margin: 6px 0 12px; }
 .start-card .fineprint { text-align: center; }
+.home-grid > .start-card { align-self: start; }
+.home-grid > .start-card .primary { margin-bottom: 0; }
 .side-cards { display: flex; flex-direction: column; gap: 22px; }
 .link-card { position: relative; flex: 1; text-align: left; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; width: 100%; padding: 24px; font-weight: 400; }
 .link-card h3 { font-family: var(--serif); font-weight: 500; font-size: 1.4rem; margin-bottom: 8px; }
