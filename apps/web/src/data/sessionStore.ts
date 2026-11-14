@@ -1,6 +1,5 @@
 import { isSessionRecord, parseSessionRecord, type SessionRecord } from "@neurovision/domain";
 import { ENVELOPE_KEY, EnvelopeError, loadEnvelope, saveSession } from "@neurovision/storage";
-import { removeFromClinicianHistory, upsertClinicianHistory } from "../services/browser-session-bridge";
 import type { HistoryStore } from "../services/history-store";
 import { isEnvelopeError } from "../services/history-store";
 import type { KeyValueStore } from "../services/package-store";
@@ -8,8 +7,7 @@ import type { KeyValueStore } from "../services/package-store";
 /**
  * Screen-facing session store. Persistence goes through the service layer's
  * storage-backed HistoryStore (the `@neurovision/storage` envelope). The
- * in-memory path is only for the standalone build. Successful browser saves
- * also mirror into clinician history so Profile lists the same live sessions.
+ * in-memory path is only for the standalone build.
  */
 export interface LoadResult {
   sessions: SessionRecord[];
@@ -58,10 +56,6 @@ function rejectedCount(storage: KeyValueStore | null): number {
   } catch {
     return 1;
   }
-}
-
-function shouldMirrorClinician(standalone: boolean): boolean {
-  return !standalone;
 }
 
 /**
@@ -162,7 +156,6 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
         } else {
           saveSession(storage, valid);
         }
-        if (shouldMirrorClinician(standalone)) upsertClinicianHistory(valid, storage);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -179,7 +172,6 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
           const sessions = envelope.sessions.filter((item) => item.id !== id);
           storage.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
         }
-        if (shouldMirrorClinician(standalone)) removeFromClinicianHistory(id, storage);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
