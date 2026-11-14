@@ -143,9 +143,9 @@ describe("app service layer", () => {
     assert.notEqual(gaze.simulated.leftBiased.id, gaze.simulated.bothHalves.id);
   });
 
-  it("uses the in-memory store when packages/storage is absent", () => {
+  it("keeps the web service on its memory store until it adopts packages/storage", () => {
     const services = createAppServices();
-    assert.equal(existsSync(join(repoRoot, "packages/storage")), false);
+    assert.equal(existsSync(join(repoRoot, "packages/storage")), true);
     assert.equal(services.storeKind, "memory");
   });
 });
