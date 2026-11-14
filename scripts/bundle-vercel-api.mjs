@@ -9,7 +9,7 @@ const entry = join(root, "apps/api/src/vercel-handler.ts");
 
 const TEST_ONLY = /@electric-sql\/pglite|\/apps\/api\/test\/|\/test\/.*\.test\./;
 
-export async function bundleVercelApi() {
+export async function bundleVercelApi({ logLevel = "warning" } = {}) {
   mkdirSync(dirname(vercelBundlePath), { recursive: true });
   await esbuild.build({
     absWorkingDir: root,
@@ -19,7 +19,7 @@ export async function bundleVercelApi() {
     platform: "node",
     format: "esm",
     target: ["node20"],
-    logLevel: "info",
+    logLevel,
     legalComments: "none",
     sourcemap: false,
     splitting: false,
@@ -44,5 +44,5 @@ export async function bundleVercelApi() {
 const invokedDirectly =
   Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  await bundleVercelApi();
+  await bundleVercelApi({ logLevel: "info" });
 }
