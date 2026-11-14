@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   ApiOfflineError,
   createAppServices,
-  createOidcClient,
+  createMemoryKeyValueStore,
+  showApiControls,
+  shouldEnqueueUpload,
 } from "../src/services/index.ts";
 import type { SessionRecord } from "@neurovision/domain";
 
@@ -132,51 +134,35 @@ describe("service-layer end-to-end flow", () => {
     );
   });
 
-  it("polls processing, exports, deletes, and completes OIDC against a mocked API, and stays offline when standalone", async () => {
+  it("signs in through API routes, queues an upload, polls processing, exports, deletes, and stays offline when standalone", async () => {
     const calls: string[] = [];
     const states = ["pending", "ready"];
-    const oidcStorage = new Map<string, string>();
-    const oidc = createOidcClient({
-      config: {
-        authorizeUrl: "https://issuer.example.test/authorize",
-        tokenUrl: "https://issuer.example.test/token",
-        clientId: "neurovision-web",
-        redirectUri: "https://app.example.test/callback",
-        scope: "openid",
-      },
-      storage: {
-        getItem: (key) => oidcStorage.get(key) ?? null,
-        setItem: (key, value) => {
-          oidcStorage.set(key, value);
-        },
-        removeItem: (key) => {
-          oidcStorage.delete(key);
-        },
-      },
-      fetch: async () =>
-        new Response(JSON.stringify({ access_token: "e2e-token", token_type: "Bearer" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-    });
+    const kv = createMemoryKeyValueStore();
 
     const services = createAppServices({
       now: () => new Date("2026-11-14T17:00:00.000Z"),
+      keyValueStore: kv,
       config: {
         apiBaseUrl: "https://api.example.test",
         standalone: false,
-        oidc: {
-          authorizeUrl: "https://issuer.example.test/authorize",
-          tokenUrl: "https://issuer.example.test/token",
-          clientId: "neurovision-web",
-          redirectUri: "https://app.example.test/callback",
-          scope: "openid",
-        },
       },
-      oidc,
       fetch: async (input, init) => {
         const url = String(input);
         calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.includes("/api/v1/auth/callback")) {
+          return new Response(null, { status: 302, headers: { location: "/" } });
+        }
+        if (url.endsWith("/api/v1/me") || url.endsWith("/api/v1/auth/local")) {
+          return new Response(
+            JSON.stringify({
+              subject: "participant-demo",
+              orgId: "org-demo",
+              role: "participant",
+              csrfToken: "csrf-e2e",
+            }),
+            { status: 200 },
+          );
+        }
         if (url.endsWith("/health")) {
           return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
         }
@@ -188,6 +174,21 @@ describe("service-layer end-to-end flow", () => {
         if ((init?.method ?? "GET") === "DELETE") {
           return new Response(
             JSON.stringify({ participantId: "e2e-part", deleted: true, idempotent: false }),
+            { status: 200 },
+          );
+        }
+        if (url.includes("/batches/") || url.endsWith("/finalize")) {
+          return new Response(
+            JSON.stringify({
+              batchId: "e2e-live-batch-1",
+              sequence: 1,
+              idempotent: true,
+              sessionId: "e2e-live",
+              sealed: true,
+              jobId: "job-e2e",
+              inputHash: "hash",
+              processing: "pending",
+            }),
             { status: 200 },
           );
         }
@@ -217,11 +218,21 @@ describe("service-layer end-to-end flow", () => {
       },
     });
 
-    const redirect = await services.beginOidcRedirect();
-    await services.completeOidcCallback(
-      `https://app.example.test/callback?code=e2e-code&state=${redirect.state}`,
+    const redirect = await services.beginSignIn();
+    assert.equal(redirect.url, "https://api.example.test/api/v1/auth/login");
+    await services.completeSignIn("https://app.example.test/?code=e2e-code&state=e2e-state");
+    const me = await services.getMe();
+    assert.equal(me?.subject, "participant-demo");
+
+    const live = services.completeSession(
+      services.startSession({ id: "e2e-live", alias: "E2E live", startedAt: "2026-11-14T17:00:00.000Z" }),
+      { completedAt: "2026-11-14T17:03:00.000Z" },
     );
-    assert.equal(services.getAccessToken(), "e2e-token");
+    assert.equal(shouldEnqueueUpload({ ended: true, session: live, apiEnabled: services.apiEnabled }), true);
+    await services.save(live);
+    await services.enqueueUpload({ session: live });
+    await services.drainQueue();
+    assert.equal(services.queueState().acknowledged, 1);
 
     assert.deepEqual(await services.health(), { status: "ok" });
     const processed = await services.pollProcessingState("e2e-live", {
@@ -237,6 +248,7 @@ describe("service-layer end-to-end flow", () => {
     assert.ok(calls.some((call) => call.includes("/api/v1/sessions/e2e-live")));
     assert.ok(calls.some((call) => call.includes("/exports")));
     assert.ok(calls.some((call) => call.startsWith("DELETE ")));
+    assert.ok(showApiControls(services.apiEnabled));
 
     let standaloneCalls = 0;
     const standalone = createAppServices({
@@ -248,9 +260,11 @@ describe("service-layer end-to-end flow", () => {
     });
     assert.equal(standalone.apiEnabled, false);
     assert.equal(standalone.storeKind, "memory");
+    assert.equal(showApiControls(standalone.apiEnabled), false);
     await assert.rejects(() => standalone.pollProcessingState("e2e-live"), ApiOfflineError);
     await assert.rejects(() => standalone.exportParticipant("e2e-part"), ApiOfflineError);
     await assert.rejects(() => standalone.deleteParticipant("e2e-part"), ApiOfflineError);
+    await assert.rejects(() => standalone.enqueueUpload({ session: live }), ApiOfflineError);
     assert.equal(standaloneCalls, 0);
   });
 });

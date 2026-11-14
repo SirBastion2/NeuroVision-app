@@ -42,13 +42,13 @@ describe("patient → clinician session bridge", () => {
       storage.removeItem(CLINICIAN_HISTORY_KEY);
       storage.removeItem(PATIENT_SESSION_KEY);
 
-      const patient = createLocalSessionStore(storage);
+      const patient = createLocalSessionStore({ storage });
       const live = structuredClone(DEMONSTRATION_SESSIONS[0]);
       live.id = "live-bridge-1";
       live.source = "live";
       live.alias = "Judge-01";
 
-      const saved = patient.save(live);
+      const saved = await patient.save(live);
       assert.equal(saved.ok, true);
       assert.equal(readClinicianHistory().some((s) => s.id === "live-bridge-1"), true);
 

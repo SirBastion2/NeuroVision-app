@@ -31,12 +31,20 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
       S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET}
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $$S3_ACCESS_KEY_ID $$S3_SECRET_ACCESS_KEY &&
-      mc mb -p local/$$S3_BUCKET || true &&
-      mc anonymous set none local/$$S3_BUCKET
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        i=0
+        until mc alias set local http://minio:9000 "$$S3_ACCESS_KEY_ID" "$$S3_SECRET_ACCESS_KEY"; do
+          i=$$((i+1))
+          if [ "$$i" -gt 30 ]; then
+            echo "MinIO did not become ready" >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        mc mb -p "local/$$S3_BUCKET" || true
+        mc anonymous set none "local/$$S3_BUCKET"
 
   api:
     build: .
@@ -59,8 +67,15 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      DEMO_SEED: ${DEMO_SEED:-true}
     ports:
       - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
   worker:
     build: .
@@ -80,3 +95,4 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
       WORKER_ID: ${WORKER_ID:-worker-compose}
+      DEMO_SEED: ${DEMO_SEED:-true}

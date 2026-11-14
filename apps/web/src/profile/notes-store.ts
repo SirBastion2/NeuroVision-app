@@ -4,7 +4,7 @@ export interface ClinicalNote {
   body: string;
   createdAt: string;
   updatedAt: string;
-  /** Always local-only in this prototype. */
+  /** Always local-only in this build. */
   storage: "local";
 }
 

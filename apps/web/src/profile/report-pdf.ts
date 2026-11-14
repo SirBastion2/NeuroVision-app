@@ -51,7 +51,7 @@ export function buildClinicianReportPdf(input: ReportInput): Blob {
     [90, 96, 102],
   );
   line(
-    "Data integrity: session records are validated with @neurovision/domain parseSessionRecord. Demonstration and live sources are labeled separately. Notes in this prototype are stored only in this browser.",
+    "Data integrity: session records are validated with @neurovision/domain parseSessionRecord. Demonstration and live sources are labeled separately. Notes in this build are stored only in this browser.",
     10,
     [90, 96, 102],
   );

@@ -88,7 +88,7 @@ export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
             Two short board tasks record every response in space and time. The review shows what was found, what was
             missed, and on which side, then suggests a practice setup you can read and overrule.
           </p>
-          <p className="fineprint">Research prototype. Describes one session’s responses; it is not a diagnosis.</p>
+          <p className="fineprint">Research tool. Describes one session’s responses; it is not a diagnosis.</p>
         </div>
         <HeroBoard />
       </section>

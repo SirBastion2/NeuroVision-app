@@ -21,6 +21,15 @@ import { LineIntro, TargetIntro } from "./screens/Intros";
 import { MyProfile } from "./screens/MyProfile";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
+import {
+  createAppServices,
+  participantIdForExport,
+  shouldEnqueueUpload,
+  showApiControls,
+  type Me,
+  type ProcessingSnapshot,
+  type UploadQueueState,
+} from "./services";
 import "./styles.css";
 
 type Theme = "light" | "dark";
@@ -52,12 +61,31 @@ const ASSESSMENT_STEPS: { label: string; screens: Screen[] }[] = [
 ];
 
 export function App() {
-  const store = useMemo(() => createLocalSessionStore(), []);
+  const services = useMemo(() => createAppServices(), []);
+  const apiEnabled = showApiControls(services.apiEnabled);
+  const store = useMemo(
+    () =>
+      createLocalSessionStore({
+        history: {
+          save: (session) => services.save(session),
+          listHistory: () => services.listHistory(),
+          remove: (id) => services.remove(id),
+        },
+        standalone: services.storeKind === "memory",
+      }),
+    [services],
+  );
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
-  const [stored, setStored] = useState<LoadResult>(() => store.load());
+  const [stored, setStored] = useState<LoadResult>({ sessions: [], rejected: 0, error: null });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [signedIn, setSignedIn] = useState<Me | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [queue, setQueue] = useState<UploadQueueState>(() => services.queueState());
+  const [processing, setProcessing] = useState<Record<string, ProcessingSnapshot>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const main = useRef<HTMLElement>(null);
+  const enqueued = useRef(new Set<string>());
   const { session, screen } = state;
 
   useEffect(() => {
@@ -69,19 +97,64 @@ export function App() {
     }
   }, [theme]);
 
-  // Save live sessions whenever they change after the assessment ends (practice rounds included).
+  useEffect(() => void store.load().then(setStored), [store]);
+  useEffect(() => services.subscribeQueue(setQueue), [services]);
+  useEffect(() => {
+    void services.drainQueue();
+  }, [services]);
+
+  useEffect(() => {
+    if (!apiEnabled) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("code") && url.searchParams.get("state")) {
+      void services
+        .completeSignIn(url)
+        .then((result) => {
+          if ("subject" in result) setSignedIn(result);
+          url.searchParams.delete("code");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        })
+        .catch((error: unknown) => {
+          setAuthError(error instanceof Error ? error.message : String(error));
+        });
+      return;
+    }
+    void services.getMe().then(setSignedIn);
+  }, [apiEnabled, services]);
+
   useEffect(() => {
     if (!state.ended || !session || session.source !== "live") return;
-    setSaveError(store.save(session).error);
-    setStored(store.load());
-  }, [state.ended, session, store]);
+    let cancelled = false;
+    void (async () => {
+      const result = await store.save(session);
+      if (cancelled) return;
+      setSaveError(result.error);
+      setStored(await store.load());
+      if (
+        shouldEnqueueUpload({ ended: true, session, apiEnabled }) &&
+        !enqueued.current.has(session.id)
+      ) {
+        enqueued.current.add(session.id);
+        try {
+          await services.enqueueUpload({ session });
+        } catch (error) {
+          if (cancelled) return;
+          setSaveError(error instanceof Error ? error.message : String(error));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.ended, session, store, services, apiEnabled]);
 
-  // Refresh patient store when opening History / My Profile after clinician or assessment writes.
   useEffect(() => {
-    if (screen === "history" || screen === "my-profile") setStored(store.load());
+    if (screen === "history" || screen === "my-profile") {
+      void store.load().then(setStored);
+    }
   }, [screen, store]);
 
-  // Move focus to the new screen's heading for keyboard and screen-reader users.
   useEffect(() => {
     window.scrollTo(0, 0);
     if (screen.endsWith("-task")) return;
@@ -92,6 +165,25 @@ export function App() {
     }
   }, [screen]);
 
+  useEffect(() => {
+    if (!apiEnabled) return;
+    const ac = new AbortController();
+    const ids = queue.jobs
+      .filter((job) => job.status === "acknowledged" || job.status === "uploading")
+      .map((job) => job.sessionId);
+    for (const id of ids) {
+      void services
+        .pollProcessingState(id, {
+          signal: ac.signal,
+          onUpdate: (snapshot) => {
+            setProcessing((current) => ({ ...current, [id]: snapshot }));
+          },
+        })
+        .catch(() => undefined);
+    }
+    return () => ac.abort();
+  }, [apiEnabled, services, queue]);
+
   const start = (alias: string, input: InputModality, variant: LayoutVariant) =>
     dispatch({ type: "start", session: createSession({ alias, input, viewport: currentViewport() }), variant });
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
@@ -99,14 +191,12 @@ export function App() {
   const home = () => dispatch({ type: "home" });
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
 
-  // Trials are created once per screen entry so the runner gets a stable record.
   const trial = useMemo(() => {
     if (!session) return null;
     if (screen === "target-task") return newTargetSelectionTrial(session, state.variant, currentViewport());
     if (screen === "line-task") return newLineTrial(session, state.lineIndex, currentViewport());
     if (screen === "practice-task" && state.practice) return newPracticeTrial(session, state.practice.layout, currentViewport());
     return null;
-    // Recreated only on screen/line changes; session updates mid-trial must not reset the runner.
   }, [screen, state.lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inAssessment = ["target-intro", "target-task", "line-intro", "line-task"].includes(screen);
@@ -116,6 +206,40 @@ export function App() {
   const showPrimaryNav = !focusMode && !inAssessment;
   const centerNavOn: Screen | null =
     screen === "home" || screen === "history" || screen === "gaze" ? screen : null;
+  const exportId = participantIdForExport({
+    signedInParticipantId: signedIn?.subject ?? null,
+    activeProfileId: stored.sessions[0]?.profileId ?? null,
+  });
+
+  const onSignIn = () => {
+    void services.beginSignIn().then((redirect) => {
+      window.location.assign(redirect.url);
+    });
+  };
+
+  const onExport = async () => {
+    if (!exportId) return;
+    setActionError(null);
+    try {
+      const result = await services.exportParticipant(exportId);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(result.bundle, null, 2)], { type: "application/json" }));
+      Object.assign(document.createElement("a"), { href: url, download: `${exportId}-export.json` }).click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const onDeleteParticipant = async () => {
+    if (!exportId) return;
+    setActionError(null);
+    try {
+      await services.deleteParticipant(exportId);
+      setStored(await store.load());
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <div className={`app ${focusMode ? "focus-mode" : ""}`}>
@@ -156,6 +280,19 @@ export function App() {
 
         {!focusMode && (
           <div className="topbar-right">
+            {apiEnabled &&
+              (signedIn ? (
+                <>
+                  <span className="small">{signedIn.subject}</span>
+                  <button className="ghost" type="button" onClick={() => void services.signOut().then(() => setSignedIn(null))}>
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={onSignIn}>
+                  Sign in
+                </button>
+              ))}
             <button
               className="theme-toggle"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -180,6 +317,16 @@ export function App() {
       </header>
 
       <main ref={main} tabIndex={-1} key={screen} className="screen">
+        {authError && (
+          <p className="notice error" role="alert">
+            {authError}
+          </p>
+        )}
+        {apiEnabled && queue.pending + queue.uploading + queue.blocked > 0 && (
+          <p className="notice" role="status">
+            Upload queue: {queue.pending} queued, {queue.uploading} uploading, {queue.blocked} blocked, {queue.acknowledged} sent.
+          </p>
+        )}
         {screen === "home" && (
           <Home
             onStart={start}
@@ -262,11 +409,18 @@ export function App() {
           <History
             stored={stored}
             onOpen={(s) => dispatch({ type: "open", session: s })}
-            onDelete={(id) => {
-              setSaveError(store.remove(id).error);
-              setStored(store.load());
+            onDelete={async (id) => {
+              const result = await store.remove(id);
+              setSaveError(result.error);
+              setStored(await store.load());
             }}
             onHome={home}
+            apiEnabled={apiEnabled}
+            processing={processing}
+            queue={queue}
+            actionError={actionError}
+            onExport={apiEnabled ? () => void onExport() : undefined}
+            onDeleteParticipant={apiEnabled ? () => void onDeleteParticipant() : undefined}
           />
         )}
         {screen === "gaze" && <GazeLab onHome={home} />}
@@ -286,7 +440,7 @@ export function App() {
         <footer className="footer">
           <span>NeuroVision · Spatial Attention Lab</span>
           <span>
-            Research prototype · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this
+            Research tool · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this
             browser
           </span>
         </footer>

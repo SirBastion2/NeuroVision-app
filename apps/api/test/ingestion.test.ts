@@ -334,10 +334,7 @@ describe("ingestion", { concurrency: false }, () => {
     assert.equal(body.summaries[0].stub, false);
     assert.equal(body.summaries[0].eligibility.gaze, false);
     assert.equal(body.summaries[0].gazeAnalysis.trials[0].metrics, null);
-    assert.equal(
-      body.summaries[0].gazeAnalysis.trials[0].eligibility.reasons.includes("trace_unreadable"),
-      true,
-    );
+    assert.equal(body.summaries[0].gazeAnalysis.trials[0].eligibility.reasons.includes("trace_unreadable"), true);
     assert.ok(body.summaries[0].scoring.targetSelection);
   });
 });

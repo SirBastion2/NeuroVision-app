@@ -65,7 +65,10 @@ export function createPgDatabase(connectionString: string): Database {
 }
 
 export async function migrate(db: Database): Promise<void> {
-  await db.exec(SCHEMA_SQL);
+  await db.transaction(async (tx) => {
+    await tx.query("SELECT pg_advisory_xact_lock(724001)");
+    await tx.exec(SCHEMA_SQL);
+  });
 }
 
 export async function many<T>(db: Database, sql: string, params: unknown[] = []): Promise<T[]> {

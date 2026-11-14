@@ -1,4 +1,5 @@
 import type { SessionRecord } from "@neurovision/domain";
+import { ENVELOPE_KEY, loadEnvelope } from "@neurovision/storage";
 import { installStoragePackage } from "./storage-install";
 import type { HistoryStore } from "./history-store";
 
@@ -13,6 +14,7 @@ export type PackageStoreFactory = (store: KeyValueStore) => {
   save(record: SessionRecord): Promise<SessionRecord>;
   load(id: string): Promise<SessionRecord | null>;
   list(): Promise<SessionRecord[]>;
+  remove?(id: string): Promise<void>;
 };
 
 let registeredFactory: PackageStoreFactory | null = null;
@@ -40,6 +42,21 @@ export function getBrowserKeyValueStore(): KeyValueStore | null {
   }
 }
 
+export function createMemoryKeyValueStore(initial: Record<string, string> = {}): KeyValueStore {
+  const data = { ...initial };
+  return {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+    },
+    setItem(key, value) {
+      data[key] = value;
+    },
+    removeItem(key) {
+      delete data[key];
+    },
+  };
+}
+
 /** Wrap a storage-package store as the web HistoryStore (`kind: "package"`). */
 export function createPackageHistoryStoreAdapter(
   kv: KeyValueStore,
@@ -51,6 +68,15 @@ export function createPackageHistoryStoreAdapter(
     save: (record) => store.save(record),
     load: (id) => store.load(id),
     list: () => store.list(),
+    async remove(id) {
+      if (typeof store.remove === "function") {
+        await store.remove(id);
+        return;
+      }
+      const envelope = loadEnvelope(kv);
+      const sessions = envelope.sessions.filter((item) => item.id !== id);
+      kv.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
+    },
   };
 }
 

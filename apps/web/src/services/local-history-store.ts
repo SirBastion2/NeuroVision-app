@@ -31,6 +31,9 @@ export function createLocalHistoryStore(): HistoryStore {
       writeClinicianHistory(merged);
       return merged.map((item) => structuredClone(item));
     },
+    async remove(id) {
+      removeFromClinicianHistory(id);
+    },
   };
 }
 
