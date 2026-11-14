@@ -11,6 +11,7 @@
  * Pure functions only. Self-contained except for type-only imports.
  */
 import type { TestNorm, TestObservation } from "./evidence.js";
+import { compareToNorm, greyscalesMetric, toTestNorm, type HealthyRangeReading } from "./norms.js";
 
 export type DarkSide = "left" | "right";
 export type BarPosition = "top" | "bottom";
@@ -117,10 +118,11 @@ export function scoreGreyscales(trials: GreyscalesTrial[], responses: Greyscales
   };
 }
 
-/** Healthy baseline depends on reading direction. Values are placeholders until event norms exist. */
+/** Healthy baseline depends on reading direction. Mixed/other is uncalibrated. */
 export function greyscalesNormFor(direction: ReadingDirection): TestNorm {
-  if (direction === "left-to-right") {
-    return { mean: 0.2, healthySd: 0.35, sensitivity: 1, source: "assumed", note: "Left-to-right readers: leftward bias expected." };
-  }
-  return { mean: 0, healthySd: 0.35, sensitivity: 1, source: "assumed", note: "Right-to-left or mixed readers: little or no bias expected." };
+  return toTestNorm(greyscalesMetric(direction));
+}
+
+export function greyscalesHealthyRange(bias: number, direction: ReadingDirection): HealthyRangeReading {
+  return compareToNorm(bias, greyscalesMetric(direction));
 }

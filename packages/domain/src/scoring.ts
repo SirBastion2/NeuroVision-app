@@ -1,6 +1,12 @@
 import { LINE_Y_TOLERANCE, regionOfStimulus, type BoardRegion, type BoardSide } from "./board.js";
 import { sortEvents } from "./events.js";
 import { isOnLineSegment, lineLength, lineMidpoint } from "./layouts.js";
+import {
+  BISECTION_SIGNED_ERROR_PCT,
+  HOLLOW_RINGS_OMISSION_ASYMMETRY,
+  compareToNorm,
+  type HealthyRangeReading,
+} from "./norms.js";
 import { suggestPractice } from "./practice.js";
 import { isScoredTrialEnd, type PracticeSuggestion, type SessionRecord, type TrialRecord } from "./session.js";
 
@@ -52,6 +58,7 @@ export interface LineBisectionSummary {
   validCount: number;
   signedMedian: number | null;
   absoluteMedian: number | null;
+  healthyRange: HealthyRangeReading | null;
 }
 
 export type SpatialPatternKind =
@@ -70,6 +77,7 @@ export interface SpatialPatternSummary {
   firstLatencyMs: number | null;
   distractors: number;
   repeats: number;
+  laterality: HealthyRangeReading | null;
 }
 
 export interface ScoringResult {
@@ -213,11 +221,13 @@ export function summarizeLineBisection(trials: readonly TrialRecord[]): LineBise
   const lineTrials = trials.filter((trial) => trial.task === "line-bisection");
   const errors = lineTrials.map((trial) => scoreLineBisection(trial).error);
   const valid = errors.filter((error): error is number => error !== null);
+  const signedMedian = valid.length >= 3 ? median(valid) : null;
   return {
     errors,
     validCount: valid.length,
-    signedMedian: valid.length >= 3 ? median(valid) : null,
+    signedMedian,
     absoluteMedian: valid.length >= 3 ? median(valid.map(Math.abs)) : null,
+    healthyRange: signedMedian == null ? null : compareToNorm(signedMedian, BISECTION_SIGNED_ERROR_PCT),
   };
 }
 
@@ -232,22 +242,25 @@ export function summarizeSpatialPattern(score: TargetSelectionScore | null): Spa
       firstLatencyMs: null,
       distractors: 0,
       repeats: 0,
+      laterality: null,
     };
   }
 
+  const laterality = compareToNorm(score.omissionAsymmetry, HOLLOW_RINGS_OMISSION_ASYMMETRY);
+  const cutoff = HOLLOW_RINGS_OMISSION_ASYMMETRY.cutoff ?? Number.POSITIVE_INFINITY;
   const asymmetry = score.omissionAsymmetry ?? 0;
   let kind: SpatialPatternKind = "balanced";
-  let description = "Selections are distributed across both sides without a large omission gap.";
+  let description = "Omission laterality is within the healthy range.";
 
   if (score.hitRate < 0.5) {
     kind = "low-selection";
-    description = "Fewer than half of the targets were selected.";
-  } else if (asymmetry >= 25) {
+    description = "Fewer than half of the targets were selected, so laterality is not compared to the healthy range.";
+  } else if (asymmetry >= cutoff) {
     kind = "left-omission";
-    description = "Omissions concentrate on the left side of the board.";
-  } else if (asymmetry <= -25) {
+    description = "Left-side omissions sit outside the healthy range for cancellation laterality.";
+  } else if (asymmetry <= -cutoff) {
     kind = "right-omission";
-    description = "Omissions concentrate on the right side of the board.";
+    description = "Right-side omissions sit outside the healthy range for cancellation laterality.";
   }
 
   return {
@@ -259,6 +272,7 @@ export function summarizeSpatialPattern(score: TargetSelectionScore | null): Spa
     firstLatencyMs: score.firstLatencyMs,
     distractors: score.distractors,
     repeats: score.repeats,
+    laterality: score.hitRate < 0.5 ? { ...laterality, text: description } : laterality,
   };
 }
 

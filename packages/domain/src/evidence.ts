@@ -7,24 +7,31 @@
  * views of one hidden lean (theta, in healthy-SD units).
  *
  * Three hypotheses: "none" (balanced), "left" (left weaker), "right" (right weaker).
- * Pure functions only: no DOM, no I/O. Self-contained (no imports) so the
- * reference demo build can inline it.
+ * Pure functions only: no DOM, no I/O. Healthy means/SDs live in norms.ts.
  */
+
+import { DEFAULT_NORMS, isCalibratedNorm, type NormCitation, type NormSample, type NormSource } from "./norms.js";
 
 export type TestId = "scene" | "clock" | "greyscales" | "bisection" | "detection";
 export type Hypothesis = "none" | "left" | "right";
 
 export interface TestNorm {
-  /** Healthy mean of the lateral index (pseudoneglect moves this away from 0 for some tests). */
-  mean: number;
-  /** Healthy between-person SD of the lateral index. */
-  healthySd: number;
+  /** Healthy mean of the lateral index. Null when the metric is uncalibrated. */
+  mean: number | null;
+  /** Healthy between-person SD of the lateral index. Null when uncalibrated. */
+  healthySd: number | null;
   /** How strongly a true lean shows up in this test relative to the others. 1 = average. */
   sensitivity: number;
-  /** Where the numbers came from. "assumed" must be shown to users. */
-  source: "hacker-norms" | "literature" | "assumed";
+  /** Where the numbers came from. "assumed" and "uncalibrated" must be shown to users. */
+  source: NormSource;
   note?: string;
+  calibrated?: boolean;
+  cutoff?: number | null;
+  sample?: NormSample | null;
+  citation?: NormCitation | null;
 }
+
+export { DEFAULT_NORMS };
 
 export interface TestObservation {
   test: TestId;
@@ -75,22 +82,8 @@ export interface EvidenceResult {
   tests: TestEvidence[];
   notes: string[];
   usesAssumedNorms: boolean;
+  usesUncalibratedNorms: boolean;
 }
-
-/** Placeholder norms. Replace with hacker norms once collected (see specs/04-evidence-model.md). */
-export const DEFAULT_NORMS: Record<TestId, TestNorm> = {
-  scene: { mean: 0, healthySd: 0.06, sensitivity: 1, source: "assumed", note: "Omission rate, right half minus left half." },
-  clock: { mean: 0, healthySd: 0.12, sensitivity: 1, source: "assumed", note: "Accuracy on left-half errors minus right-half errors." },
-  greyscales: {
-    mean: 0.2,
-    healthySd: 0.35,
-    sensitivity: 1,
-    source: "assumed",
-    note: "Darker-left minus darker-right choices per trial. Healthy left-to-right readers lean positive (pseudoneglect).",
-  },
-  bisection: { mean: 1, healthySd: 3, sensitivity: 1, source: "assumed", note: "Negated mean signed error, percent of line length." },
-  detection: { mean: 0, healthySd: 0.15, sensitivity: 1, source: "assumed", note: "Right-minus-left detection advantage." },
-};
 
 const THETA: number[] = [];
 for (let i = 0; i <= 480; i++) THETA.push(-12 + i * 0.05);
@@ -120,6 +113,7 @@ const PRIOR_THETA: Record<Hypothesis, number[]> = {
 
 /** Standardize a lateral index against healthy norms, folding in the person's own sampling error. */
 export function standardize(obs: TestObservation, norm: TestNorm): number {
+  if (!isCalibratedNorm(norm) || norm.mean == null || norm.healthySd == null) return Number.NaN;
   const denom = Math.sqrt(norm.healthySd ** 2 + Math.max(0, obs.se) ** 2);
   return (obs.value - norm.mean) / denom;
 }
@@ -195,8 +189,8 @@ export function combineEvidence(
   const rows = observations.map((o) => {
     const norm = normFor(o.test);
     const z = standardize(o, norm);
-    const included = Number.isFinite(z) && o.n > 0 && (!o.induced || !!options.includeInduced);
-    return { o, norm, z, k: norm.sensitivity, included };
+    const included = isCalibratedNorm(norm) && Number.isFinite(z) && o.n > 0 && (!o.induced || !!options.includeInduced);
+    return { o, norm, z, k: Number.isFinite(norm.sensitivity) ? norm.sensitivity : 1, included };
   });
   const used = rows.filter((r) => r.included);
   const { post, thetaPost } = posteriorOver(
@@ -262,12 +256,17 @@ export function combineEvidence(
   const notes: string[] = [];
   for (const t of tests) {
     if (t.induced && !t.included) notes.push(`${t.label} was produced on purpose for the demonstration, so it isn't counted.`);
+    if (t.normSource === "uncalibrated" && !t.induced) {
+      notes.push(`${t.label} has no published healthy range, so it is not scored against norms.`);
+    }
     if (t.discordant) {
       notes.push(`${t.label} disagrees with the other tests. Neglect can affect some tasks and not others, so this is worth a closer look.`);
     }
   }
   const usesAssumedNorms = used.some((r) => r.norm.source === "assumed");
-  if (usesAssumedNorms) notes.push("Some healthy norms are placeholders until event data replaces them.");
+  const usesUncalibratedNorms = rows.some((r) => r.norm.source === "uncalibrated" || r.norm.calibrated === false);
+  if (usesAssumedNorms) notes.push("Some healthy norms are still marked assumed and are not from published data.");
+  if (usesUncalibratedNorms) notes.push("Some tests have no published healthy range and were not scored against norms.");
 
   return {
     posterior: post,
@@ -277,6 +276,7 @@ export function combineEvidence(
     tests,
     notes,
     usesAssumedNorms,
+    usesUncalibratedNorms,
   };
 }
 
@@ -297,14 +297,17 @@ export function fitNorms(values: number[], sensitivity = 1, prior?: TestNorm, ps
   const n = values.length;
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
-  const k = prior ? pseudoN : 0;
-  const m = prior ? (n * mean + k * prior.mean) / (n + k) : mean;
-  const s = prior ? Math.sqrt(((n - 1) * sd * sd + k * prior.healthySd ** 2) / (n - 1 + k)) : sd;
+  const usablePrior = prior && prior.mean != null && prior.healthySd != null;
+  const k = usablePrior ? pseudoN : 0;
+  const m = usablePrior ? (n * mean + k * prior.mean!) / (n + k) : mean;
+  const s = usablePrior ? Math.sqrt(((n - 1) * sd * sd + k * prior.healthySd! ** 2) / (n - 1 + k)) : sd;
   return {
     mean: m,
     healthySd: Math.max(s, 1e-3),
     sensitivity,
     source: "hacker-norms",
-    note: prior ? `Fitted from ${n} event participants, shrunk toward the prior norm.` : `Fitted from ${n} event participants.`,
+    calibrated: true,
+    cutoff: prior?.cutoff ?? null,
+    note: usablePrior ? `Fitted from ${n} event participants, shrunk toward the prior norm.` : `Fitted from ${n} event participants.`,
   };
 }

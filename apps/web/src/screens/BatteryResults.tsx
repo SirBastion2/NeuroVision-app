@@ -61,6 +61,10 @@ export function usedDefaultNorms(record: BatteryRecord, evidence: EvidenceResult
   });
 }
 
+function isUncalibratedRow(row: TestEvidence): boolean {
+  return row.normSource === "uncalibrated";
+}
+
 export function serializeBatteryRecord(record: BatteryRecord): string {
   return JSON.stringify(parseBatteryRecord(record), null, 2);
 }
@@ -81,15 +85,18 @@ export function batteryDisplay(record: BatteryRecord, patientExample = false) {
 
   const evidence = combineEvidence(observations, batteryNorms(record), patientExample && induced ? { includeInduced: true } : {});
   const counted = evidence.tests.filter((row) => row.included);
+  const ledger = evidence.tests;
   return {
     scene,
     scored,
     evidence,
     observations,
     counted,
+    ledger,
     hasInduced: induced != null,
     sceneRan,
     usedDefaultNorms: usedDefaultNorms(record, evidence),
+    usedUncalibratedNorms: evidence.usesUncalibratedNorms,
   };
 }
 
@@ -110,6 +117,7 @@ function percent(value: number): number {
 }
 
 function contributionText(row: TestEvidence): string {
+  if (isUncalibratedRow(row)) return "Uncalibrated — no published healthy range";
   const times = row.factor >= 10 ? row.factor.toFixed(0) : row.factor.toFixed(1);
   if (row.favors === "none") return `Supports a balanced reading (${times}×)`;
   if (row.favors === "left") return `Points to the left side (${times}×)`;
@@ -201,7 +209,7 @@ function SceneMap({ scene, foundIds }: { scene: Scene; foundIds: readonly string
 export function BatteryResults({ record, onExport, onBack }: Props) {
   const [patientExample, setPatientExample] = useState(false);
   const display = useMemo(() => batteryDisplay(record, patientExample), [record, patientExample]);
-  const { evidence, counted, scene, scored, hasInduced, sceneRan } = display;
+  const { evidence, counted, ledger, scene, scored, hasInduced, sceneRan } = display;
   const posteriors: Array<{ key: Hypothesis; pct: number }> = [
     { key: "left", pct: percent(evidence.posterior.left) },
     { key: "none", pct: percent(evidence.posterior.none) },
@@ -301,7 +309,7 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
         <section className="card">
           <div className="card-head">
             <h3>Ledger</h3>
-            <span className="small">Counted tests only. Lateral index: negative means the left side is weaker.</span>
+            <span className="small">Lateral index: negative means the left side is weaker. Uncalibrated tests are shown but not scored against norms.</span>
           </div>
           <table>
             <thead>
@@ -313,7 +321,7 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
               </tr>
             </thead>
             <tbody>
-              {counted.map((row) => {
+              {ledger.map((row) => {
                 const observation = observationByTest.get(row.test);
                 return (
                   <tr key={`${row.test}-${row.label}`}>
@@ -321,7 +329,13 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
                     <td>{observation ? formatIndex(observation.value) : formatIndex(row.z)}</td>
                     <td>{contributionText(row)}</td>
                     <td>
-                      {row.discordant ? <span className="badge incomplete">Disagrees</span> : <span className="small">—</span>}
+                      {isUncalibratedRow(row) ? (
+                        <span className="badge incomplete">Uncalibrated</span>
+                      ) : row.discordant ? (
+                        <span className="badge incomplete">Disagrees</span>
+                      ) : (
+                        <span className="small">—</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -352,8 +366,8 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
           </div>
           <div className="stats">
             <p className="notice">Screening aid, not a diagnosis</p>
-            {display.usedDefaultNorms ? (
-              <p className="notice warn">Placeholder norms were used for this reading.</p>
+            {display.usedUncalibratedNorms ? (
+              <p className="notice warn">Some tests have no published healthy range and were not scored against norms.</p>
             ) : null}
             {record.source === "demonstration" ? (
               <p className="notice">
@@ -361,7 +375,7 @@ export function BatteryResults({ record, onExport, onBack }: Props) {
               </p>
             ) : null}
             {evidence.notes
-              .filter((note) => !note.includes("placeholders") && !note.includes("on purpose"))
+              .filter((note) => !note.includes("no published healthy range") && !note.includes("on purpose"))
               .map((note) => (
                 <p key={note} className="notice warn">
                   {note}

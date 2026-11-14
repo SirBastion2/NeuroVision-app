@@ -1,7 +1,8 @@
+import { STAR_CANCELLATION_COC, compareToNorm } from "@neurovision/domain";
 import type { StarLayout, StarMetrics, TapEvent } from "./types";
 import { binOf, mean, normX } from "./math";
 
-export const COC_FLAG_THRESHOLD = 0.08;
+export const COC_FLAG_THRESHOLD = STAR_CANCELLATION_COC.cutoff ?? 0.081;
 export const BINS = 6;
 
 interface Seg {
@@ -73,7 +74,7 @@ export function computeStarMetrics(layout: StarLayout, taps: readonly TapEvent[]
     hitRateRight: half("right"),
     hitRateByBin: binTotals.map((n, i) => (n ? binHits[i]! / n : null)),
     centerOfCancellation: coc,
-    cocFlag: coc !== null && coc > COC_FLAG_THRESHOLD,
+    cocFlag: compareToNorm(coc, STAR_CANCELLATION_COC).beyondCutoff,
     firstTap: first ? { x: normX(first.x, W), side: normX(first.x, W) < 0 ? "left" : "right" } : null,
     pathCrossings: countPathCrossings(cancels),
     revisits: taps.filter((t) => t.kind === "revisit").length,

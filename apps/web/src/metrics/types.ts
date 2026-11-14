@@ -109,7 +109,7 @@ export interface StarMetrics {
   hitRateByBin: Array<number | null>;
   /** Center of Cancellation: mean x of found targets minus mean x of all targets (normalized). Positive = shifted right. */
   centerOfCancellation: number | null;
-  /** True when CoC > 0.08. An unvalidated screening flag, not a diagnosis. */
+  /** True when CoC is beyond the published BIT-mapped cutoff. Not a diagnosis. */
   cocFlag: boolean;
   firstTap: { x: number; side: "left" | "right" } | null;
   pathCrossings: number;

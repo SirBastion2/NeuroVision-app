@@ -1,4 +1,10 @@
 import { useMemo, useState } from "react";
+import {
+  BISECTION_SIGNED_ERROR_PCT,
+  GAZE_LEFT_FRACTION,
+  STAR_CANCELLATION_COC,
+  compareToNorm,
+} from "@neurovision/domain";
 import type { BisectionMetrics, GazeMetrics, SessionResult, StarMetrics } from "../../metrics/types";
 import { isTracked } from "../../metrics/gaze";
 import { sessionToJson } from "../../metrics/types";
@@ -144,7 +150,7 @@ function SessionMap({ session, heat, path }: { session: SessionResult; heat: boo
 function StarCards({ m, g }: { m: StarMetrics; g: GazeMetrics | null }) {
   return (
     <>
-      <Card label="Center of Cancellation" value={signed(m.centerOfCancellation)} sub={m.cocFlag ? "Above 0.08: rightward shift (unvalidated flag)" : "Positive = shifted right"} flag={m.cocFlag} />
+      <Card label="Center of Cancellation" value={signed(m.centerOfCancellation)} sub={m.cocFlag ? compareToNorm(m.centerOfCancellation, STAR_CANCELLATION_COC).text : "Positive = shifted right"} flag={m.cocFlag} />
       <Card label="Found" value={`${m.hits} / ${m.targets}`} sub={pct(m.hitRate)} />
       <Card label="Left vs right half" value={`${pct(m.hitRateLeft)} · ${pct(m.hitRateRight)}`} sub="hit rate" />
       <Card label="First tap" value={m.firstTap ? m.firstTap.side : "n/a"} sub={m.firstTap ? `x = ${signed(m.firstTap.x)}` : undefined} />
@@ -157,7 +163,7 @@ function StarCards({ m, g }: { m: StarMetrics; g: GazeMetrics | null }) {
 function BisectionCards({ m }: { m: BisectionMetrics }) {
   return (
     <>
-      <Card label="Mean deviation" value={signed(m.meanDeviation, 1, "%")} sub="of line length · positive = right" flag={(m.meanDeviation ?? 0) > 8} />
+      <Card label="Mean deviation" value={signed(m.meanDeviation, 1, "%")} sub={compareToNorm(m.meanDeviation, BISECTION_SIGNED_ERROR_PCT).text} flag={compareToNorm(m.meanDeviation, BISECTION_SIGNED_ERROR_PCT).beyondCutoff} />
       <Card label="Spread (SD)" value={m.sdDeviation == null ? "n/a" : `${m.sdDeviation.toFixed(1)}%`} />
       <Card label="Left vs right lines" value={`${signed(m.meanDeviationLeftLines, 1, "%")} · ${signed(m.meanDeviationRightLines, 1, "%")}`} sub="mean deviation" />
       <Card label="Lines answered" value={`${m.answered} / ${m.lines}`} />
@@ -168,7 +174,7 @@ function BisectionCards({ m }: { m: BisectionMetrics }) {
 function GazeCards({ g }: { g: GazeMetrics }) {
   return (
     <>
-      <Card label="Gaze on left half" value={pct(g.leftGazeFraction)} sub="of tracked gaze time" flag={g.leftGazeFraction !== null && g.leftGazeFraction < 0.35} />
+      <Card label="Gaze on left half" value={pct(g.leftGazeFraction)} sub={compareToNorm(g.leftGazeFraction, GAZE_LEFT_FRACTION).text} flag={false} />
       <Card label="Gaze CoC" value={signed(g.gazeCenterOfCancellation)} sub="mean gaze x vs targets" />
       <Card label="First look" value={g.firstLookDirection ?? "n/a"} sub="after leaving centre" />
       <Card label="Leftmost reach" value={signed(g.leftmostReach)} sub="5th percentile of gaze x" />

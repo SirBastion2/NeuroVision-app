@@ -17,6 +17,7 @@
  * the further left the target sits. Pure functions only.
  */
 import type { TestObservation } from "./evidence.js";
+import { STARRY_LATERALITY, compareToNorm, type HealthyRangeReading } from "./norms.js";
 
 export type StarrySide = "left" | "right";
 
@@ -93,6 +94,7 @@ export interface StarryScore {
   /** Median RT left minus right (positive = left slower). Null when either side has no hits. */
   rtGapMs: number | null;
   observation: TestObservation;
+  healthyRange: HealthyRangeReading;
 }
 
 function rng(seed: number): () => number {
@@ -207,6 +209,7 @@ export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], 
   const falseAlarms = presses.filter((p) => p.trialId === null).length;
   const rateL = left.n ? left.hits / left.n : 0;
   const rateR = right.n ? right.hits / right.n : 0;
+  const value = rateL - rateR;
   return {
     left,
     right,
@@ -216,9 +219,10 @@ export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], 
     observation: {
       test: "detection",
       label: "Starry Night",
-      value: rateL - rateR,
+      value,
       se: seDiff(left.hits, left.n, right.hits, right.n),
       n: left.n + right.n,
     },
+    healthyRange: compareToNorm(value, STARRY_LATERALITY),
   };
 }

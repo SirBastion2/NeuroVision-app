@@ -109,7 +109,7 @@ export function StarryResult({
         <div className="verdict-text">
           <Eyebrow plain>Left vs right</Eyebrow>
           <h2>{Math.abs(gap) < 0.1 ? "Even on both sides" : gap < 0 ? "More red dots missed on the left" : "More red dots missed on the right"}</h2>
-          <p>Describes this run only. A gap of one or two dots is within normal variation.</p>
+          <p>{s.healthyRange.text} Describes this run only; not a diagnosis.</p>
         </div>
         <Balance
           left={s.left.hits}

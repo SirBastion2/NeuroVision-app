@@ -130,6 +130,9 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
           <i className="key centre" /> True centre <i className="key mark" /> Mark placed. Positive = right of centre, as a
           share of line length. Medians need at least three valid lines.
         </p>
+        {lb.healthyRange ? (
+          <p className={lb.healthyRange.status === "outside" ? "notice warn" : "notice"}>{lb.healthyRange.text}</p>
+        ) : null}
       </section>
 
       <section className="card practice-summary">

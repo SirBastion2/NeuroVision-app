@@ -73,20 +73,23 @@ describe("BatteryResults", () => {
     assert.match(html, new RegExp(display.evidence.verdict.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(html, /in units of normal person-to-person variation; negative means the left side is weaker/);
     assert.match(html, /Screening aid, not a diagnosis/);
-    assert.match(html, /Placeholder norms were used for this reading/);
+    assert.match(html, /Some tests have no published healthy range and were not scored against norms/);
+    assert.match(html, /Uncalibrated/);
     assert.match(html, /Show patient example/);
     assert.match(html, /Export JSON/);
 
     const countedLabels = display.counted.map((row) => row.label);
     assert.deepEqual(
       countedLabels.map((label) => label.replace(/,.*/, "")).sort(),
-      ["Clock check", "Greyscales", "Line bisection", "Scene search"].sort(),
+      ["Greyscales", "Line bisection"].sort(),
     );
-    for (const label of countedLabels) {
+    const ledgerLabels = display.ledger.map((row) => row.label.replace(/,.*/, "")).sort();
+    assert.deepEqual(ledgerLabels, ["Clock check", "Greyscales", "Line bisection", "Scene search"].sort());
+    for (const label of ledgerLabels) {
       assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     }
     assert.equal((html.match(/<tbody>/g) ?? []).length, 1);
-    assert.equal((html.match(/<tr>/g) ?? []).length, 1 + display.counted.length);
+    assert.equal((html.match(/<tr>/g) ?? []).length, 1 + display.ledger.length);
     assert.doesNotMatch(html, /hidden area included/);
   });
 
@@ -99,11 +102,16 @@ describe("BatteryResults", () => {
     const sceneOn = on.evidence.tests.filter((row) => row.test === "scene");
     assert.equal(sceneOff.length, 1);
     assert.equal(sceneOn.length, 1);
-    assert.equal(off.counted.filter((row) => row.test === "scene").length, 1);
-    assert.equal(on.counted.filter((row) => row.test === "scene").length, 1);
+    assert.equal(off.ledger.filter((row) => row.test === "scene").length, 1);
+    assert.equal(on.ledger.filter((row) => row.test === "scene").length, 1);
+    assert.equal(off.counted.filter((row) => row.test === "scene").length, 0);
+    assert.equal(on.counted.filter((row) => row.test === "scene").length, 0);
     assert.equal(sceneOff[0]!.label, "Scene search");
     assert.equal(sceneOn[0]!.label, "Scene search, hidden area included");
-    assert.notEqual(sceneOff[0]!.z, sceneOn[0]!.z);
+    const offScene = off.observations.find((row) => row.test === "scene");
+    const onScene = on.observations.find((row) => row.test === "scene");
+    assert.ok(offScene && onScene);
+    assert.notEqual(offScene.value, onScene.value);
 
     const otherOff = off.counted.filter((row) => row.test !== "scene").map((row) => row.test);
     const otherOn = on.counted.filter((row) => row.test !== "scene").map((row) => row.test);

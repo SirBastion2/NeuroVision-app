@@ -1,6 +1,5 @@
 import { jsPDF } from "jspdf";
 import {
-  DEFAULT_NORMS,
   scoreBatteryRecord,
   scoreSession,
   sessionSourceLabel,
@@ -128,16 +127,11 @@ export function buildClinicianReportPdf(input: ReportInput): Blob {
       );
     }
     line("Screening aid, not a diagnosis.", 10, [90, 96, 102]);
-    const usedDefaults = counted.some((row) => {
-      const stored = battery.normsUsed[row.test];
-      const fallback = DEFAULT_NORMS[row.test];
-      if (stored) {
-        return stored.mean === fallback.mean && stored.healthySd === fallback.healthySd && stored.source === fallback.source;
-      }
-      return row.test !== "greyscales" || !battery.readingDirection;
-    });
-    if (usedDefaults || scored.evidence.usesAssumedNorms) {
-      line("Placeholder norms were used for this reading.", 10, [90, 96, 102]);
+    if (scored.evidence.usesUncalibratedNorms) {
+      line("Some tests have no published healthy range and were not scored against norms.", 10, [90, 96, 102]);
+    }
+    if (scored.evidence.usesAssumedNorms) {
+      line("Some healthy norms are still marked assumed and are not from published data.", 10, [90, 96, 102]);
     }
     if (battery.source === "demonstration") {
       line("Demonstration record.", 10, [90, 96, 102]);

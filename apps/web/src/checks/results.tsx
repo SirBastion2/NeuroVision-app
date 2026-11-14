@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import {
   CLOCK_DEFAULTS,
+  greyscalesHealthyRange,
   greyscalesNormFor,
   scoreClock,
   scoreGreyscales,
@@ -130,11 +131,16 @@ export function Balance({ left, right, leftLabel, rightLabel, total, aria }: { l
   );
 }
 
-function greyscalesSentence(g: GreyscalesScore, mean: number) {
+function greyscalesSentence(g: GreyscalesScore, reading: ReadingDirection) {
   const answered = g.darkerLeftChoices + g.darkerRightChoices;
   if (!answered) return "No pairs were answered.";
   const lean = g.bias > 0.1 ? "a leftward lean" : g.bias < -0.1 ? "a rightward lean" : "almost no lean either way";
-  return `You picked the bar that’s darker on the left ${g.darkerLeftChoices} of ${answered} times: ${lean}. The healthy average for your reading direction is set to ${signed(mean)} for now.`;
+  const range = greyscalesHealthyRange(g.bias, reading);
+  const norm = greyscalesNormFor(reading);
+  if (!range.calibrated) {
+    return `You picked the bar that’s darker on the left ${g.darkerLeftChoices} of ${answered} times: ${lean}. Uncalibrated — no published healthy range for this reading direction.`;
+  }
+  return `You picked the bar that’s darker on the left ${g.darkerLeftChoices} of ${answered} times: ${lean}. Healthy-range mean for this reading direction is ${signed(norm.mean)}. ${range.text}`;
 }
 
 export function ClockResult({ trials, responses, eyebrow = "Clock check · result", children }: { trials: ClockTrial[]; responses: ClockResponse[]; eyebrow?: string; children?: ReactNode }) {
@@ -159,7 +165,7 @@ export function ClockResult({ trials, responses, eyebrow = "Clock check · resul
         <div className="verdict-text">
           <Eyebrow plain>Left half vs right half</Eyebrow>
           <h2>{clock.observation.value === 0 ? "Even on both sides" : clock.observation.value < 0 ? "More slips missed on the left" : "More slips missed on the right"}</h2>
-          <p>Describes this run only. A gap of one or two slips is well within normal variation.</p>
+          <p>{clock.healthyRange.text} Describes this run only; not a diagnosis.</p>
         </div>
         <Balance
           left={clock.left.correct}
@@ -212,7 +218,7 @@ export function GreyResult({ trials, responses, reading, eyebrow = "Greyscales �
       <section className="card">
         <div className="grey-summary">
           <div>
-            <p className="suggestion-text">{greyscalesSentence(grey, norm.mean)}</p>
+            <p className="suggestion-text">{greyscalesSentence(grey, reading)}</p>
             <Balance
               left={grey.darkerLeftChoices}
               right={grey.darkerRightChoices}
@@ -228,7 +234,11 @@ export function GreyResult({ trials, responses, reading, eyebrow = "Greyscales �
           </div>
         </div>
       </section>
-      <p className="notice">Most people have a slight natural lean, and this test can see yours. Research tool, not a diagnosis.</p>
+      <p className={norm.calibrated === false ? "notice warn" : "notice"}>
+        {norm.calibrated === false
+          ? "Uncalibrated — no published healthy range for this reading direction. Research tool, not a diagnosis."
+          : "Most people have a slight natural lean, and this test can see yours. Research tool, not a diagnosis."}
+      </p>
       {children}
     </>
   );
