@@ -11,6 +11,7 @@ import {
 } from "@neurovision/domain";
 import {
   createAppServices,
+  createMemoryKeyValueStore,
   createMemoryStore,
   type PackageStoreFactory,
 } from "../src/services/index.ts";
@@ -147,11 +148,29 @@ describe("app service layer", () => {
     assert.notEqual(gaze.simulated.leftBiased.id, gaze.simulated.bothHalves.id);
   });
 
-  it("keeps the web service on its memory store until it adopts packages/storage", () => {
+  it("falls back to in-memory history when no key-value backend is available", () => {
     const services = createAppServices();
     assert.equal(existsSync(join(repoRoot, "packages/storage")), true);
     assert.equal(services.storeKind, "memory");
     assert.equal(services.apiEnabled, false);
+  });
+
+  it("uses the storage-package HistoryStore when a key-value backend is present", async () => {
+    const kv = createMemoryKeyValueStore();
+    const services = createAppServices({ keyValueStore: kv });
+    assert.equal(services.storeKind, "package");
+    const started = services.startSession({
+      id: "pkg-real",
+      alias: "Package default",
+      startedAt: "2026-11-14T16:00:00.000Z",
+    });
+    const saved = await services.save(started);
+    const reloaded = await services.load(saved.id);
+    assert.ok(reloaded);
+    assert.equal(reloaded.id, saved.id);
+    assert.equal(reloaded.alias, saved.alias);
+    await services.remove(saved.id);
+    assert.equal(await services.load(saved.id), null);
   });
 
   it("uses the storage-package HistoryStore as the default when that factory is present", async () => {

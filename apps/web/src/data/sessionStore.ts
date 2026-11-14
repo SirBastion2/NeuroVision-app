@@ -1,10 +1,13 @@
 import { isSessionRecord, parseSessionRecord, type SessionRecord } from "@neurovision/domain";
+import { ENVELOPE_KEY, EnvelopeError, loadEnvelope, saveSession } from "@neurovision/storage";
+import type { HistoryStore } from "../services/history-store";
+import { isEnvelopeError } from "../services/history-store";
+import type { KeyValueStore } from "../services/package-store";
 
 /**
- * TEMPORARY browser storage for D+E screens. Agent B owns `packages/storage`;
- * when it lands, replace `createLocalSessionStore` with B's adapter behind this
- * same interface. Every write goes through `parseSessionRecord` (ARCHITECTURE.md),
- * and malformed stored records are kept and counted, never silently discarded.
+ * Screen-facing session store. Persistence goes through the service layer's
+ * storage-backed HistoryStore (the `@neurovision/storage` envelope). The
+ * in-memory path is only for the standalone build.
  */
 export interface LoadResult {
   sessions: SessionRecord[];
@@ -18,80 +21,173 @@ export interface SaveResult {
 }
 
 export interface SessionStore {
-  load(): LoadResult;
-  save(session: SessionRecord): SaveResult;
-  remove(id: string): SaveResult;
+  load(): Promise<LoadResult>;
+  save(session: SessionRecord): Promise<SaveResult>;
+  remove(id: string): Promise<SaveResult>;
 }
 
-const KEY = "neurovision.web.sessions";
-const VERSION = 1;
-
-interface Envelope {
-  version: number;
-  records: unknown[];
+export interface ServiceHistory {
+  save(session: SessionRecord): Promise<SessionRecord>;
+  listHistory(): Promise<SessionRecord[]>;
+  remove(id: string): Promise<void>;
 }
 
-export function createLocalSessionStore(storage: Pick<Storage, "getItem" | "setItem"> | null = safeLocalStorage()): SessionStore {
-  let memory: Envelope = { version: VERSION, records: [] };
+export const SCREEN_SESSIONS_KEY = "neurovision.web.sessions";
+export const REJECTED_ASIDE_KEY = "neurovision.web.sessions.rejected";
+export const SCREEN_IMPORT_KEY = "neurovision.web.sessions.imported";
 
-  const read = (): Envelope => {
-    if (!storage) return memory;
-    const raw = storage.getItem(KEY);
-    if (!raw) return { version: VERSION, records: [] };
-    const parsed = JSON.parse(raw) as Partial<Envelope>;
-    if (parsed.version !== VERSION || !Array.isArray(parsed.records)) {
-      throw new Error(`Unsupported stored data (version ${String(parsed.version)}). It was left untouched.`);
-    }
-    return { version: VERSION, records: parsed.records };
-  };
+export interface CreateLocalSessionStoreOptions {
+  storage?: KeyValueStore | null;
+  history?: HistoryStore | ServiceHistory | null;
+  standalone?: boolean;
+}
 
-  const write = (envelope: Envelope): SaveResult => {
+function isServiceHistory(value: HistoryStore | ServiceHistory): value is ServiceHistory {
+  return "listHistory" in value;
+}
+
+function rejectedCount(storage: KeyValueStore | null): number {
+  if (!storage) return 0;
+  const aside = storage.getItem(REJECTED_ASIDE_KEY);
+  if (!aside) return 0;
+  try {
+    const parsed = JSON.parse(aside) as { records?: unknown };
+    return Array.isArray(parsed.records) ? parsed.records.length : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Copy malformed screen-store records aside, then write valid ones into the
+ * storage-package envelope. Runs once per browser.
+ */
+export function importScreenSessions(storage: KeyValueStore): void {
+  if (storage.getItem(SCREEN_IMPORT_KEY) === "1") return;
+  const raw = storage.getItem(SCREEN_SESSIONS_KEY);
+  if (raw === null) {
+    storage.setItem(SCREEN_IMPORT_KEY, "1");
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    storage.setItem(REJECTED_ASIDE_KEY, raw);
+    storage.setItem(SCREEN_IMPORT_KEY, "1");
+    return;
+  }
+  const envelope = parsed as { version?: unknown; records?: unknown };
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    envelope.version !== 1 ||
+    !Array.isArray(envelope.records)
+  ) {
+    storage.setItem(REJECTED_ASIDE_KEY, raw);
+    storage.setItem(SCREEN_IMPORT_KEY, "1");
+    return;
+  }
+  const records: unknown[] = envelope.records;
+  const rejected = records.filter((record) => !isSessionRecord(record));
+  const valid = records.filter(isSessionRecord);
+  if (rejected.length > 0) {
+    storage.setItem(REJECTED_ASIDE_KEY, JSON.stringify({ version: 1, records: rejected }));
+  }
+  for (const session of valid) {
     try {
-      if (storage) storage.setItem(KEY, JSON.stringify(envelope));
-      else memory = envelope;
-      return { ok: true, error: null };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      saveSession(storage, session);
+    } catch (error) {
+      if (error instanceof EnvelopeError || (error instanceof Error && error.name === "EnvelopeError")) {
+        break;
+      }
+      throw error;
     }
-  };
+  }
+  storage.removeItem(SCREEN_SESSIONS_KEY);
+  storage.setItem(SCREEN_IMPORT_KEY, "1");
+}
 
-  const idOf = (record: unknown) =>
-    typeof record === "object" && record !== null && "id" in record ? (record as { id: unknown }).id : undefined;
+export function createLocalSessionStore(options: CreateLocalSessionStoreOptions = {}): SessionStore {
+  const standalone = options.standalone ?? false;
+  const storage = options.storage === undefined ? safeLocalStorage() : options.storage;
+  const history = options.history ?? null;
+  const memory = new Map<string, SessionRecord>();
+
+  if (storage && !standalone) {
+    try {
+      importScreenSessions(storage);
+    } catch {
+      /* import is best-effort; load will surface envelope errors */
+    }
+  }
+
+  const listFromHistory = async (): Promise<SessionRecord[]> => {
+    if (!history) return [];
+    return isServiceHistory(history) ? history.listHistory() : history.list();
+  };
 
   return {
-    load() {
+    async load() {
       try {
-        const { records } = read();
-        const sessions = records.filter(isSessionRecord);
-        return { sessions, rejected: records.length - sessions.length, error: null };
-      } catch (e) {
-        return { sessions: [], rejected: 0, error: e instanceof Error ? e.message : String(e) };
+        if (history) {
+          const sessions = await listFromHistory();
+          return { sessions, rejected: standalone ? 0 : rejectedCount(storage), error: null };
+        }
+        if (standalone || !storage) {
+          return { sessions: [...memory.values()].map((record) => structuredClone(record)), rejected: 0, error: null };
+        }
+        const envelope = loadEnvelope(storage);
+        return { sessions: envelope.sessions, rejected: rejectedCount(storage), error: null };
+      } catch (error) {
+        if (isEnvelopeError(error)) {
+          return { sessions: [], rejected: 0, error: error.message };
+        }
+        return { sessions: [], rejected: 0, error: error instanceof Error ? error.message : String(error) };
       }
     },
-    save(session) {
+    async save(session) {
       try {
         const valid = parseSessionRecord(session);
-        const envelope = read();
-        const others = envelope.records.filter((r) => idOf(r) !== valid.id);
-        return write({ version: VERSION, records: [...others, valid] });
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+        if (history) {
+          await history.save(valid);
+          return { ok: true, error: null };
+        }
+        if (standalone || !storage) {
+          memory.set(valid.id, structuredClone(valid));
+          return { ok: true, error: null };
+        }
+        saveSession(storage, valid);
+        return { ok: true, error: null };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
-    remove(id) {
+    async remove(id) {
       try {
-        const envelope = read();
-        return write({ version: VERSION, records: envelope.records.filter((r) => idOf(r) !== id) });
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+        if (history) {
+          await history.remove(id);
+          return { ok: true, error: null };
+        }
+        if (standalone || !storage) {
+          memory.delete(id);
+          return { ok: true, error: null };
+        }
+        const envelope = loadEnvelope(storage);
+        const sessions = envelope.sessions.filter((item) => item.id !== id);
+        storage.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
+        return { ok: true, error: null };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
   };
 }
 
-function safeLocalStorage(): Storage | null {
+function safeLocalStorage(): KeyValueStore | null {
   try {
-    return typeof localStorage === "undefined" ? null : localStorage;
+    if (typeof localStorage === "undefined") return null;
+    return localStorage;
   } catch {
     return null;
   }

@@ -1,4 +1,5 @@
 import { parseSessionRecord, type SessionRecord } from "@neurovision/domain";
+import { EnvelopeError } from "@neurovision/storage";
 import {
   getBrowserKeyValueStore,
   getPackageHistoryStoreFactory,
@@ -14,6 +15,7 @@ export interface HistoryStore {
   save(record: SessionRecord): Promise<SessionRecord>;
   load(id: string): Promise<SessionRecord | null>;
   list(): Promise<SessionRecord[]>;
+  remove(id: string): Promise<void>;
 }
 
 export interface ResolveHistoryStoreOptions {
@@ -24,8 +26,8 @@ export interface ResolveHistoryStoreOptions {
 }
 
 /**
- * In-memory history. Fallback when `packages/storage` is not in the workspace,
- * and the store used by the standalone file (no durable browser envelope).
+ * In-memory history. Used by the standalone file (no durable browser envelope)
+ * and when no key-value backend is available.
  */
 export function createMemoryStore(): HistoryStore {
   const records = new Map<string, SessionRecord>();
@@ -43,6 +45,9 @@ export function createMemoryStore(): HistoryStore {
     async list() {
       return [...records.values()].map((record) => structuredClone(record));
     },
+    async remove(id) {
+      records.delete(id);
+    },
   };
 }
 
@@ -55,13 +60,14 @@ export function guardedStore(store: HistoryStore): HistoryStore {
     },
     load: (id) => store.load(id),
     list: () => store.list(),
+    remove: (id) => store.remove(id),
   };
 }
 
 /**
  * Default history store: the storage-package HistoryStore when that package
- * is present and a key-value backend exists. Standalone builds and tests
- * without the package fall back to in-memory.
+ * is present and a key-value backend exists. Standalone builds fall back to
+ * in-memory.
  */
 export function resolveHistoryStore(preferredOrOptions?: HistoryStore | ResolveHistoryStoreOptions): HistoryStore {
   const options: ResolveHistoryStoreOptions =
@@ -82,4 +88,8 @@ export function resolveHistoryStore(preferredOrOptions?: HistoryStore | ResolveH
     options.keyValueStore === undefined ? getBrowserKeyValueStore() : options.keyValueStore;
   const fromPackage = tryCreatePackageHistoryStore(kv ?? null, factory);
   return guardedStore(fromPackage ?? createMemoryStore());
+}
+
+export function isEnvelopeError(error: unknown): error is EnvelopeError {
+  return error instanceof EnvelopeError || (error instanceof Error && error.name === "EnvelopeError");
 }

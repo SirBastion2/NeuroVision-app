@@ -1,6 +1,7 @@
 export {
   createMemoryStore,
   guardedStore,
+  isEnvelopeError,
   resolveHistoryStore,
   type HistoryStore,
   type ResolveHistoryStoreOptions,
@@ -16,16 +17,23 @@ export {
 export {
   ApiError,
   ApiOfflineError,
+  CSRF_COOKIE,
   TERMINAL_PROCESSING_STATES,
   createApiClient,
   createApiClientFromConfig,
   isTerminalProcessingState,
   type ApiClient,
   type ApiClientOptions,
+  type AssignmentResult,
+  type BatchPayloadInput,
+  type BatchResult,
   type CompletionState,
   type DeleteResult,
   type ExportResult,
+  type FinalizeResult,
   type HealthResult,
+  type Me,
+  type ParticipantListItem,
   type ProcessingDetail,
   type ProcessingSnapshot,
   type ProcessingState,
@@ -44,25 +52,21 @@ export {
   type PollProcessingOptions,
 } from "./processing";
 export {
-  OidcCallbackError,
-  OidcConfigError,
-  createOidcClient,
+  AuthCallbackError,
+  AuthConfigError,
+  createApiAuthClient,
+  type ApiAuthClient,
   type AuthorizationRedirect,
-  type CreateOidcClientOptions,
-  type OidcClient,
-  type OidcToken,
-  type OidcTransactionStore,
-} from "./oidc";
+} from "./api-auth";
 export {
   isApiEnabled,
   isStandaloneRuntime,
   readEnv,
-  readOidcConfig,
   readRuntimeConfig,
-  type OidcRuntimeConfig,
   type WebRuntimeConfig,
 } from "./runtime-config";
 export {
+  createMemoryKeyValueStore,
   createPackageHistoryStoreAdapter,
   getBrowserKeyValueStore,
   getPackageHistoryStoreFactory,
@@ -71,3 +75,20 @@ export {
   type KeyValueStore,
   type PackageStoreFactory,
 } from "./package-store";
+export {
+  UPLOAD_QUEUE_KEY,
+  createUploadQueue,
+  type CreateUploadQueueOptions,
+  type EnqueueUploadInput,
+  type UploadJob,
+  type UploadQueue,
+  type UploadQueueState,
+} from "./upload-queue";
+export {
+  jobForSession,
+  participantIdForExport,
+  processingLabel,
+  shouldEnqueueUpload,
+  showApiControls,
+} from "./screen-wiring";
+export { canonicalJson, contentHash, sha256Hex } from "./hash";

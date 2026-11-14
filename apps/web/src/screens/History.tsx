@@ -11,12 +11,21 @@ import { Eyebrow } from "../components/Brand";
 import { TrendChart } from "../components/TrendChart";
 import type { LoadResult } from "../data/sessionStore";
 import { date, dateTime, pct, points } from "../lib/format";
+import { jobForSession, processingLabel, showApiControls } from "../services/screen-wiring";
+import type { ProcessingSnapshot } from "../services/api-client";
+import type { UploadQueueState } from "../services/upload-queue";
 
 interface Props {
   stored: LoadResult;
   onOpen: (session: SessionRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
+  apiEnabled?: boolean;
+  processing?: Record<string, ProcessingSnapshot>;
+  queue?: UploadQueueState;
+  actionError?: string | null;
+  onExport?: () => void;
+  onDeleteParticipant?: () => void;
 }
 
 const EXCLUDED: Record<TrendExclusionReason, string> = {
@@ -26,9 +35,22 @@ const EXCLUDED: Record<TrendExclusionReason, string> = {
   incomparable: "Different protocol",
 };
 
-export function History({ stored, onOpen, onDelete, onHome }: Props) {
+export function History({
+  stored,
+  onOpen,
+  onDelete,
+  onHome,
+  apiEnabled = false,
+  processing = {},
+  queue,
+  actionError,
+  onExport,
+  onDeleteParticipant,
+}: Props) {
   const [showDemo, setShowDemo] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirmParticipant, setConfirmParticipant] = useState(false);
+  const apiControls = showApiControls(apiEnabled);
 
   const profiles = useMemo(() => {
     const map = new Map<string, string>();
@@ -79,6 +101,11 @@ export function History({ stored, onOpen, onDelete, onHome }: Props) {
         )}
       </header>
 
+      {actionError && (
+        <p className="notice error" role="alert">
+          {actionError}
+        </p>
+      )}
       {stored.error && (
         <p className="notice error" role="alert">
           Stored sessions could not be read: {stored.error}
@@ -146,13 +173,14 @@ export function History({ stored, onOpen, onDelete, onHome }: Props) {
                 <th>Gap</th>
                 <th>Pattern</th>
                 <th>Trend</th>
+                {apiControls && <th>Server</th>}
                 <th />
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="empty">
+                  <td colSpan={apiControls ? 9 : 8} className="empty">
                     No sessions yet. Run an assessment from Home.
                   </td>
                 </tr>
@@ -173,6 +201,11 @@ export function History({ stored, onOpen, onDelete, onHome }: Props) {
                     <td>{points(ts?.omissionAsymmetry ?? null, 0)}</td>
                     <td>{result.spatialPattern.kind.replace("-", " ")}</td>
                     <td className="small">{trendCell(session)}</td>
+                    {apiControls && (
+                      <td className="small">
+                        {processingLabel(processing[session.id], queue ? jobForSession(queue, session.id) : undefined) ?? "Local"}
+                      </td>
+                    )}
                     <td className="row-actions">
                       <button onClick={() => onOpen(session)}>Open</button>
                       {session.source === "live" &&
@@ -200,6 +233,33 @@ export function History({ stored, onOpen, onDelete, onHome }: Props) {
       </section>
 
       <div className="actions">
+        {apiControls && onExport && (
+          <button className="ghost" type="button" onClick={onExport}>
+            Export
+          </button>
+        )}
+        {apiControls && onDeleteParticipant &&
+          (confirmParticipant ? (
+            <>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  onDeleteParticipant();
+                  setConfirmParticipant(false);
+                }}
+              >
+                Confirm delete
+              </button>
+              <button className="ghost" type="button" onClick={() => setConfirmParticipant(false)}>
+                Keep
+              </button>
+            </>
+          ) : (
+            <button className="ghost" type="button" onClick={() => setConfirmParticipant(true)}>
+              Delete participant
+            </button>
+          ))}
         <button onClick={onHome}>Home</button>
       </div>
     </div>

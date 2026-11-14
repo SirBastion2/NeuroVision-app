@@ -44,17 +44,30 @@ import {
   type DeleteResult,
   type ExportResult,
   type HealthResult,
+  type Me,
   type ProcessingSnapshot,
   type PutSessionInput,
   type SessionResource,
   type TraceUploadRequest,
   type TraceUploadResult,
 } from "./api-client";
+import { createApiAuthClient, type ApiAuthClient, type AuthorizationRedirect } from "./api-auth";
 import { resolveHistoryStore, type HistoryStore } from "./history-store";
-import { createOidcClient, type AuthorizationRedirect, type OidcClient, type OidcToken } from "./oidc";
-import { getBrowserKeyValueStore, type KeyValueStore, type PackageStoreFactory } from "./package-store";
+import {
+  createMemoryKeyValueStore,
+  getBrowserKeyValueStore,
+  type KeyValueStore,
+  type PackageStoreFactory,
+} from "./package-store";
 import { deleteParticipant, exportParticipant, pollProcessingState, type PollProcessingOptions } from "./processing";
 import { readRuntimeConfig, type WebRuntimeConfig } from "./runtime-config";
+import {
+  createUploadQueue,
+  type EnqueueUploadInput,
+  type UploadJob,
+  type UploadQueue,
+  type UploadQueueState,
+} from "./upload-queue";
 
 const DEFAULT_VIEWPORT: Viewport = describeViewport(1280, 900);
 const GAZE_LAB_DURATION_MS = 22_000;
@@ -95,7 +108,8 @@ export interface CreateAppServicesOptions {
   keyValueStore?: KeyValueStore | null;
   packageStoreFactory?: PackageStoreFactory | null;
   api?: ApiClient;
-  oidc?: OidcClient;
+  auth?: ApiAuthClient;
+  queue?: UploadQueue;
   fetch?: typeof fetch;
 }
 
@@ -104,7 +118,8 @@ export interface AppServices {
   readonly contractsVersion: string;
   readonly apiEnabled: boolean;
   readonly api: ApiClient;
-  readonly oidc: OidcClient;
+  readonly auth: ApiAuthClient;
+  readonly queue: UploadQueue;
   startSession(input?: StartSessionInput): SessionRecord;
   recordClick(session: SessionRecord, trialId: string, point: Point, elapsed: number): SessionRecord;
   recordTrialClick(trial: TrialRecord, sessionId: string, point: Point, elapsed: number): TrialRecord;
@@ -114,6 +129,7 @@ export interface AppServices {
   score(session: SessionRecord): ScoringResult;
   save(session: SessionRecord): Promise<SessionRecord>;
   load(id: string): Promise<SessionRecord | null>;
+  remove(id: string): Promise<void>;
   listHistory(): Promise<SessionRecord[]>;
   comparableHistory(sessions?: readonly SessionRecord[]): Promise<ComparableHistory>;
   sessionsComparable(a: SessionRecord, b: SessionRecord): boolean;
@@ -130,9 +146,16 @@ export interface AppServices {
   pollProcessingState(sessionId: string, options?: PollProcessingOptions): Promise<ProcessingSnapshot>;
   exportParticipant(participantId: string): Promise<ExportResult>;
   deleteParticipant(participantId: string, input?: { confirm?: true }): Promise<DeleteResult>;
-  beginOidcRedirect(): Promise<AuthorizationRedirect>;
-  completeOidcCallback(url: string | URL): Promise<OidcToken>;
-  getAccessToken(): string | null;
+  enqueueUpload(input: EnqueueUploadInput): Promise<UploadJob>;
+  queueState(): UploadQueueState;
+  subscribeQueue(listener: (state: UploadQueueState) => void): () => void;
+  drainQueue(): Promise<UploadQueueState>;
+  beginSignIn(): Promise<AuthorizationRedirect>;
+  completeSignIn(url: string | URL): Promise<Me | { url: string }>;
+  signInLocal(input: { subject: string; orgId: string }): Promise<Me>;
+  getMe(): Promise<Me | null>;
+  signOut(): Promise<void>;
+  getCsrfToken(): string | null;
 }
 
 function emptyDecision(): PracticeSuggestion {
@@ -197,19 +220,21 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   });
   const now = options.now ?? (() => new Date());
   const createId = options.createId ?? (() => crypto.randomUUID());
-  const oidc =
-    options.oidc ??
-    createOidcClient({
-      config: standalone ? null : config.oidc,
-      fetch: options.fetch,
-    });
+  const kv =
+    options.keyValueStore === undefined ? getBrowserKeyValueStore() : options.keyValueStore;
   const api =
     options.api ??
     createApiClient({
       baseUrl: config.apiBaseUrl,
       standalone,
       fetch: options.fetch,
-      getAccessToken: () => oidc.getAccessToken(),
+    });
+  const auth = options.auth ?? createApiAuthClient({ api });
+  const queue =
+    options.queue ??
+    createUploadQueue({
+      api,
+      store: kv ?? createMemoryKeyValueStore(),
     });
 
   const recordTrialClick = (
@@ -242,7 +267,8 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     contractsVersion: CONTRACTS_VERSION,
     apiEnabled: api.enabled,
     api,
-    oidc,
+    auth,
+    queue,
 
     startSession(input: StartSessionInput = {}): SessionRecord {
       const id = input.id ?? createId();
@@ -320,6 +346,10 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
 
     load(id) {
       return store.load(id);
+    },
+
+    remove(id) {
+      return store.remove(id);
     },
 
     listHistory() {
@@ -416,16 +446,44 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       return deleteParticipant(api, participantId, input);
     },
 
-    beginOidcRedirect() {
-      return oidc.buildAuthorizationUrl();
+    enqueueUpload(input) {
+      return queue.enqueue(input);
     },
 
-    completeOidcCallback(url) {
-      return oidc.handleCallback(url);
+    queueState() {
+      return queue.getState();
     },
 
-    getAccessToken() {
-      return oidc.getAccessToken();
+    subscribeQueue(listener) {
+      return queue.subscribe(listener);
+    },
+
+    drainQueue() {
+      return queue.drain();
+    },
+
+    beginSignIn() {
+      return auth.beginSignIn();
+    },
+
+    completeSignIn(url) {
+      return auth.completeSignIn(url);
+    },
+
+    signInLocal(input) {
+      return auth.signInLocal(input);
+    },
+
+    getMe() {
+      return auth.getMe();
+    },
+
+    signOut() {
+      return auth.signOut();
+    },
+
+    getCsrfToken() {
+      return auth.getCsrfToken();
     },
   };
 }

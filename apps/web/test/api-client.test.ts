@@ -217,7 +217,6 @@ describe("typed API client", () => {
       config: {
         apiBaseUrl: "https://api.example.test",
         standalone: false,
-        oidc: null,
       },
       fetch: fetchImpl,
     });

@@ -5,6 +5,7 @@ export type CompletionState = "active" | "complete" | "interrupted";
 export type SyncState = "local" | "queued" | "uploading" | "acknowledged" | "blocked";
 
 export const TERMINAL_PROCESSING_STATES: ReadonlySet<ProcessingState> = new Set(["ready", "failed"]);
+export const CSRF_COOKIE = "nv_csrf";
 
 export function isTerminalProcessingState(state: string): state is ProcessingState {
   return TERMINAL_PROCESSING_STATES.has(state as ProcessingState);
@@ -51,6 +52,30 @@ export interface SessionResource {
   record?: unknown;
 }
 
+export interface BatchPayloadInput {
+  sequence: number;
+  parentBatchId: string | null;
+  shell: unknown;
+  trials: unknown[];
+  practice: unknown[];
+  contentHash: string;
+}
+
+export interface BatchResult {
+  batchId: string;
+  sequence: number;
+  idempotent: boolean;
+}
+
+export interface FinalizeResult {
+  sessionId: string;
+  sealed: boolean;
+  idempotent: boolean;
+  jobId: string | null;
+  inputHash: string | null;
+  processing: ProcessingState;
+}
+
 export interface TraceUploadRequest {
   declaredByteCount: number;
   declaredExpandedBytes: number;
@@ -91,6 +116,29 @@ export interface HealthResult {
   status: "ok";
 }
 
+export interface Me {
+  subject: string;
+  orgId: string;
+  role: string;
+  csrfToken: string;
+}
+
+export interface ParticipantListItem {
+  id: string;
+  orgId?: string;
+  label?: string;
+  subject: string | null;
+}
+
+export interface AssignmentResult {
+  id: string;
+  revision: number;
+  manifestHash?: string;
+  exposureStatus?: string;
+  manifest?: unknown;
+  idempotent?: boolean;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -117,13 +165,29 @@ export interface ApiClientOptions {
   standalone?: boolean;
   fetch?: typeof fetch;
   getAccessToken?: () => string | null;
+  getCsrfToken?: () => string | null;
+  onCsrfToken?: (token: string | null) => void;
 }
 
 export interface ApiClient {
   readonly enabled: boolean;
   readonly baseUrl: string;
+  getCsrfToken(): string | null;
   health(): Promise<HealthResult>;
+  getMe(): Promise<Me>;
+  signInLocal(input: { subject: string; orgId: string }): Promise<Me>;
+  completeAuthCallback(code: string, state: string): Promise<void>;
+  logout(): Promise<{ signedOut: boolean }>;
+  listParticipants(): Promise<{ participants: ParticipantListItem[] }>;
+  createAssignment(input: {
+    id?: string;
+    participantId: string;
+    exposureStatus: "unseen" | "seen" | "unknown";
+    manifest: unknown;
+  }): Promise<AssignmentResult>;
   putSession(input: PutSessionInput): Promise<SessionResource>;
+  putBatch(sessionId: string, batchId: string, payload: BatchPayloadInput): Promise<BatchResult>;
+  finalizeSession(sessionId: string): Promise<FinalizeResult>;
   createTraceUpload(sessionId: string, request: TraceUploadRequest): Promise<TraceUploadAuthorization>;
   putTraceContent(sessionId: string, traceId: string, bytes: Uint8Array, contentUrl?: string): Promise<TraceUploadResult>;
   uploadTrace(sessionId: string, request: TraceUploadRequest, bytes: Uint8Array): Promise<TraceUploadResult>;
@@ -135,9 +199,9 @@ export interface ApiClient {
 
 function joinUrl(base: string, path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
-  const trimmedBase = base.replace(/\/+$/, "");
   const trimmedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${trimmedBase}${trimmedPath}`;
+  if (!base || base === "/" || base === ".") return trimmedPath;
+  return `${base.replace(/\/+$/, "")}${trimmedPath}`;
 }
 
 function snapshotFromSession(session: SessionResource): ProcessingSnapshot {
@@ -171,6 +235,35 @@ function errorFrom(status: number, body: unknown, fallback: string): ApiError {
   return new ApiError(status, "http_error", fallback, {});
 }
 
+function readCookie(name: string): string | null {
+  try {
+    const cookie = (globalThis as { document?: { cookie?: string } }).document?.cookie;
+    if (!cookie) return null;
+    const parts = cookie.split(";");
+    for (const part of parts) {
+      const [rawKey, ...rest] = part.trim().split("=");
+      if (rawKey === name) return decodeURIComponent(rest.join("="));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function asMe(body: unknown, fallbackCsrf: string | null): Me {
+  const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const csrf =
+    typeof record.csrfToken === "string"
+      ? record.csrfToken
+      : fallbackCsrf ?? "";
+  return {
+    subject: typeof record.subject === "string" ? record.subject : "",
+    orgId: typeof record.orgId === "string" ? record.orgId : "",
+    role: typeof record.role === "string" ? record.role : "",
+    csrfToken: csrf,
+  };
+}
+
 export function createApiClient(options: ApiClientOptions): ApiClient {
   const enabled = isApiEnabled({
     apiBaseUrl: options.baseUrl,
@@ -178,6 +271,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   });
   const baseUrl = options.baseUrl.replace(/\/+$/, "");
   const fetchImpl = options.fetch ?? fetch.bind(globalThis);
+  let csrf = options.getCsrfToken?.() ?? null;
+
+  const rememberCsrf = (token: string | null): void => {
+    csrf = token;
+    options.onCsrfToken?.(token);
+  };
 
   const request = async (path: string, init: RequestInit = {}): Promise<unknown> => {
     if (!enabled) throw new ApiOfflineError();
@@ -186,10 +285,22 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (token && !headers.has("authorization")) {
       headers.set("authorization", `Bearer ${token}`);
     }
-    const response = await fetchImpl(joinUrl(baseUrl, path), { ...init, headers });
+    const method = (init.method ?? "GET").toUpperCase();
+    const csrfToken = options.getCsrfToken?.() ?? csrf ?? readCookie(CSRF_COOKIE);
+    if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method) && !headers.has("x-csrf-token")) {
+      headers.set("x-csrf-token", csrfToken);
+    }
+    const response = await fetchImpl(joinUrl(baseUrl, path), {
+      ...init,
+      headers,
+      credentials: "include",
+    });
     const body = await readBody(response);
     if (!response.ok) {
       throw errorFrom(response.status, body, `Request failed (${response.status})`);
+    }
+    if (body && typeof body === "object" && "csrfToken" in body && typeof (body as Me).csrfToken === "string") {
+      rememberCsrf((body as Me).csrfToken);
     }
     return body;
   };
@@ -206,8 +317,64 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     enabled,
     baseUrl,
 
+    getCsrfToken() {
+      return options.getCsrfToken?.() ?? csrf ?? readCookie(CSRF_COOKIE);
+    },
+
     async health() {
       return json<HealthResult>("/health");
+    },
+
+    async getMe() {
+      return asMe(await json<unknown>("/api/v1/me"), csrf);
+    },
+
+    async signInLocal(input) {
+      const me = asMe(
+        await json<unknown>("/api/v1/auth/local", {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+        csrf,
+      );
+      rememberCsrf(me.csrfToken || csrf);
+      return me;
+    },
+
+    async completeAuthCallback(code, state) {
+      if (!enabled) throw new ApiOfflineError();
+      const path = `/api/v1/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+      const response = await fetchImpl(joinUrl(baseUrl, path), {
+        method: "GET",
+        credentials: "include",
+        redirect: "manual",
+      });
+      if (response.type === "opaqueredirect" || (response.status >= 200 && response.status < 400)) {
+        return;
+      }
+      const body = await readBody(response);
+      throw errorFrom(response.status, body, `Request failed (${response.status})`);
+    },
+
+    async logout() {
+      const result = await json<{ signedOut: boolean }>("/api/v1/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      rememberCsrf(null);
+      return result;
+    },
+
+    async listParticipants() {
+      const body = await json<{ participants?: ParticipantListItem[] }>("/api/v1/participants");
+      return { participants: body.participants ?? [] };
+    },
+
+    async createAssignment(input) {
+      return json<AssignmentResult>("/api/v1/assignments", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
     },
 
     async putSession(input) {
@@ -215,6 +382,20 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return json<SessionResource>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
         method: "PUT",
         body: JSON.stringify(body),
+      });
+    },
+
+    async putBatch(sessionId, batchId, payload) {
+      return json<BatchResult>(
+        `/api/v1/sessions/${encodeURIComponent(sessionId)}/batches/${encodeURIComponent(batchId)}`,
+        { method: "PUT", body: JSON.stringify(payload) },
+      );
+    },
+
+    async finalizeSession(sessionId) {
+      return json<FinalizeResult>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/finalize`, {
+        method: "POST",
+        body: JSON.stringify({}),
       });
     },
 

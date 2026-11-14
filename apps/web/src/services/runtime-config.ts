@@ -1,15 +1,6 @@
-export interface OidcRuntimeConfig {
-  authorizeUrl: string;
-  tokenUrl: string;
-  clientId: string;
-  redirectUri: string;
-  scope: string;
-}
-
 export interface WebRuntimeConfig {
   apiBaseUrl: string;
   standalone: boolean;
-  oidc: OidcRuntimeConfig | null;
 }
 
 type EnvRecord = Record<string, string | boolean | undefined>;
@@ -44,28 +35,12 @@ export function isStandaloneRuntime(env?: EnvRecord): boolean {
   return isFileProtocol();
 }
 
-export function readOidcConfig(env?: EnvRecord): OidcRuntimeConfig | null {
-  const authorizeUrl = readEnv("VITE_OIDC_AUTHORIZE_URL", env);
-  const tokenUrl = readEnv("VITE_OIDC_TOKEN_URL", env);
-  const clientId = readEnv("VITE_OIDC_CLIENT_ID", env);
-  const redirectUri = readEnv("VITE_OIDC_REDIRECT_URI", env);
-  if (!authorizeUrl || !tokenUrl || !clientId || !redirectUri) return null;
-  return {
-    authorizeUrl,
-    tokenUrl,
-    clientId,
-    redirectUri,
-    scope: readEnv("VITE_OIDC_SCOPE", env) || "openid",
-  };
-}
-
 export function readRuntimeConfig(env?: EnvRecord): WebRuntimeConfig {
   const standalone = isStandaloneRuntime(env);
   const apiBaseUrl = standalone ? "" : readEnv("VITE_API_BASE_URL", env).replace(/\/+$/, "");
   return {
     apiBaseUrl,
     standalone,
-    oidc: standalone ? null : readOidcConfig(env),
   };
 }
 
