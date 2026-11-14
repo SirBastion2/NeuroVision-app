@@ -1,13 +1,13 @@
 /**
- * Published healthy-range norms for NeuroVision metrics.
+ * Healthy-range norms for NeuroVision metrics.
  *
- * Numbers come from peer-reviewed healthy-control samples, converted into the
- * units this codebase already scores. Metrics without a defensible published
- * match are marked uncalibrated: scoring must not invent a mean, SD, or cutoff
- * for them.
+ * Scoring uses Table 2 placeholder means/SDs for the three tests that enter
+ * the evidence model (Starry Night, Hollow Rings, line bisection). Those
+ * values are assumed, not measured, and every result that uses them carries
+ * a notice. Clock, greyscales, gaze, and Hidden scene do not enter the model.
  */
 
-export type NormSource = "hacker-norms" | "literature" | "assumed" | "uncalibrated";
+export type NormSource = "hacker-norms" | "literature" | "assumed" | "fitted" | "uncalibrated";
 export type CutoffDirection = "above" | "below" | "absolute";
 export type HealthyRangeStatus = "within" | "outside" | "uncalibrated";
 
@@ -21,7 +21,7 @@ export interface NormCitation {
 }
 
 export interface NormSample {
-  /** Healthy-control n when the paper reports one; omitted for cutoff-only mappings. */
+  /** Healthy-control n when a fitted sample exists; omitted for placeholders. */
   n?: number;
   ageRange: string;
   notes?: string;
@@ -64,272 +64,154 @@ export interface TestNormShape {
   citation?: NormCitation | null;
 }
 
-const AZOUVI_2006: NormCitation = {
-  authors: "Azouvi P, Bartolomeo P, Beis J-M, Perennou D, Pradat-Diehl P, Rousseaux M",
-  year: 2006,
-  title: "A battery of tests for the quantitative assessment of unilateral neglect",
-  journal: "Restorative Neurology and Neuroscience",
-  doi: "10.3233/RNN-2006-354",
-  url: "https://pubmed.ncbi.nlm.nih.gov/17119296/",
-};
+/** Notice attached to any reading that used Table 2 placeholders. */
+export const ASSUMED_NORM_NOTICE =
+  "Healthy-range means and SDs are assumed placeholders, not measured values.";
 
-const FRIEDRICH_ELIAS_2014: NormCitation = {
-  authors: "Friedrich TE, Elias LJ",
-  year: 2014,
-  title: "Behavioural asymmetries on the greyscales task: The influence of native reading direction",
-  journal: "Culture and Brain",
-  doi: "10.1007/s40167-014-0019-3",
-  url: "https://doi.org/10.1007/s40167-014-0019-3",
-};
+/** Notice attached when scoring uses Eq. (9) fitted healthy-control norms. */
+export function fittedNormNotice(n: number): string {
+  return `Healthy-range means and SDs are fitted from ${n} healthy-control sessions (Eq. 9).`;
+}
 
-const RORDEN_KARNATH_2010: NormCitation = {
-  authors: "Rorden C, Karnath H-O",
-  year: 2010,
-  title: "A simple measure of neglect severity",
-  journal: "Neuropsychologia",
-  doi: "10.1016/j.neuropsychologia.2010.04.018",
-  url: "https://doi.org/10.1016/j.neuropsychologia.2010.04.018",
-};
+const PLACEHOLDER_NOTE =
+  "Assumed placeholder (Table 2). Not a measured healthy-control sample; replace by fitting (Eq. 9) once n ≥ 5.";
 
-const AZOUVI_CONTROLS = "adults 20–80+ years (French BEN healthy controls)";
+const UNCALIBRATED_NOTE = "This measure does not enter the evidence model and has no scoring healthy range.";
 
-/** Azouvi 2006 20 cm line: mm → percent of line length (200 mm). */
-export const BISECTION_LINE_MM = 200;
-export const AZOUVI_BISECTION_MEAN_MM = -0.95;
-export const AZOUVI_BISECTION_SD_MM = 4.15;
-export const AZOUVI_BISECTION_CUTOFF_MM = 6.5;
+function assumedMetric(
+  id: string,
+  label: string,
+  unit: string,
+  mean: number,
+  sd: number,
+  note: string,
+): MetricNorm {
+  return {
+    id,
+    label,
+    unit,
+    mean,
+    sd,
+    cutoff: null,
+    cutoffDirection: null,
+    sample: null,
+    citation: null,
+    source: "assumed",
+    calibrated: true,
+    note,
+  };
+}
 
-/** Signed midpoint error, percent of line length, right of centre positive. */
-export const BISECTION_SIGNED_ERROR_PCT: MetricNorm = {
-  id: "bisection-signed-error-pct",
-  label: "Line bisection signed error",
-  unit: "% of line length (right of centre positive)",
-  mean: (100 * AZOUVI_BISECTION_MEAN_MM) / BISECTION_LINE_MM,
-  sd: (100 * AZOUVI_BISECTION_SD_MM) / BISECTION_LINE_MM,
-  cutoff: (100 * AZOUVI_BISECTION_CUTOFF_MM) / BISECTION_LINE_MM,
-  cutoffDirection: "above",
-  sample: {
-    n: 457,
-    ageRange: AZOUVI_CONTROLS,
-    notes: "20 cm lines, Table 2. Cutoff is the published rightward (left-neglect) threshold.",
-  },
-  citation: AZOUVI_2006,
-  source: "literature",
-  calibrated: true,
-  note: "Converted from millimetres on a 20 cm line. Rightward marks sit outside the healthy range above 6.5 mm (3.25% of line length).",
-};
-
-/**
- * Evidence-model lateral index = negated mean signed error, so left-weaker is
- * negative. Healthy mean therefore flips sign; SD is unchanged.
- */
-export const BISECTION_LATERAL_INDEX: MetricNorm = {
-  id: "bisection-lateral-index",
-  label: "Line bisection lateral index",
-  unit: "negated % of line length (negative = left weaker)",
-  mean: BISECTION_SIGNED_ERROR_PCT.mean === null ? null : -BISECTION_SIGNED_ERROR_PCT.mean,
-  sd: BISECTION_SIGNED_ERROR_PCT.sd,
-  cutoff: BISECTION_SIGNED_ERROR_PCT.cutoff === null ? null : -BISECTION_SIGNED_ERROR_PCT.cutoff,
-  cutoffDirection: "below",
-  sample: BISECTION_SIGNED_ERROR_PCT.sample,
-  citation: AZOUVI_2006,
-  source: "literature",
-  calibrated: true,
-  note: "Same Azouvi 2006 20 cm sample as signed error, with the evidence-model sign flip.",
-};
-
-/**
- * Friedrich & Elias 2014 response bias is (rightward − leftward) choices on 96
- * trials, negative = leftward. Our bias is (darker-left − darker-right) / n,
- * positive = leftward, so we flip sign and divide by 96.
- */
-export const GREYSCALES_TRIALS = 96;
-export const FRIEDRICH_LTR_BIAS = -34.6;
-export const FRIEDRICH_LTR_SD = 37.67;
-export const FRIEDRICH_RTL_BIAS = -0.99;
-export const FRIEDRICH_RTL_SD = 42.06;
-
-export const GREYSCALES_LTR: MetricNorm = {
-  id: "greyscales-ltr",
-  label: "Greyscales bias (left-to-right readers)",
-  unit: "bias −1…1 (positive = darker-left / leftward)",
-  mean: -FRIEDRICH_LTR_BIAS / GREYSCALES_TRIALS,
-  sd: FRIEDRICH_LTR_SD / GREYSCALES_TRIALS,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: {
-    n: 54,
-    ageRange: "young adults, university sample (LTR males 25.8±5.5 y)",
-    notes: "Native left-to-right readers. Paper score −96…+96, negative = leftward.",
-  },
-  citation: FRIEDRICH_ELIAS_2014,
-  source: "literature",
-  calibrated: true,
-  note: "Healthy left-to-right readers favour the darker-left bar (pseudoneglect).",
-};
-
-export const GREYSCALES_RTL: MetricNorm = {
-  id: "greyscales-rtl",
-  label: "Greyscales bias (right-to-left readers)",
-  unit: "bias −1…1 (positive = darker-left / leftward)",
-  mean: -FRIEDRICH_RTL_BIAS / GREYSCALES_TRIALS,
-  sd: FRIEDRICH_RTL_SD / GREYSCALES_TRIALS,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: {
-    n: 43,
-    ageRange: "young adults, university sample (RTL males 25.2±5.3 y)",
-    notes: "Native right-to-left readers. Paper score −96…+96, negative = leftward.",
-  },
-  citation: FRIEDRICH_ELIAS_2014,
-  source: "literature",
-  calibrated: true,
-  note: "Native right-to-left readers showed no reliable leftward greyscales bias.",
-};
-
-export const GREYSCALES_OTHER: MetricNorm = {
-  id: "greyscales-other",
-  label: "Greyscales bias (mixed or other reading direction)",
-  unit: "bias −1…1 (positive = darker-left / leftward)",
-  mean: null,
-  sd: null,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: null,
-  citation: null,
-  source: "uncalibrated",
-  calibrated: false,
-  note: "Friedrich & Elias 2014 reports LTR and RTL groups only. Mixed or other reading direction has no published healthy range here.",
-};
-
-/** Azouvi bells: left-minus-right omissions on 15 targets per side. */
-export const BELLS_TARGETS_PER_SIDE = 15;
-export const AZOUVI_BELLS_MEAN_LR = 0.05;
-export const AZOUVI_BELLS_SD_LR = 1.39;
-export const AZOUVI_BELLS_CUTOFF_LR = 2;
-
-function bellsCountToPoints(count: number): number {
-  return (100 * count) / BELLS_TARGETS_PER_SIDE;
+function uncalibratedMetric(id: string, label: string, unit: string, note = UNCALIBRATED_NOTE): MetricNorm {
+  return {
+    id,
+    label,
+    unit,
+    mean: null,
+    sd: null,
+    cutoff: null,
+    cutoffDirection: null,
+    sample: null,
+    citation: null,
+    source: "uncalibrated",
+    calibrated: false,
+    note,
+  };
 }
 
 /**
- * Hollow-ring (target-selection) omission laterality in percentage points:
- * left omission rate minus right omission rate. Mapped from Azouvi bells
- * laterality as a proportion of targets on each side.
+ * Evidence-model lateral index = negated mean signed error, so left-weaker is
+ * negative. Table 2: μ = +1, σ = 3 (percent of line length).
  */
-export const HOLLOW_RINGS_OMISSION_ASYMMETRY: MetricNorm = {
-  id: "hollow-rings-omission-asymmetry",
-  label: "Hollow rings omission laterality",
-  unit: "percentage points (left omission rate − right omission rate)",
-  mean: bellsCountToPoints(AZOUVI_BELLS_MEAN_LR),
-  sd: bellsCountToPoints(AZOUVI_BELLS_SD_LR),
-  cutoff: bellsCountToPoints(AZOUVI_BELLS_CUTOFF_LR),
-  cutoffDirection: "absolute",
-  sample: {
-    n: 576,
-    ageRange: AZOUVI_CONTROLS,
-    notes: "Bells test left-minus-right omissions, Table 2. Converted to % of 15 targets per side.",
-  },
-  citation: AZOUVI_2006,
-  source: "literature",
-  calibrated: true,
-  note: "Closest published cancellation laterality (Bells test). Cutoff |L−R| > 2 omissions → 13.33 percentage points.",
-};
+export const BISECTION_LATERAL_INDEX: MetricNorm = assumedMetric(
+  "bisection-lateral-index",
+  "Line bisection lateral index",
+  "negated % of line length (negative = left weaker)",
+  1,
+  3,
+  `${PLACEHOLDER_NOTE} Index is the negated mean signed error.`,
+);
 
-/** Hit-rate right minus hit-rate left, the screening-star companion of bells laterality. */
-export const STAR_CANCELLATION_HIT_ASYMMETRY: MetricNorm = {
-  id: "star-cancellation-hit-asymmetry",
-  label: "Star cancellation hit-rate asymmetry",
-  unit: "hitRateRight − hitRateLeft",
-  mean: HOLLOW_RINGS_OMISSION_ASYMMETRY.mean === null ? null : HOLLOW_RINGS_OMISSION_ASYMMETRY.mean / 100,
-  sd: HOLLOW_RINGS_OMISSION_ASYMMETRY.sd === null ? null : HOLLOW_RINGS_OMISSION_ASYMMETRY.sd / 100,
-  cutoff: HOLLOW_RINGS_OMISSION_ASYMMETRY.cutoff === null ? null : HOLLOW_RINGS_OMISSION_ASYMMETRY.cutoff / 100,
-  cutoffDirection: "absolute",
-  sample: HOLLOW_RINGS_OMISSION_ASYMMETRY.sample,
-  citation: AZOUVI_2006,
-  source: "literature",
-  calibrated: true,
-  note: "Same Bells laterality as hollow-ring omission asymmetry, expressed as a hit-rate difference.",
-};
+/** Signed midpoint error, percent of line length, right of centre positive. Table 2 flipped. */
+export const BISECTION_SIGNED_ERROR_PCT: MetricNorm = assumedMetric(
+  "bisection-signed-error-pct",
+  "Line bisection signed error",
+  "% of line length (right of centre positive)",
+  -1,
+  3,
+  `${PLACEHOLDER_NOTE} Sign is opposite the evidence-model index.`,
+);
 
-/** Center of Cancellation: published BIT-equivalent cutoff, not a new mean/SD. */
-export const STAR_CANCELLATION_COC: MetricNorm = {
-  id: "star-cancellation-coc",
-  label: "Star cancellation Center of Cancellation",
-  unit: "normalized x (positive = found targets shifted right)",
-  mean: null,
-  sd: null,
-  cutoff: 0.081,
-  cutoffDirection: "above",
-  sample: {
-    ageRange: "mapped to the Behavioural Inattention Test star-cancellation cutoff",
-    notes: "Rorden & Karnath (2010) report that CoC 0.081 corresponds to the conventional BIT cutoff. No separate healthy mean/SD is used.",
-  },
-  citation: RORDEN_KARNATH_2010,
-  source: "literature",
-  calibrated: true,
-  note: "Cutoff-only. Values above 0.081 sit outside the healthy range used by the BIT mapping.",
-};
+/** Starry Night, Eq. (1): left hit rate − right hit rate. Table 2: μ = 0, σ = 0.15. */
+export const STARRY_LATERALITY: MetricNorm = assumedMetric(
+  "starry-night-laterality",
+  "Starry Night laterality",
+  "left hit rate − right hit rate (negative = left weaker)",
+  0,
+  0.15,
+  `${PLACEHOLDER_NOTE} Assumed symmetric.`,
+);
 
-export const CLOCK_LATERALITY: MetricNorm = {
-  id: "clock-laterality",
-  label: "Clock check laterality",
-  unit: "left-half accuracy − right-half accuracy",
-  mean: null,
-  sd: null,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: null,
-  citation: null,
-  source: "uncalibrated",
-  calibrated: false,
-  note: "Published clock-drawing cutoffs (e.g. Azouvi CDT) are a different task. This two-clock comparison has no published healthy range.",
-};
+/** Hollow Rings, Eq. (1): right omission rate − left omission rate. Table 2: μ = 0, σ = 0.06. */
+export const HOLLOW_RINGS_LATERAL_INDEX: MetricNorm = assumedMetric(
+  "hollow-rings-lateral-index",
+  "Hollow Rings laterality",
+  "right omission rate − left omission rate (negative = left weaker)",
+  0,
+  0.06,
+  `${PLACEHOLDER_NOTE} Assumed symmetric, few omissions.`,
+);
 
-export const STARRY_LATERALITY: MetricNorm = {
-  id: "starry-night-laterality",
-  label: "Starry Night laterality",
-  unit: "left hit rate − right hit rate",
-  mean: null,
-  sd: null,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: null,
-  citation: null,
-  source: "uncalibrated",
-  calibrated: false,
-  note: "Deouell, Sacher & Soroker (2005) introduced this paradigm with a small patient series and no healthy-control mean/SD for this left−right hit-rate index.",
-};
+/** @deprecated Use HOLLOW_RINGS_LATERAL_INDEX. Kept as an alias for existing imports. */
+export const HOLLOW_RINGS_OMISSION_ASYMMETRY = HOLLOW_RINGS_LATERAL_INDEX;
 
-export const SCENE_LATERALITY: MetricNorm = {
-  id: "scene-laterality",
-  label: "Hidden scene laterality",
-  unit: "right-half minus left-half omission rate",
-  mean: null,
-  sd: null,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: null,
-  citation: null,
-  source: "uncalibrated",
-  calibrated: false,
-  note: "The Hidden scene is a demonstration. It is not scored against a healthy range.",
-};
+export const GREYSCALES_LTR: MetricNorm = uncalibratedMetric(
+  "greyscales-ltr",
+  "Greyscales bias (left-to-right readers)",
+  "bias −1…1 (positive = darker-left / leftward)",
+);
 
-export const GAZE_LEFT_FRACTION: MetricNorm = {
-  id: "gaze-left-fraction",
-  label: "Gaze time on the left half",
-  unit: "fraction of tracked gaze time",
-  mean: null,
-  sd: null,
-  cutoff: null,
-  cutoffDirection: null,
-  sample: null,
-  citation: null,
-  source: "uncalibrated",
-  calibrated: false,
-  note: "Webcam dwell laterality has no matching published healthy-control mean, SD, or cutoff.",
-};
+export const GREYSCALES_RTL: MetricNorm = uncalibratedMetric(
+  "greyscales-rtl",
+  "Greyscales bias (right-to-left readers)",
+  "bias −1…1 (positive = darker-left / leftward)",
+);
+
+export const GREYSCALES_OTHER: MetricNorm = uncalibratedMetric(
+  "greyscales-other",
+  "Greyscales bias (mixed or other reading direction)",
+  "bias −1…1 (positive = darker-left / leftward)",
+);
+
+export const STAR_CANCELLATION_HIT_ASYMMETRY: MetricNorm = uncalibratedMetric(
+  "star-cancellation-hit-asymmetry",
+  "Star cancellation hit-rate asymmetry",
+  "hitRateRight − hitRateLeft",
+);
+
+export const STAR_CANCELLATION_COC: MetricNorm = uncalibratedMetric(
+  "star-cancellation-coc",
+  "Star cancellation Center of Cancellation",
+  "normalized x (positive = found targets shifted right)",
+);
+
+export const CLOCK_LATERALITY: MetricNorm = uncalibratedMetric(
+  "clock-laterality",
+  "Clock check laterality",
+  "left-half accuracy − right-half accuracy",
+);
+
+export const SCENE_LATERALITY: MetricNorm = uncalibratedMetric(
+  "scene-laterality",
+  "Hidden scene laterality",
+  "right-half minus left-half omission rate",
+);
+
+export const GAZE_LEFT_FRACTION: MetricNorm = uncalibratedMetric(
+  "gaze-left-fraction",
+  "Gaze time on the left half",
+  "fraction of tracked gaze time",
+);
 
 export const METRICS = {
   "bisection-signed-error-pct": BISECTION_SIGNED_ERROR_PCT,
@@ -338,6 +220,7 @@ export const METRICS = {
   "greyscales-rtl": GREYSCALES_RTL,
   "greyscales-other": GREYSCALES_OTHER,
   "hollow-rings-omission-asymmetry": HOLLOW_RINGS_OMISSION_ASYMMETRY,
+  "hollow-rings-lateral-index": HOLLOW_RINGS_LATERAL_INDEX,
   "star-cancellation-hit-asymmetry": STAR_CANCELLATION_HIT_ASYMMETRY,
   "star-cancellation-coc": STAR_CANCELLATION_COC,
   "clock-laterality": CLOCK_LATERALITY,
@@ -400,7 +283,7 @@ export function compareToNorm(value: number | null | undefined, metric: MetricNo
       z: null,
       beyondCutoff: false,
       status: "uncalibrated",
-      text: "Uncalibrated — no published healthy range for this measure.",
+      text: "Uncalibrated — this measure does not enter the evidence model.",
     };
   }
 
@@ -415,19 +298,25 @@ export function compareToNorm(value: number | null | undefined, metric: MetricNo
   }
 
   const zPart = z == null ? "" : ` (z = ${formatZ(z)})`;
+  let notice = "";
+  if (metric.source === "assumed") notice = ` ${ASSUMED_NORM_NOTICE}`;
+  else if (metric.source === "fitted") {
+    const n = metric.sample?.n;
+    notice = ` ${n != null ? fittedNormNotice(n) : "Healthy-range means and SDs are fitted (Eq. 9)."}`;
+  }
   return {
     metricId: metric.id,
     calibrated: true,
     z,
     beyondCutoff,
     status: beyondCutoff ? "outside" : "within",
-    text: beyondCutoff ? `Outside the healthy range${zPart}.` : `Within the healthy range${zPart}.`,
+    text: `${beyondCutoff ? `Outside the healthy range${zPart}.` : `Within the healthy range${zPart}.`}${notice}`,
   };
 }
 
 /**
- * Map a value onto [0, 1] using the published cutoff span, or |z|/2 when only
- * mean/SD exist. Uncalibrated metrics return null so callers drop them.
+ * Map a value onto [0, 1] using |z|/2 against the scoring healthy range.
+ * Uncalibrated metrics return null so callers drop them.
  */
 export function deviationUnit(value: number | null | undefined, metric: MetricNorm): number | null {
   if (value == null || !Number.isFinite(value) || !isCalibratedMetric(metric)) return null;
@@ -444,11 +333,16 @@ export function deviationUnit(value: number | null | undefined, metric: MetricNo
   return unit < 0 ? 0 : unit > 1 ? 1 : unit;
 }
 
-/** Evidence-model defaults. Uncalibrated tests are excluded from the posterior. */
-export const DEFAULT_NORMS: Record<"scene" | "clock" | "greyscales" | "bisection" | "detection", TestNormShape> = {
-  scene: toTestNorm(SCENE_LATERALITY),
-  clock: toTestNorm(CLOCK_LATERALITY),
-  greyscales: toTestNorm(GREYSCALES_LTR),
-  bisection: toTestNorm(BISECTION_LATERAL_INDEX),
-  detection: toTestNorm(STARRY_LATERALITY),
-};
+/**
+ * Evidence-model defaults. Only Starry Night, Hollow Rings, and line bisection
+ * are assumed placeholders and enter the posterior. The rest are uncalibrated.
+ */
+export const DEFAULT_NORMS: Record<"scene" | "clock" | "greyscales" | "bisection" | "detection" | "cancellation", TestNormShape> =
+  {
+    scene: toTestNorm(SCENE_LATERALITY),
+    clock: toTestNorm(CLOCK_LATERALITY),
+    greyscales: toTestNorm(GREYSCALES_LTR),
+    bisection: toTestNorm(BISECTION_LATERAL_INDEX),
+    detection: toTestNorm(STARRY_LATERALITY),
+    cancellation: toTestNorm(HOLLOW_RINGS_LATERAL_INDEX),
+  };

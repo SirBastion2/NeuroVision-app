@@ -9,9 +9,9 @@ import type { BisectionMetrics, DeviationScore, GazeMetrics, StarMetrics } from 
 
 /**
  * Transparent left/right deviation from the healthy range, in [0, 1].
- * Each component is mapped with published mean/SD or cutoff from the norms
- * module. Uncalibrated parts (including webcam gaze laterality) are dropped
- * and the remaining weights renormalised. This is not a diagnosis.
+ * Only metrics with scoring norms (the Table 2 placeholders for the three
+ * model tests) contribute. Clock, greyscales, gaze, Hidden scene, and
+ * uncalibrated screening indices are dropped and remaining weights renormalised.
  */
 export const DEVIATION_WEIGHTS = {
   centerOfCancellation: 0.35,

@@ -57,5 +57,10 @@ test("taps on unlit lanterns and repeats are classified", () => {
 test("bisection marks drifting right give a negative lateral index", () => {
   const lines = generateBisectionLines(6, 1);
   const right = lines.map((l) => ({ lineId: l.id, x: (l.x1 + l.x2) / 2 + 0.1 * (l.x2 - l.x1) }));
-  assert.ok(bisectionObservation(lines, right).observation.value < -9);
+  const scored = bisectionObservation(lines, right);
+  assert.ok(scored.observation.value < -9);
+  const mean = scored.errors.reduce((a, b) => a + b, 0) / scored.errors.length;
+  const sd = Math.sqrt(scored.errors.reduce((a, b) => a + (b - mean) ** 2, 0) / (scored.errors.length - 1));
+  assert.ok(Math.abs(scored.observation.value - -mean) < 1e-12);
+  assert.ok(Math.abs(scored.observation.se - sd / Math.sqrt(5)) < 1e-12);
 });

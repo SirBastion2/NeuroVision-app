@@ -1,29 +1,47 @@
 # Healthy-range norms
 
-All numbers used to score or flag a result live in `packages/domain/src/norms.ts`. Scoring compares a recorded value to that module (`z` from mean/SD, or beyond a published cutoff). Results wording describes deviation from the healthy range only. Metrics without a defensible published match are **uncalibrated**: no mean, SD, or cutoff is invented for them.
+Scoring lives in `packages/domain/src/norms.ts` and the shared-θ model in `packages/domain/src/evidence.ts`. Only three tests enter the model: **Starry Night**, **Hollow Rings**, and **line bisection**. Results wording describes deviation from the healthy range or a lean. It does not describe diagnosis.
 
-## Calibrated
+The means and SDs currently used for those three tests are the Table 2 placeholders from the NeuroVision battery paper (Section 4.5). They are **assumed**, not measured. The model attaches a notice to any result that uses them. Clock, greyscales, gaze, and Hidden scene do not enter the model.
 
-| Metric | What is stored | Sample | Source |
-| --- | --- | --- | --- |
-| Line bisection signed error (% of line length, right of centre positive) | Mean −0.475%, SD 2.075%, cutoff +3.25% (from −0.95 / 4.15 / 6.5 mm on a 20 cm line) | n = 457, adults 20–80+ years (French BEN controls) | Azouvi et al., 2006, *Restorative Neurology and Neuroscience*. [PubMed](https://pubmed.ncbi.nlm.nih.gov/17119296/) DOI 10.3233/RNN-2006-354 |
-| Line bisection lateral index (evidence model; negated signed error) | Mean +0.475%, SD 2.075%, cutoff −3.25% | Same sample | Same paper; sign flipped to match “negative = left weaker” |
-| Greyscales bias, left-to-right readers (−1…1, positive = darker-left) | Mean +0.360, SD 0.392 (paper −34.6 / 37.67 on −96…+96, sign flipped and /96) | n = 54, young adults (university sample) | Friedrich & Elias, 2014, *Culture and Brain*. [DOI](https://doi.org/10.1007/s40167-014-0019-3) |
-| Greyscales bias, right-to-left readers | Mean +0.010, SD 0.438 (paper −0.99 / 42.06, same conversion) | n = 43, young adults (university sample) | Same paper |
-| Hollow rings omission laterality (left − right omission rate, percentage points) | Mean 0.33, SD 9.27, cutoff \|13.33\| (from Bells L−R omissions 0.05 / 1.39 / 2 on 15 targets per side) | n = 576, adults 20–80+ years | Azouvi et al., 2006, Bells test Table 2 |
-| Star cancellation hit-rate asymmetry (`hitRateRight − hitRateLeft`) | Mean 0.0033, SD 0.0927, cutoff 0.1333 | Same Bells sample | Same mapping, in hit-rate units |
-| Star cancellation Center of Cancellation | Cutoff 0.081 (above = outside). No healthy mean/SD | Mapped to the BIT star-cancellation cutoff | Rorden & Karnath, 2010, *Neuropsychologia*. [DOI](https://doi.org/10.1016/j.neuropsychologia.2010.04.018) |
+## Table 2 placeholders (used for scoring)
 
-## Uncalibrated
+Lateral indices follow Eq. (1): negative means the left side is weaker.
 
-These are stored in the norms module with `calibrated: false` and `source: "uncalibrated"`. Scoring and the UI label them; they do not enter the combined posterior or the 0–1 deviation score.
+| Test | Lateral index | μ | σ | Source |
+| --- | --- | --- | --- | --- |
+| Starry Night | Left hit rate − right hit rate | 0 | 0.15 | Assumed symmetric |
+| Hollow Rings | Right omission rate − left omission rate | 0 | 0.06 | Assumed symmetric, few omissions |
+| Line bisection | Negated mean signed error (% of line length) | +1 | 3 | Small leftward healthy error (pseudoneglect) |
 
-| Metric | Why uncalibrated |
+Standard errors follow Eq. (2): adjusted proportions `(x + 1/2) / (n + 1)` for the two rate differences, and the sample SD of the five bisection errors divided by √5. Each index is standardized with Eq. (3), then combined under the shared-θ model (Eqs. (4)–(7)).
+
+These placeholders will be replaced by fitted values once at least five healthy participants are available. Fitting uses Eq. (9) with κ = 8 shrinkage toward the placeholder.
+
+A consented full live battery can be marked `healthyControl`. `GET /api/v1/norms` loads those samples, recomputes each Eq. (1) index from stored Starry Night hits/targets, Hollow Rings omissions/targets, and the five signed bisection errors, then runs Eq. (9) per test. Below five samples, scoring keeps Table 2 and the assumed-placeholders notice. At five or more, scoring uses fitted µ̂ and σ̂, records n, sets `source: "fitted"`, and the notice says the values are fitted. Synthetic pipeline samples are labeled `fixture`. The z and posterior equations are unchanged.
+
+## Tests that do not enter the model
+
+| Measure | Why it is not scored |
 | --- | --- |
-| Clock check laterality (two-clock comparison) | Published clock-drawing cutoffs (including Azouvi CDT) are a different task |
-| Starry Night left−right hit rate | Deouell, Sacher & Soroker (2005) is a small patient series with no healthy-control mean/SD for this index |
-| Hidden scene laterality | Demonstration only; not scored |
-| Greyscales bias, mixed or other reading direction | Friedrich & Elias report LTR and RTL groups only |
-| Gaze time on the left half (webcam) | No matching published dwell-laterality mean, SD, or cutoff |
+| Clock check laterality | Not one of the three battery tests in Section 4 |
+| Greyscales bias (any reading direction) | Not one of the three battery tests in Section 4 |
+| Hidden scene laterality | Demonstration only |
+| Gaze time on the left half (webcam) | Not one of the three battery tests in Section 4 |
+| Star-cancellation Center of Cancellation | Screening index; not the Hollow Rings lateral index |
 
 Practice suggestion still uses its own 25-point side-gap rule. That is a training heuristic, not a healthy-range claim.
+
+## References for later fitting
+
+PR #22 mapped published healthy-control numbers onto nearby tasks. Those literature values are **not used for scoring**. They remain here as starting points when real NeuroVision samples are fitted with Eq. (9).
+
+| Nearby task | Published healthy-control summary | Why it is not the scoring norm |
+| --- | --- | --- |
+| Line bisection (20 cm, mm) | Azouvi et al., 2006, *Restorative Neurology and Neuroscience*, n = 457. Mean −0.95 mm, SD 4.15 mm, rightward cutoff 6.5 mm (DOI 10.3233/RNN-2006-354) | Different line set than the five browser lengths; Table 2 is the scoring placeholder |
+| Bells cancellation L−R omissions | Azouvi et al., 2006, Table 2, n = 576. Mean 0.05, SD 1.39, cutoff 2 on 15 targets per side | Hollow Rings is a different board; Table 2 uses omission-*rate* difference with σ = 0.06 |
+| Greyscales response bias | Friedrich & Elias, 2014, *Culture and Brain*. LTR n = 54, RTL n = 43 | Greyscales does not enter the model |
+| BIT star-cancellation CoC | Rorden & Karnath, 2010, *Neuropsychologia*. CoC 0.081 mapped to the BIT cutoff | CoC is not Eq. (1) Hollow Rings |
+| Starry Night | Deouell, Sacher & Soroker, 2005 | Patient series; no healthy-control mean/SD for left−right hit rate |
+
+Jewell & McCourt, 2000 (*Neuropsychologia*) is the basis cited in Table 2 for a small healthy leftward bisection error, not a fitted NeuroVision sample.

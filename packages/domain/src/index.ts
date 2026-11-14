@@ -196,6 +196,9 @@ export {
 
 export {
   median,
+  hollowRingsLateralIndex,
+  hollowRingsObservation,
+  cancellationObservationFromCounts,
   scoreTargetSelection,
   scoreLineBisection,
   summarizeLineBisection,
@@ -216,16 +219,32 @@ export type {
 
 export { isSessionRecord, parseSessionRecord } from "./validate.js";
 
-export { combineEvidence, standardize, verdictFor, seProportionDiff, fitNorms, DEFAULT_NORMS } from "./evidence.js";
-export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict } from "./evidence.js";
+export {
+  combineEvidence,
+  standardize,
+  verdictFor,
+  seProportionDiff,
+  fitNorms,
+  scoringNormsFromSamples,
+  DEFAULT_NORMS,
+  MODEL_TEST_IDS,
+  isModelTest,
+  ASSUMED_NORM_NOTICE,
+  fittedNormNotice,
+  NORM_FIT_MIN_N,
+  NORM_FIT_KAPPA,
+} from "./evidence.js";
+export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict, ModelTestId, ModelIndexSample } from "./evidence.js";
 export {
   METRICS,
   DEFAULT_NORMS as PUBLISHED_NORMS,
+  ASSUMED_NORM_NOTICE as PLACEHOLDER_NORM_NOTICE,
   BISECTION_SIGNED_ERROR_PCT,
   BISECTION_LATERAL_INDEX,
   GREYSCALES_LTR,
   GREYSCALES_RTL,
   GREYSCALES_OTHER,
+  HOLLOW_RINGS_LATERAL_INDEX,
   HOLLOW_RINGS_OMISSION_ASYMMETRY,
   STAR_CANCELLATION_HIT_ASYMMETRY,
   STAR_CANCELLATION_COC,
@@ -260,8 +279,28 @@ export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, Greyscal
 export { generateBisectionLines, signedErrorPct, bisectionObservation } from "./bisection.js";
 export type { BisectionLine, BisectionResponse } from "./bisection.js";
 
-export { BATTERY_CONTRACT_VERSION, BATTERY_MODES, isBatteryRecord, parseBatteryRecord, scoreBatteryRecord } from "./battery.js";
-export type { BatteryMode, BatteryRecord, BatteryScore } from "./battery.js";
+export {
+  BATTERY_CONTRACT_VERSION,
+  BATTERY_MODES,
+  isBatteryRecord,
+  parseBatteryRecord,
+  scoreBatteryRecord,
+  isHealthyControlSample,
+  detectionObservationFromRecord,
+  cancellationObservationFromRecord,
+  modelIndicesFromBattery,
+  applyScoringNorms,
+  scoringNormsFromBatteries,
+} from "./battery.js";
+export type {
+  BatteryMode,
+  BatteryRecord,
+  BatteryScore,
+  SideHitCounts,
+  SideOmissionCounts,
+  DetectionCounts,
+  CancellationCounts,
+} from "./battery.js";
 
-export { generateStarryTrials, scoreStarry, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
+export { generateStarryTrials, scoreStarry, starryObservationFromCounts, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
 export type { StarrySide, StarryTrial, StarryResponse, StarryPress, StarryScore, StarrySideSummary } from "./starry.js";

@@ -28,6 +28,8 @@ export interface BatteryIntroConfig {
   seed: number;
   readingDirection: ReadingDirection | null;
   consent: boolean;
+  healthyControl?: boolean;
+  fixture?: boolean;
 }
 
 export type BatteryStep = "scene" | "clock" | "greyscales" | "bisection";
@@ -41,6 +43,8 @@ export interface BatteryTaskOutputs {
   clock: { trials: ClockTrial[]; responses: ClockResponse[] };
   greyscales?: { trials: GreyscalesTrial[]; responses: GreyscalesResponse[] };
   bisection?: { lines: BisectionLine[]; responses: BisectionResponse[] };
+  detection?: BatteryRecord["detection"];
+  cancellation?: BatteryRecord["cancellation"];
 }
 
 export interface AssembleBatteryOptions {
@@ -137,6 +141,10 @@ export function assembleBatteryRecord(
     clock: { trials: outputs.clock.trials, responses: outputs.clock.responses },
     greyscales: full && outputs.greyscales ? outputs.greyscales : null,
     bisection: full && outputs.bisection ? outputs.bisection : null,
+    detection: full && outputs.detection ? outputs.detection : null,
+    cancellation: full && outputs.cancellation ? outputs.cancellation : null,
+    healthyControl: config.healthyControl === true,
+    fixture: config.fixture === true,
     normsUsed: normsUsedFor(config.mode, config.readingDirection),
   };
   return parseBatteryRecord(record);

@@ -64,7 +64,8 @@ describe("battery run wiring", () => {
     const display = batteryDisplay(record);
     assert.equal(display.sceneRan, false);
     assert.ok(display.counted.every((row) => row.test !== "scene"));
-    assert.match(display.evidence.verdict.text, /healthy range/i);
+    assert.equal(display.evidence.verdict.key, "no-data");
+    assert.ok(display.counted.every((row) => row.test === "bisection"));
   });
 
   it("renders clock and greyscales intros with the current screen classes", () => {

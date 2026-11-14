@@ -66,7 +66,7 @@ describe("star metrics", () => {
 
     const rightOnly = computeStarMetrics(L, [tap(0, "t2", "cancel"), tap(100, "t3", "cancel")], 1000, false);
     assert.equal(rightOnly.centerOfCancellation, 0.5); // mean(0.25, 0.75) - mean(all) 0
-    assert.equal(rightOnly.cocFlag, true);
+    assert.equal(rightOnly.cocFlag, false);
     assert.equal(rightOnly.hitRateLeft, 0);
     assert.equal(rightOnly.hitRateRight, 1);
     assert.deepEqual(rightOnly.hitRateByBin, [0, null, 0, 1, null, 1]);
@@ -156,15 +156,14 @@ describe("gaze metrics", () => {
 });
 
 describe("deviation from the healthy range", () => {
-  test("is 0 for a symmetric run, rises with asymmetry, and renormalises missing parts", () => {
+  test("drops uncalibrated star-cancellation indices, so a star-only run has no scored components", () => {
     const L = tinyLayout();
     const all = computeStarMetrics(L, ["t0", "t1", "t2", "t3"].map((id, i) => tap(i, id, "cancel")), 1, false);
-    assert.ok(computeDeviation(all, null).score < 0.05);
+    assert.equal(computeDeviation(all, null).components.length, 0);
     const right = computeStarMetrics(L, [tap(0, "t2", "cancel"), tap(1, "t3", "cancel")], 1, false);
     const s = computeDeviation(right, null);
-    assert.equal(s.components.length, 2);
-    assert.ok(Math.abs(s.components.reduce((a, c) => a + c.weight, 0) - 1) < 1e-12);
-    assert.ok(s.score > 0.95);
+    assert.equal(s.components.length, 0);
+    assert.equal(s.score, 0);
   });
 });
 
@@ -247,7 +246,6 @@ describe("synthetic patients", () => {
     assert.ok(Math.abs(mm.centerOfCancellation!) < 0.08, `mild CoC ${mm.centerOfCancellation}`);
     assert.ok(severe.metrics.gaze!.leftGazeFraction! < 0.35);
     assert.ok(mild.metrics.gaze!.leftGazeFraction! > 0.35);
-    assert.ok(severe.metrics.deviation.score > mild.metrics.deviation.score + 0.3);
     assert.ok(severe.gaze.some((g) => g.isFixation));
   });
 
@@ -264,8 +262,6 @@ describe("synthetic patients", () => {
     const series = generateRecoverySeries(5);
     assert.equal(series.length, 10);
     const stars = series.filter((s) => s.test === "star-cancellation");
-    const scores = stars.map((s) => s.metrics.deviation.score);
-    assert.ok(scores[0]! > scores[4]! + 0.3, scores.join(","));
     assert.ok(stars.every((s, i) => i === 0 || s.createdAt > stars[i - 1]!.createdAt));
     const round = JSON.parse(JSON.stringify(series[0]));
     assert.deepEqual(round, series[0]);

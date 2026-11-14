@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import {
+  ASSUMED_NORM_NOTICE,
+  applyScoringNorms,
+  fittedNormNotice,
   parseBatteryRecord,
   parseSessionRecord,
+  scoreBatteryRecord,
+  scoringNormsFromBatteries,
   type BatteryRecord,
   type PracticeRound,
   type SessionRecord,
@@ -629,11 +634,23 @@ export async function readSession(deps: Deps, actor: Actor, sessionId: string) {
       record = null;
     }
   }
+  let battery: BatteryRecord | null = null;
+  let score = null;
+  if (batteryRow) {
+    try {
+      battery = parseBatteryRecord(asJson(batteryRow.record));
+      const current = await scoringNormsForOrg(deps, actor);
+      score = scoreBatteryRecord(applyScoringNorms(battery, current.norms));
+    } catch {
+      battery = asJson<BatteryRecord>(batteryRow.record);
+    }
+  }
   return {
     ...presentSession(session),
     processingDetail: await processingView(deps, session),
     record,
-    battery: batteryRow ? asJson<BatteryRecord>(batteryRow.record) : null,
+    battery,
+    score,
   };
 }
 
@@ -976,7 +993,87 @@ function batteryTrials(record: BatteryRecord): Array<{
       }),
     });
   }
+  if (record.detection) {
+    trials.push({
+      trialId: `${record.id}-detection`,
+      payload: { task: "detection", left: record.detection.left, right: record.detection.right },
+      events: [
+        {
+          seq: 1,
+          elapsed: 0,
+          x: record.detection.left.hits,
+          y: record.detection.left.targets,
+          kind: "target",
+          objectId: "left",
+        },
+        {
+          seq: 2,
+          elapsed: 0,
+          x: record.detection.right.hits,
+          y: record.detection.right.targets,
+          kind: "target",
+          objectId: "right",
+        },
+      ],
+    });
+  }
+  if (record.cancellation) {
+    trials.push({
+      trialId: `${record.id}-cancellation`,
+      payload: { task: "cancellation", left: record.cancellation.left, right: record.cancellation.right },
+      events: [
+        {
+          seq: 1,
+          elapsed: 0,
+          x: record.cancellation.left.omissions,
+          y: record.cancellation.left.targets,
+          kind: "target",
+          objectId: "left",
+        },
+        {
+          seq: 2,
+          elapsed: 0,
+          x: record.cancellation.right.omissions,
+          y: record.cancellation.right.targets,
+          kind: "target",
+          objectId: "right",
+        },
+      ],
+    });
+  }
   return trials;
+}
+
+async function loadOrgBatteries(deps: Deps, orgId: string): Promise<BatteryRecord[]> {
+  const rows = await deps.db.query<{ record: unknown }>(
+    `SELECT b.record
+     FROM battery_records b
+     JOIN sessions s ON s.id = b.session_id
+     JOIN participants p ON p.id = s.participant_id
+     WHERE s.org_id = $1 AND p.deleted_at IS NULL
+     ORDER BY s.started_at, s.id`,
+    [orgId],
+  );
+  const records: BatteryRecord[] = [];
+  for (const row of rows.rows) {
+    try {
+      records.push(parseBatteryRecord(asJson(row.record)));
+    } catch {
+      /* skip rows that are not domain battery records */
+    }
+  }
+  return records;
+}
+
+export async function scoringNormsForOrg(deps: Deps, actor: Actor) {
+  const batteries = await loadOrgBatteries(deps, actor.orgId);
+  const fitted = scoringNormsFromBatteries(batteries);
+  return {
+    n: fitted.n,
+    source: fitted.source,
+    norms: fitted.norms,
+    notice: fitted.source === "fitted" ? fittedNormNotice(fitted.n) : ASSUMED_NORM_NOTICE,
+  };
 }
 
 export async function putBattery(deps: Deps, actor: Actor, sessionId: string, raw: unknown) {
@@ -992,6 +1089,8 @@ export async function putBattery(deps: Deps, actor: Actor, sessionId: string, ra
   if (!shouldPersistBattery(record)) {
     throw new HttpError(400, "validation", "The hidden scene demo is not saved.");
   }
+  const currentNorms = await scoringNormsForOrg(deps, actor);
+  record = applyScoringNorms(record, currentNorms.norms);
   const bound = await one<{ id: string; subject: string | null }>(
     deps.db,
     "SELECT id, subject FROM participants WHERE org_id = $1 AND subject = $2 AND deleted_at IS NULL",

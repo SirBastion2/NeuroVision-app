@@ -16,8 +16,8 @@ Domain scoring is the only interpreter of recorded events. It walks events in el
 
 `@neurovision/domain` also exports these battery scorers (pure functions; they do not replace `scoreSession`):
 
-- norms: `METRICS`, `compareToNorm`, `deviationUnit`, `greyscalesMetric`, `toTestNorm`, `DEFAULT_NORMS` (`MetricNorm`, `HealthyRangeReading`, `NormCitation`). Published healthy-range means/SDs/cutoffs with sample and citation. Uncalibrated metrics are marked and not scored.
-- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`)
+- norms: `METRICS`, `compareToNorm`, `deviationUnit`, `greyscalesMetric`, `toTestNorm`, `DEFAULT_NORMS`, `fittedNormNotice` (`MetricNorm`, `HealthyRangeReading`, `NormCitation`). Table 2 assumed placeholders for Starry Night, Hollow Rings, and line bisection; a notice is attached to any result that uses them. Once n ≥ 5 healthy-control sessions exist, Eq. (9) fitted µ̂/σ̂ (`source: "fitted"`, with n) replace those placeholders. Clock, greyscales, gaze, and Hidden scene are uncalibrated and do not enter the model.
+- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `scoringNormsFromSamples`, `DEFAULT_NORMS`, `MODEL_TEST_IDS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`). Shared-θ model on Starry Night, Hollow Rings, and line bisection only. `fitNorms` is Eq. (9) (n ≥ 5, κ = 8 shrinkage toward the placeholder).
 - scene: `generateScene`, `scoreScene`, `hitTest`, `centerOfCancellation`, `SCENE_DEFAULTS` (`HideSide`, `SceneConfig`, `Scene`, `Lantern`, `Building`, `SceneWindow`, `SceneTap`, `SceneTapResult`, `SceneScore`)
 - clock: `generateClockTrials`, `scoreClock`, `numeralAngle`, `CLOCK_DEFAULTS` (`ClockSide`, `ClockErrorType`, `StackPosition`, `ClockNumeral`, `ClockFace`, `ClockTrial`, `ClockResponse`, `ClockScore`)
 - greyscales: `generateGreyscalesTrials`, `scoreGreyscales`, `chosenDarkSide`, `greyscalesNormFor`, `GREYSCALES_DEFAULTS` (`DarkSide`, `BarPosition`, `ReadingDirection`, `GreyscalesTrial`, `GreyscalesResponse`, `GreyscalesScore`)
@@ -78,9 +78,10 @@ Stored under its own envelope. Scores are not stored; `scoreBatteryRecord` regen
 | Export | Kind | Meaning |
 | --- | --- | --- |
 | `BATTERY_CONTRACT_VERSION` | `"battery-1.0.0"` | Battery record contract id stored on `BatteryRecord.contract`. |
-| `BatteryRecord` | `{ contract, id, mode, hide, seed, readingDirection, consent, source, startedAt, completedAt, scene, clock, greyscales, bisection, normsUsed }` | One battery run. `mode` is `"demo" \| "full"`. `source` is `"live" \| "demonstration"`. `greyscales` and `bisection` may be `null`. `parseBatteryRecord`. |
+| `BatteryRecord` | `{ contract, id, mode, hide, seed, readingDirection, consent, source, startedAt, completedAt, scene, clock, greyscales, bisection, detection, cancellation, healthyControl, fixture, normsUsed }` | One battery run. `mode` is `"demo" \| "full"`. `source` is `"live" \| "demonstration"`. `greyscales`, `bisection`, `detection`, and `cancellation` may be `null`. `detection` stores per-side hits/targets (Starry Night); `cancellation` stores per-side omissions/targets (Hollow Rings); bisection stores the five signed errors via lines and responses. `healthyControl` marks a consented full live run as an Eq. (9) sample. `fixture` labels synthetic test samples. `parseBatteryRecord` defaults missing detection/cancellation to `null` and the flags to `false`. |
 | `parseBatteryRecord` | helper | Throws if any field is invalid; returns a typed copy. |
-| `scoreBatteryRecord` | helper | Pure rescoring from raw data: scene, clock, greyscales, bisection, `combineEvidence`. |
+| `scoreBatteryRecord` | helper | Pure rescoring from raw data: scene, clock, greyscales, bisection, Starry Night, Hollow Rings, `combineEvidence`. |
+| `scoringNormsFromBatteries` | helper | Loads healthy-control samples, computes Eq. (1) indices, and returns Table 2 placeholders when n < 5 or Eq. (9) fitted norms when n ≥ 5. |
 
 ### Organization and identity
 
@@ -185,7 +186,7 @@ Screens talk to domain, gaze, storage, and the HTTP API through `apps/web/src/se
 | `recordClick` / `finishTrial` | Append a classified `ResponseEvent` and close a trial |
 | `completeSession` / `score` | Mark the record complete and run `scoreSession` |
 | `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write). When the API client is on, `listHistory` merges server sessions and falls back to the browser store. |
-| `listBatteries` / `uploadBattery` / `sessionActivity` | Battery records and a daily activity bucket from `GET /api/v1/sessions`. Full live batteries also save locally. The hidden-scene demo is never stored. |
+| `listBatteries` / `uploadBattery` / `scoringNorms` / `sessionActivity` | Battery records and a daily activity bucket from `GET /api/v1/sessions`. `scoringNorms` is `GET /api/v1/norms` (Table 2 until n ≥ 5, then Eq. (9)). Full live batteries also save locally. The hidden-scene demo is never stored. |
 | `comparableHistory` | `summarizeAssessmentTrend` / `areSessionsComparable` over saved records |
 | `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
 | `loadGazeLabData` | Demonstration click sequence, two gaze streams, calibration report, plus simulated lab traces from `@neurovision/gaze` |
@@ -218,6 +219,7 @@ The client matches the routes `apps/api` registers. Requests use `credentials: "
 | `signInLocal` | `POST /api/v1/auth/local` |
 | `logout` | `POST /api/v1/auth/logout` |
 | `listSessions` | `GET /api/v1/sessions` (sessions, batteries, daily activity) |
+| `getNorms` | `GET /api/v1/norms` (current scoring norms: assumed Table 2 or fitted Eq. (9)) |
 | `putSession` | `PUT /api/v1/sessions/:sessionId` |
 | `putBattery` | `PUT /api/v1/sessions/:sessionId/battery` |
 | `createAssignment` | `POST /api/v1/assignments` |
