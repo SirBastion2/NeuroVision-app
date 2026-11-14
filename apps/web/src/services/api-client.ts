@@ -112,6 +112,12 @@ export interface DeleteResult {
   idempotent: boolean;
 }
 
+export interface SessionDeleteResult {
+  sessionId: string;
+  deleted: boolean;
+  idempotent: boolean;
+}
+
 export interface HealthResult {
   status: "ok";
 }
@@ -198,6 +204,7 @@ export interface ApiClient {
   getProcessingState(sessionId: string): Promise<ProcessingSnapshot>;
   exportParticipant(participantId: string): Promise<ExportResult>;
   deleteParticipant(participantId: string, input?: { confirm?: true }): Promise<DeleteResult>;
+  deleteSession(sessionId: string): Promise<SessionDeleteResult>;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -475,6 +482,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return json<DeleteResult>(`/api/v1/participants/${encodeURIComponent(participantId)}`, {
         method: "DELETE",
         body: JSON.stringify({ confirm: input.confirm ?? true }),
+      });
+    },
+
+    async deleteSession(sessionId) {
+      return json<SessionDeleteResult>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
       });
     },
   };

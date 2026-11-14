@@ -11,9 +11,11 @@ import {
 } from "@neurovision/domain";
 import { assembleBatteryRecord } from "../src/data/batterySession.ts";
 import {
+  createApiClient,
   createAppServices,
   createMemoryKeyValueStore,
   createMemoryStore,
+  createUploadQueue,
   type PackageStoreFactory,
 } from "../src/services/index.ts";
 
@@ -159,7 +161,10 @@ describe("app service layer", () => {
 
   it("uses the storage-package HistoryStore when a key-value backend is present", async () => {
     const kv = createMemoryKeyValueStore();
-    const services = createAppServices({ keyValueStore: kv });
+    const services = createAppServices({
+      keyValueStore: kv,
+      config: { apiBaseUrl: "", standalone: false },
+    });
     assert.equal(services.storeKind, "package");
     const started = services.startSession({
       id: "pkg-real",
@@ -182,6 +187,7 @@ describe("app service layer", () => {
       save: (record) => inner.save(record),
       load: (id) => inner.load(id),
       list: () => inner.list(),
+      remove: (id) => inner.remove(id),
     });
     const kv = {
       getItem: () => null,
@@ -210,6 +216,7 @@ describe("app service layer", () => {
       save: (record) => inner.save(record),
       load: (id) => inner.load(id),
       list: () => inner.list(),
+      remove: (id) => inner.remove(id),
     });
     const services = createAppServices({
       standalone: true,
@@ -274,5 +281,128 @@ describe("app service layer", () => {
     assert.equal(batteries.some((row) => row.id === "bat-1"), true);
     const activity = await services.sessionActivity();
     assert.equal(activity[0]?.count, 3);
+  });
+
+  it("deletes an incomplete pending session locally, from the upload queue, and on the server", async () => {
+    const kv = createMemoryKeyValueStore();
+    const deleted: string[] = [];
+    let remoteSessions: unknown[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "DELETE" && /\/api\/v1\/sessions\/([^/?]+)$/.test(url)) {
+        const sessionId = decodeURIComponent(url.split("/sessions/")[1] ?? "");
+        deleted.push(sessionId);
+        const existed = remoteSessions.some((row) => (row as { id?: string }).id === sessionId);
+        remoteSessions = remoteSessions.filter((row) => (row as { id?: string }).id !== sessionId);
+        if (!existed) {
+          return new Response(JSON.stringify({ error: "not_found", message: "Not found." }), { status: 404 });
+        }
+        return new Response(JSON.stringify({ sessionId, deleted: true, idempotent: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (method === "GET" && url.includes("/api/v1/sessions") && !url.includes("/sessions/pending-open")) {
+        return new Response(JSON.stringify({ sessions: remoteSessions, batteries: [], activity: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "unavailable", message: "offline" }), { status: 503 });
+    };
+    const api = createApiClient({
+      baseUrl: "https://api.example.test",
+      fetch: fetchImpl,
+    });
+    const queue = createUploadQueue({
+      api,
+      store: kv,
+      isOnline: () => false,
+      listenOnline: () => () => undefined,
+    });
+    const services = createAppServices({
+      keyValueStore: kv,
+      api,
+      queue,
+      config: { apiBaseUrl: "https://api.example.test", standalone: false },
+      fetch: fetchImpl,
+      now: () => new Date("2026-11-14T16:00:00.000Z"),
+    });
+    const kept = fillHits(
+      services,
+      services.startSession({
+        id: "kept-1",
+        alias: "Kept",
+        profileId: "participant-demo",
+        startedAt: "2026-11-14T16:00:00.000Z",
+      }),
+      10,
+      10,
+    );
+    const pending = services.startSession({
+      id: "pending-open",
+      alias: "Interrupted",
+      profileId: "participant-demo",
+      startedAt: "2026-11-14T16:10:00.000Z",
+    });
+    assert.equal(pending.status, "incomplete");
+    await services.save(kept);
+    await services.save(pending);
+    remoteSessions = [pending, kept];
+    await services.enqueueUpload({
+      session: pending,
+      participantId: "participant-demo",
+      assignmentId: "assign-participant-demo",
+    });
+    assert.equal(services.queue.peek("pending-open")?.sessionId, "pending-open");
+
+    const before = await services.listHistory();
+    assert.equal(before.some((row) => row.id === "pending-open"), true);
+    const beforeTrend = await services.comparableHistory(before);
+    assert.equal(
+      beforeTrend.trend.excluded.some((item) => item.sessionId === "pending-open" && item.reason === "unscored"),
+      true,
+    );
+    assert.equal(
+      beforeTrend.trend.points.some((point) => point.sessionId === "pending-open"),
+      false,
+    );
+
+    await services.remove("pending-open");
+    assert.deepEqual(deleted, ["pending-open"]);
+    assert.equal(await services.load("pending-open"), null);
+    assert.equal(services.queue.peek("pending-open"), undefined);
+
+    const after = await services.listHistory();
+    assert.deepEqual(
+      after.map((row) => row.id).sort(),
+      ["kept-1"],
+    );
+    const afterTrend = await services.comparableHistory(after);
+    assert.equal(
+      afterTrend.trend.excluded.some((item) => item.sessionId === "pending-open"),
+      false,
+    );
+    assert.equal(
+      afterTrend.trend.points.some((point) => point.sessionId === "kept-1"),
+      true,
+    );
+
+    const localOnly = services.startSession({
+      id: "never-uploaded",
+      alias: "Local only",
+      profileId: "participant-demo",
+      startedAt: "2026-11-14T16:20:00.000Z",
+    });
+    await services.save(localOnly);
+    await services.remove("never-uploaded");
+    assert.deepEqual(deleted, ["pending-open", "never-uploaded"]);
+    assert.equal(await services.load("never-uploaded"), null);
+    const reloaded = await services.listHistory();
+    assert.equal(
+      reloaded.some((row) => row.id === "pending-open" || row.id === "never-uploaded"),
+      false,
+    );
   });
 });

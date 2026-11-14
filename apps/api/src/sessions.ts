@@ -785,6 +785,44 @@ export async function exportParticipant(deps: Deps, actor: Actor, participantId:
   return { exportId, bundle };
 }
 
+export async function deleteSession(deps: Deps, actor: Actor, sessionId: string) {
+  const traces = await deps.db.transaction(async (tx) => {
+    const txDeps = { ...deps, db: tx };
+    const session = await one<SessionRow>(
+      tx,
+      `SELECT s.id, s.org_id, s.participant_id, s.assignment_id, s.assignment_revision, s.started_at,
+              s.completion, s.sync_state, s.processing_state, s.request_hash, s.sealed_at,
+              s.session_revision, s.input_hash, p.subject AS participant_subject, p.deleted_at
+       FROM sessions s
+       JOIN participants p ON p.id = s.participant_id
+       WHERE s.id = $1 AND s.org_id = $2
+       FOR UPDATE`,
+      [sessionId, actor.orgId],
+    );
+    if (!session || session.deleted_at) {
+      return { sessionId, deleted: true as const, idempotent: true as const, traces: [] as Array<{ object_key: string }> };
+    }
+    assertWriter(session, actor);
+    const storedTraces = await tx.query<{ object_key: string }>("SELECT object_key FROM trace_refs WHERE session_id = $1", [
+      sessionId,
+    ]);
+    await tx.query("DELETE FROM response_events WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM gaze_samples WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM trials WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM batches WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM derived_summaries WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM session_documents WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM battery_records WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM jobs WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM trace_refs WHERE session_id = $1", [sessionId]);
+    await tx.query("DELETE FROM sessions WHERE id = $1", [sessionId]);
+    await audit(txDeps, actor, "delete", "session", sessionId, { participantId: session.participant_id });
+    return { sessionId, deleted: true as const, idempotent: false as const, traces: storedTraces.rows };
+  });
+  for (const trace of traces.traces) await deps.objects.delete(trace.object_key);
+  return { sessionId: traces.sessionId, deleted: traces.deleted, idempotent: traces.idempotent };
+}
+
 export async function deleteParticipant(deps: Deps, actor: Actor, participantId: string) {
   requireAdmin(actor);
   return deps.db.transaction(async (tx) => {

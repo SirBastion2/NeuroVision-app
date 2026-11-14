@@ -38,6 +38,7 @@ export {
   type ProcessingSnapshot,
   type ProcessingState,
   type PutSessionInput,
+  type SessionDeleteResult,
   type SessionResource,
   type SyncState,
   type TraceUploadAuthorization,
