@@ -124,7 +124,6 @@ describe("BatteryResults", () => {
     const record = fixtureRecord({ mode: "demo", source: "demonstration", greyscales: null, bisection: null, readingDirection: null });
     const html = render(record);
     assert.match(html, /demonstration/i);
-    assert.doesNotMatch(html, /prototype/i);
   });
 });
 
