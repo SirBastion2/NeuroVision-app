@@ -11,6 +11,8 @@ Later agents should read `docs/ARCHITECTURE.md` as the repository map, then use 
 | `apps/web/src/services/` | Agent F | Thin service layer: session start, scoring, history I/O, demonstration and gaze-lab loaders. Screens import this; F does not add product screens. |
 | `apps/web` standalone build | Agent F | `vite.standalone.config.ts`, `npm run build:standalone`, single-file HTML check. |
 | `packages/storage` | Agent B | Browser storage, validated session I/O, identity / profile. |
+| `apps/api` | Agent B | Fastify API, OIDC session cookies, ingestion, exports, deletion. |
+| `apps/worker` | Agent B | Job leases, analysis dispatch, orphan and deletion cleanup. |
 | `packages/gaze` | Agent C | Gaze streams, replay, heatmaps, calibration, quality gates, analysis. |
 | `apps/web` gaze lab shell | Agent C | Minimal gaze-lab wiring only; D+E own full product UI. |
 | Root workspace (`package.json`, `tsconfig.base.json`, `scripts/`) | Agent A (initial), then Agent F | Shared scripts (`npm test`, `npm run build`, `npm run build:standalone`, `npm run verify`) and TypeScript baseline. |
