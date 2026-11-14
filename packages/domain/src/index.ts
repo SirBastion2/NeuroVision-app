@@ -133,3 +133,12 @@ export type {
 } from "./scoring.js";
 
 export { isSessionRecord, parseSessionRecord } from "./validate.js";
+
+export { combineEvidence, standardize, verdictFor, seProportionDiff, fitNorms, DEFAULT_NORMS } from "./evidence.js";
+export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict } from "./evidence.js";
+export { generateClockTrials, scoreClock, numeralAngle, CLOCK_DEFAULTS } from "./clock.js";
+export type { ClockSide, ClockErrorType, StackPosition, ClockNumeral, ClockFace, ClockTrial, ClockResponse, ClockScore } from "./clock.js";
+export { generateGreyscalesTrials, scoreGreyscales, chosenDarkSide, greyscalesNormFor, GREYSCALES_DEFAULTS } from "./greyscales.js";
+export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, GreyscalesResponse, GreyscalesScore } from "./greyscales.js";
+export { generateStarryTrials, scoreStarry, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
+export type { StarrySide, StarryTrial, StarryResponse, StarryPress, StarryScore, StarrySideSummary } from "./starry.js";

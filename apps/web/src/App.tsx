@@ -5,19 +5,20 @@ import {
   describeViewport,
   type InputModality,
   type LayoutVariant,
+  type SessionRecord,
   type TrialRecord,
 } from "@neurovision/domain";
 import { BrandMark, Wordmark } from "./components/Brand";
 import { TaskRunner } from "./components/TaskRunner";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
-import { TIME_LIMIT_MS, createSession, newLineTrial, newPracticeTrial, newTargetSelectionTrial } from "./lib/session";
-import { GazeLab } from "./screens/GazeLab";
+import { TIME_LIMIT_MS, newLineTrial, newPracticeTrial, newTargetSelectionTrial } from "./lib/session";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
+import { BatteryPage } from "./checks/pages";
 import "./styles.css";
 
 type Theme = "light" | "dark";
@@ -32,6 +33,11 @@ function initialTheme(): Theme {
   }
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
+
+const LINE_STEPS: { label: string; screens: Screen[] }[] = [
+  { label: "Line bisection", screens: ["line-intro", "line-task"] },
+  { label: "Review", screens: ["review"] },
+];
 
 const ASSESSMENT_STEPS: { label: string; screens: Screen[] }[] = [
   { label: "Target selection", screens: ["target-intro", "target-task"] },
@@ -75,11 +81,23 @@ export function App() {
     }
   }, [screen]);
 
-  const start = (alias: string, input: InputModality, variant: LayoutVariant) =>
-    dispatch({ type: "start", session: createSession({ alias, input, viewport: currentViewport() }), variant });
+  // Home "Start assessment": the full run (Starry Night → hollow rings → line bisection → combined report).
+  const [runSetup, setRunSetup] = useState<{ alias: string; input: InputModality; variant: LayoutVariant } | null>(null);
+  const start = (alias: string, input: InputModality, variant: LayoutVariant) => {
+    setRunSetup({ alias, input, variant });
+    dispatch({ type: "go", screen: "assessment" });
+  };
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
   const onPractice = useCallback((trial: TrialRecord) => dispatch({ type: "practice-finished", trial }), []);
   const home = () => dispatch({ type: "home" });
+  const saveRun = useCallback(
+    (s: SessionRecord) => {
+      setSaveError(store.save(s).error);
+      setStored(store.load());
+    },
+    [store],
+  );
+  const [checkRunning, setCheckRunning] = useState(false);
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
 
   // Trials are created once per screen entry so the runner gets a stable record.
@@ -93,8 +111,10 @@ export function App() {
   }, [screen, state.lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inAssessment = ["target-intro", "target-task", "line-intro", "line-task"].includes(screen);
-  const focusMode = inAssessment || screen === "practice-task";
-  const stepIndex = ASSESSMENT_STEPS.findIndex((s) => s.screens.includes(screen));
+  const focusMode = inAssessment || checkRunning || screen === "practice-task";
+  const steps = state.linesOnly ? LINE_STEPS : ASSESSMENT_STEPS;
+  const stepIndex = steps.findIndex((s) => s.screens.includes(screen));
+  const isLinesPage = state.linesOnly && ["line-intro", "line-task", "review"].includes(screen);
   const cue = state.practice?.config;
 
   return (
@@ -106,7 +126,7 @@ export function App() {
         </button>
         {inAssessment ? (
           <ol className="stepper" aria-label="Assessment progress">
-            {ASSESSMENT_STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <li key={s.label} className={i < stepIndex ? "done" : i === stepIndex ? "current" : ""} aria-current={i === stepIndex ? "step" : undefined}>
                 <span>{i + 1}</span>
                 {s.label}
@@ -119,11 +139,20 @@ export function App() {
               <button className={screen === "home" ? "on" : ""} onClick={home}>
                 Home
               </button>
+              <button className={screen === "starry" ? "on" : ""} onClick={() => go("starry")}>
+                Starry Night
+              </button>
+              <button className={screen === "rings" ? "on" : ""} onClick={() => go("rings")}>
+                Hollow rings
+              </button>
+              <button className={screen === "lines" || isLinesPage ? "on" : ""} onClick={() => go("lines")}>
+                Line bisection
+              </button>
+              <button className={screen === "demo" ? "on" : ""} onClick={() => go("demo")}>
+                Demo
+              </button>
               <button className={screen === "history" ? "on" : ""} onClick={() => go("history")}>
                 History
-              </button>
-              <button className={screen === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
-                Gaze lab
               </button>
             </nav>
           )
@@ -131,7 +160,7 @@ export function App() {
         <button
           className="theme-toggle"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          disabled={screen.endsWith("-task")}
+          disabled={screen.endsWith("-task") || checkRunning}
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
         >
           <svg viewBox="0 0 24 24" aria-hidden>
@@ -145,7 +174,12 @@ export function App() {
       </header>
 
       <main ref={main} tabIndex={-1} key={screen} className="screen">
-        {screen === "home" && <Home onStart={start} onOpen={(s) => dispatch({ type: "open", session: s })} onHistory={() => go("history")} onGaze={() => go("gaze")} />}
+        {screen === "home" && <Home onStart={start} onOpen={(s) => dispatch({ type: "open", session: s })} onHistory={() => go("history")} onDemo={() => go("demo")} />}
+        {screen === "assessment" && <BatteryPage from="starry" {...(runSetup ?? {})} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "starry" && <BatteryPage from="starry" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "rings" && <BatteryPage from="rings" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "lines" && <BatteryPage from="lines" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "demo" && <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
         {screen === "target-task" && session && trial && (
           <TaskRunner
@@ -220,7 +254,6 @@ export function App() {
             onHome={home}
           />
         )}
-        {screen === "gaze" && <GazeLab onHome={home} />}
       </main>
 
       {!focusMode && (

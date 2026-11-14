@@ -12,7 +12,12 @@ export type Screen =
   | "practice-task"
   | "practice-reflection"
   | "history"
-  | "gaze";
+  | "gaze"
+  | "assessment"
+  | "starry"
+  | "rings"
+  | "lines"
+  | "demo";
 
 export interface FlowState {
   screen: Screen;
@@ -25,12 +30,15 @@ export interface FlowState {
   practice: PracticeRoundSetup | null;
   /** Starting point for the next setup screen (the faded config after a round). */
   nextSuggestion: PracticeSuggestion | null;
+  /** True when line bisection was started on its own, without target selection first. */
+  linesOnly: boolean;
 }
 
 export type FlowAction =
   | { type: "home" }
   | { type: "go"; screen: Screen }
   | { type: "start"; session: SessionRecord; variant: LayoutVariant }
+  | { type: "start-lines"; session: SessionRecord }
   | { type: "trial-finished"; trial: TrialRecord }
   | { type: "practice-configured"; setup: PracticeRoundSetup }
   | { type: "practice-finished"; trial: TrialRecord }
@@ -45,6 +53,7 @@ export const initialFlow: FlowState = {
   ended: false,
   practice: null,
   nextSuggestion: null,
+  linesOnly: false,
 };
 
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
@@ -55,6 +64,8 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return { ...state, screen: action.screen };
     case "start":
       return { ...initialFlow, screen: "target-intro", session: action.session, variant: action.variant };
+    case "start-lines":
+      return { ...initialFlow, screen: "line-intro", session: action.session, linesOnly: true };
     case "open":
       return { ...initialFlow, screen: "review", session: action.session, ended: true };
     case "trial-finished": {

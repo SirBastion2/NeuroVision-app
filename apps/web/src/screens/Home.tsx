@@ -3,7 +3,6 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   DEMONSTRATION_SESSIONS,
-  INPUT_MODALITIES,
   createTargetSelectionLayout,
   scoreSession,
   viewportClass,
@@ -15,17 +14,11 @@ import { STIMULUS_RADIUS } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
 import { SessionThumb } from "../components/SessionThumb";
 
-const INPUT_LABELS: Record<InputModality, string> = {
-  "mouse-trackpad": "Mouse or trackpad",
-  keyboard: "Keyboard cursor",
-  touch: "Touch",
-};
-
 interface Props {
   onStart: (alias: string, input: InputModality, variant: LayoutVariant) => void;
   onOpen: (session: SessionRecord) => void;
   onHistory: () => void;
-  onGaze: () => void;
+  onDemo: () => void;
 }
 
 /** The real assessment board with one half fading away, circled by the logo's orbit and star. */
@@ -61,16 +54,14 @@ function HeroBoard() {
 }
 
 const STEPS = [
-  ["01", "Target selection", "Find hollow rings among solid disks on a fixed board."],
-  ["02", "Line bisection", "Mark the centre of five lines. No feedback."],
-  ["03", "Review", "See what was found, what was missed, and where."],
-  ["04", "Practice", "An explained cue suggestion, then up to three rounds."],
+  ["01", "Starry Night", "Press whenever a red dot flashes among blinking green ones. 15 dots."],
+  ["02", "Hollow rings", "Find hollow rings among solid disks on a fixed board."],
+  ["03", "Line bisection", "Mark the centre of five lines. No feedback."],
+  ["04", "Combined report", "One report at the end: what was missed, and on which side."],
 ] as const;
 
-export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
+export function Home({ onStart, onOpen, onHistory, onDemo }: Props) {
   const [alias, setAlias] = useState("");
-  const [input, setInput] = useState<InputModality>("mouse-trackpad");
-  const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
 
   return (
@@ -84,8 +75,8 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
             <em>and where it doesn’t.</em>
           </h1>
           <p className="lede">
-            Two short board tasks record every response in space and time. The review shows what was found, what was
-            missed, and on which side, then suggests a practice setup you can read and overrule.
+            Three short tests run back to back and record every response in space and time. One combined report at the
+            end shows what was found, what was missed, and on which side.
           </p>
           <p className="fineprint">Research prototype. Describes one session’s responses; it is not a diagnosis.</p>
         </div>
@@ -107,40 +98,16 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
           className="card start-card"
           onSubmit={(e) => {
             e.preventDefault();
-            onStart(alias, input, variant);
+            onStart(alias, "mouse-trackpad", "fixed-a");
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
           <h2>Start an assessment</h2>
           <label className="field">
-            <span>Participant alias</span>
+            <span>Name</span>
             <input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="e.g. P-014" autoComplete="off" maxLength={40} />
             <small>Use a pseudonym. Do not enter real names or clinical details.</small>
           </label>
-
-          <fieldset className="field">
-            <legend>Input</legend>
-            <div className="segmented">
-              {INPUT_MODALITIES.map((m) => (
-                <label key={m} className={input === m ? "on" : ""}>
-                  <input type="radio" name="input" value={m} checked={input === m} onChange={() => setInput(m)} />
-                  {INPUT_LABELS[m]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="field">
-            <legend>Board layout</legend>
-            <div className="segmented">
-              {(["fixed-a", "fixed-b"] as const).map((v) => (
-                <label key={v} className={variant === v ? "on" : ""}>
-                  <input type="radio" name="variant" checked={variant === v} onChange={() => setVariant(v)} />
-                  Layout {v === "fixed-a" ? "A" : "B"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
 
           {!supported && (
             <p className="notice warn" role="status">
@@ -148,7 +115,7 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
             </p>
           )}
           <button className="primary large" type="submit">
-            Begin assessment
+            Start assessment
             <span aria-hidden> →</span>
           </button>
           <p className="fineprint">About three minutes. Data stays in this browser.</p>
@@ -163,10 +130,10 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
               →
             </span>
           </button>
-          <button className="card link-card" onClick={onGaze}>
-            <Eyebrow plain>Gaze lab</Eyebrow>
-            <h3>Same clicks, different looking</h3>
-            <p>Replay two simulated gaze streams against one click sequence.</p>
+          <button className="card link-card" onClick={onDemo}>
+            <Eyebrow plain>Demo run</Eyebrow>
+            <h3>Every test, back to back</h3>
+            <p>Starry Night, hollow rings and line bisection. Each starts by itself when the last one ends.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>
