@@ -16,8 +16,10 @@ import {
   LEFT_RIGHT_MISSES_LABEL,
   SEARCH_DISTANCE_HINT,
   SEARCH_DISTANCE_LABEL,
+  WRONG_TAPS_LABEL,
   boardWidths,
   missShareGap,
+  wrongTapsHint,
 } from "../src/lib/format.ts";
 
 const session = DEMONSTRATION_SESSIONS[1]!;
@@ -113,6 +115,20 @@ describe("session review board", () => {
     assert.match(html, /50 pts more missed on the left/);
     assert.doesNotMatch(html, /Omission gap/);
     assert.doesNotMatch(html, />percentage points</);
+  });
+
+  it("uses singular and plural repeat taps in the wrong-taps line", () => {
+    assert.equal(wrongTapsHint(0), "Solid disks tapped by mistake · 0 repeat taps on found rings");
+    assert.equal(wrongTapsHint(1), "Solid disks tapped by mistake · 1 repeat tap on found rings");
+    assert.equal(wrongTapsHint(2), "Solid disks tapped by mistake · 2 repeat taps on found rings");
+  });
+
+  it("shows wrong taps with a plain explanation of disks and repeats", () => {
+    const html = review();
+    assert.match(html, new RegExp(WRONG_TAPS_LABEL));
+    assert.match(html, new RegExp(wrongTapsHint(score.repeats)));
+    assert.match(html, new RegExp(`>${score.distractors}<`));
+    assert.doesNotMatch(html, /Disks selected/);
   });
 
   it("keeps the clinician dashboard reachable from History", () => {

@@ -19,6 +19,11 @@ export const LEFT_RIGHT_MISSES_LABEL = "Left vs right misses";
 export const LEFT_RIGHT_MISSES_HINT =
   "Share of left-side targets missed minus share of right-side targets missed";
 
+/** Solid-disk distractor taps, with extra taps on rings already found. */
+export const WRONG_TAPS_LABEL = "Wrong taps";
+export const wrongTapsHint = (repeats: number) =>
+  `Solid disks tapped by mistake · ${repeats} repeat tap${repeats === 1 ? "" : "s"} on found rings`;
+
 export const boardWidths = (distance: number, digits = 1) =>
   Number.isFinite(distance) ? (distance / BOARD_WIDTH).toFixed(digits) : "n/a";
 

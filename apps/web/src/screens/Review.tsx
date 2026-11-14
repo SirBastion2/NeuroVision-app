@@ -17,12 +17,14 @@ import {
   LEFT_RIGHT_MISSES_LABEL,
   SEARCH_DISTANCE_HINT,
   SEARCH_DISTANCE_LABEL,
+  WRONG_TAPS_LABEL,
   boardWidths,
   dateTime,
   missShareGap,
   pct,
   seconds,
   signedPct,
+  wrongTapsHint,
 } from "../lib/format";
 import { MAX_PRACTICE_ROUNDS } from "../lib/session";
 
@@ -109,7 +111,12 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
               title={LEFT_RIGHT_MISSES_HINT}
             />
             <Stat label="First target" value={seconds(ts.firstLatencyMs)} />
-            <Stat label="Disks selected" value={String(ts.distractors)} sub={`${ts.repeats} repeat${ts.repeats === 1 ? "" : "s"}`} />
+            <Stat
+              label={WRONG_TAPS_LABEL}
+              value={String(ts.distractors)}
+              sub={wrongTapsHint(ts.repeats)}
+              title={wrongTapsHint(ts.repeats)}
+            />
             <Stat
               label={SEARCH_DISTANCE_LABEL}
               value={boardWidths(ts.pathDistance)}
