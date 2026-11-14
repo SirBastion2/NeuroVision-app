@@ -11,7 +11,14 @@ import {
 import { ResponseOrderPlot } from "../src/components/ResponseOrderPlot.tsx";
 import { History } from "../src/screens/History.tsx";
 import { Review } from "../src/screens/Review.tsx";
-import { SEARCH_DISTANCE_HINT, SEARCH_DISTANCE_LABEL, boardWidths } from "../src/lib/format.ts";
+import {
+  LEFT_RIGHT_MISSES_HINT,
+  LEFT_RIGHT_MISSES_LABEL,
+  SEARCH_DISTANCE_HINT,
+  SEARCH_DISTANCE_LABEL,
+  boardWidths,
+  missShareGap,
+} from "../src/lib/format.ts";
 
 const session = DEMONSTRATION_SESSIONS[1]!;
 const trial = findTargetSelectionTrial(session)!;
@@ -91,6 +98,23 @@ describe("session review board", () => {
     assert.equal(Number(widths), Number((score.pathDistance / BOARD_WIDTH).toFixed(1)));
   });
 
+  it("names left vs right misses from left minus right omission rate", () => {
+    assert.equal(score.omissionAsymmetry, 50);
+    assert.equal(missShareGap(score.omissionAsymmetry), "50 pts more missed on the left");
+    assert.equal(missShareGap(-50), "50 pts more missed on the right");
+    assert.equal(missShareGap(0), "same share missed on both sides");
+    assert.equal(missShareGap(null), "n/a");
+  });
+
+  it("shows left vs right misses with a plain explanation", () => {
+    const html = review();
+    assert.match(html, new RegExp(LEFT_RIGHT_MISSES_LABEL));
+    assert.match(html, new RegExp(LEFT_RIGHT_MISSES_HINT));
+    assert.match(html, /50 pts more missed on the left/);
+    assert.doesNotMatch(html, /Omission gap/);
+    assert.doesNotMatch(html, />percentage points</);
+  });
+
   it("keeps the clinician dashboard reachable from History", () => {
     const html = renderToStaticMarkup(
       createElement(History, {
@@ -102,5 +126,7 @@ describe("session review board", () => {
       }),
     );
     assert.match(html, />Clinician Dashboard</);
+    assert.match(html, /Left vs right/);
+    assert.doesNotMatch(html, /Omission gap/);
   });
 });

@@ -10,6 +10,7 @@ import { SIMULATED_LAB_PROVENANCE } from "@neurovision/gaze";
 import { TrendChart } from "../components/TrendChart";
 import { createAppServices, type AppServices, type GazeLabData } from "../services";
 import { canUseLocalHistoryStore, createLocalHistoryStore } from "../services/local-history-store";
+import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap } from "../lib/format";
 import { GazeAttentionMap } from "./GazeAttentionMap";
 import { DEMO_PATIENT_PROFILES, type DemoPatientId } from "./demo-patients";
 import {
@@ -184,9 +185,9 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
       hint: "Right half misses",
     },
     {
-      label: "Omission gap",
-      value: formatSigned(scored?.targetSelection?.omissionAsymmetry, 0),
-      hint: "Left − right (pts)",
+      label: LEFT_RIGHT_MISSES_LABEL,
+      value: missShareGap(scored?.targetSelection?.omissionAsymmetry ?? null),
+      hint: LEFT_RIGHT_MISSES_HINT,
     },
     {
       label: "Line median",
@@ -535,8 +536,8 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
                     format={(value) => `${Math.round(value * 100)}%`}
                   />
                   <TrendChart
-                    title="Omission gap (left − right)"
-                    subtitle="Positive favors more left omissions"
+                    title={LEFT_RIGHT_MISSES_LABEL}
+                    subtitle={LEFT_RIGHT_MISSES_HINT}
                     points={omissionTrend}
                     min={Math.min(-8, ...omissionTrend.map((point) => point.value ?? 0))}
                     max={Math.max(8, ...omissionTrend.map((point) => point.value ?? 0))}

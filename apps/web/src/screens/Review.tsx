@@ -13,12 +13,14 @@ import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
 import {
+  LEFT_RIGHT_MISSES_HINT,
+  LEFT_RIGHT_MISSES_LABEL,
   SEARCH_DISTANCE_HINT,
   SEARCH_DISTANCE_LABEL,
   boardWidths,
   dateTime,
+  missShareGap,
   pct,
-  points,
   seconds,
   signedPct,
 } from "../lib/format";
@@ -100,7 +102,12 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
         <>
           <section className="stat-row">
             <Stat label="Targets found" value={`${ts.hits} / ${ts.available}`} sub={pct(ts.hitRate)} />
-            <Stat label="Omission gap, left − right" value={points(ts.omissionAsymmetry)} sub="percentage points" />
+            <Stat
+              label={LEFT_RIGHT_MISSES_LABEL}
+              value={missShareGap(ts.omissionAsymmetry)}
+              sub={LEFT_RIGHT_MISSES_HINT}
+              title={LEFT_RIGHT_MISSES_HINT}
+            />
             <Stat label="First target" value={seconds(ts.firstLatencyMs)} />
             <Stat label="Disks selected" value={String(ts.distractors)} sub={`${ts.repeats} repeat${ts.repeats === 1 ? "" : "s"}`} />
             <Stat
@@ -166,7 +173,7 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
                     <strong>
                       {s.hits}/{s.available}
                     </strong>
-                    <span>gap {points(s.omissionAsymmetry)}</span>
+                    <span>{missShareGap(s.omissionAsymmetry)}</span>
                     <span>
                       cue {round.config.cue}
                       {round.config.cue !== "none" && ` · level ${round.config.level}`}

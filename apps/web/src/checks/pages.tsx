@@ -17,7 +17,7 @@ import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
 import { TaskRunner } from "../components/TaskRunner";
-import { pct, points, seconds, signedPct } from "../lib/format";
+import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap, pct, points, seconds, signedPct } from "../lib/format";
 import { TIME_LIMIT_MS, createSession, newLineTrial, newTargetSelectionTrial, recordAssessmentTrial } from "../lib/session";
 import { LineIntro, TargetIntro } from "../screens/Intros";
 import { StarryIntro, StarryTask, type StarryRun } from "./StarryTask";
@@ -253,7 +253,14 @@ function CombinedReport({
 
       <section className="stat-row card">
         {sky && <Stat label="Starry Night · gap, left − right" value={points(sky.observation.value * 100)} sub={`${sky.left.hits}/${sky.left.n} left · ${sky.right.hits}/${sky.right.n} right`} />}
-        {ts && <Stat label="Hollow rings · omission gap" value={points(ts.omissionAsymmetry)} sub={`${ts.hits} of ${ts.available} found`} />}
+        {ts && (
+          <Stat
+            label={`Hollow rings · ${LEFT_RIGHT_MISSES_LABEL}`}
+            value={missShareGap(ts.omissionAsymmetry)}
+            sub={LEFT_RIGHT_MISSES_HINT}
+            title={LEFT_RIGHT_MISSES_HINT}
+          />
+        )}
         {tests.includes("lines") && <Stat label="Line bisection · median" value={signedPct(lb.signedMedian)} sub="positive = right of centre" />}
       </section>
 
