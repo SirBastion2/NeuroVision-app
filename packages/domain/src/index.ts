@@ -31,6 +31,7 @@ export {
   createTargetSelectionLayout,
   createPracticeLayout,
   createLineBisectionLayout,
+  layoutVariantFamily,
   lineMidpoint,
   lineLength,
   isOnLineSegment,
@@ -39,6 +40,7 @@ export type {
   StimulusKind,
   TaskKind,
   LayoutVariant,
+  LayoutVariantFamily,
   BoardDensity,
   Stimulus,
   TaskLayout,
@@ -73,8 +75,42 @@ export type {
   PracticeCue,
 } from "./session.js";
 
-export { PRACTICE_CUES, PRACTICE_LEVELS, suggestPractice, fadePracticeCue } from "./practice.js";
-export type { PracticeScoreInput } from "./practice.js";
+export {
+  PRACTICE_CUES,
+  PRACTICE_LEVELS,
+  suggestPractice,
+  configurePracticeRound,
+  fadePracticeCue,
+} from "./practice.js";
+export type { PracticeScoreInput, PracticeChoice, PracticeRoundSetup } from "./practice.js";
+
+export { reflectPracticeRound } from "./reflection.js";
+export type { PracticeReflection, PracticeVersusAssessment } from "./reflection.js";
+
+export {
+  comparabilityKey,
+  sameComparabilityKey,
+  areSessionsComparable,
+  summarizeAssessmentTrend,
+} from "./history.js";
+export type {
+  ComparabilityKey,
+  TrendExclusionReason,
+  AssessmentTrendPoint,
+  AssessmentTrend,
+} from "./history.js";
+
+export {
+  EXAMPLE_CALIBRATION_REPORT,
+  DEMONSTRATION_BALANCED,
+  DEMONSTRATION_LEFT_OMISSION,
+  DEMONSTRATION_RIGHT_OMISSION,
+  DEMONSTRATION_SESSIONS,
+  GAZE_LAB_TRACKING_GAPS,
+  GAZE_LAB_CLICK_SEQUENCE,
+  GAZE_LAB_STREAMS,
+  GAZE_LAB_FIXTURE,
+} from "./demonstration.js";
 
 export {
   median,
