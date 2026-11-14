@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+  BOARD_WIDTH,
   DEMONSTRATION_SESSIONS,
   findTargetSelectionTrial,
   scoreSession,
@@ -10,6 +11,7 @@ import {
 import { ResponseOrderPlot } from "../src/components/ResponseOrderPlot.tsx";
 import { History } from "../src/screens/History.tsx";
 import { Review } from "../src/screens/Review.tsx";
+import { SEARCH_DISTANCE_HINT, SEARCH_DISTANCE_LABEL, boardWidths } from "../src/lib/format.ts";
 
 const session = DEMONSTRATION_SESSIONS[1]!;
 const trial = findTargetSelectionTrial(session)!;
@@ -66,7 +68,7 @@ describe("session review board", () => {
     assert.doesNotMatch(off, /search-path/);
     assert.doesNotMatch(off, /order-badge/);
     assert.doesNotMatch(off, /numbered in order/);
-    assert.doesNotMatch(off, /Search path/);
+    assert.doesNotMatch(off, new RegExp(SEARCH_DISTANCE_LABEL));
     assert.match(off, /class="key found"/);
     assert.match(off, /class="key missed"/);
 
@@ -74,7 +76,19 @@ describe("session review board", () => {
     assert.match(on, /search-path/);
     assert.match(on, /order-badge/);
     assert.match(on, /Found, numbered in order/);
-    assert.match(on, /Search path/);
+    assert.match(on, new RegExp(SEARCH_DISTANCE_LABEL));
+    assert.match(on, new RegExp(SEARCH_DISTANCE_HINT));
+  });
+
+  it("shows search distance in board widths, with a plain explanation", () => {
+    const html = review();
+    const widths = boardWidths(score.pathDistance);
+    assert.match(html, new RegExp(SEARCH_DISTANCE_LABEL));
+    assert.match(html, new RegExp(SEARCH_DISTANCE_HINT));
+    assert.match(html, new RegExp(`>${widths}<`));
+    assert.doesNotMatch(html, /board units/);
+    assert.doesNotMatch(html, /Search path/);
+    assert.equal(Number(widths), Number((score.pathDistance / BOARD_WIDTH).toFixed(1)));
   });
 
   it("keeps the clinician dashboard reachable from History", () => {

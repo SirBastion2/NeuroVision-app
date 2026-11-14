@@ -10,6 +10,7 @@ import {
   type ResponseEvent,
   type TaskLayout,
 } from "@neurovision/domain";
+import { SEARCH_DISTANCE_HINT, SEARCH_DISTANCE_LABEL } from "../lib/format";
 import { Board, StimulusMark } from "./Board";
 
 const REGION_BOX: Record<BoardRegion, { x: number; y: number; width: number; height: number }> = {
@@ -141,8 +142,8 @@ export function ResponseOrderPlot({
             </span>
           )}
           {showOrder && path && (
-            <span>
-              <i className="key path" /> Search path
+            <span title={SEARCH_DISTANCE_HINT}>
+              <i className="key path" /> {SEARCH_DISTANCE_LABEL}
             </span>
           )}
         </figcaption>

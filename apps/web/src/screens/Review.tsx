@@ -12,7 +12,16 @@ import {
 import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
-import { dateTime, pct, points, seconds, signedPct } from "../lib/format";
+import {
+  SEARCH_DISTANCE_HINT,
+  SEARCH_DISTANCE_LABEL,
+  boardWidths,
+  dateTime,
+  pct,
+  points,
+  seconds,
+  signedPct,
+} from "../lib/format";
 import { MAX_PRACTICE_ROUNDS } from "../lib/session";
 
 interface Props {
@@ -94,7 +103,12 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
             <Stat label="Omission gap, left − right" value={points(ts.omissionAsymmetry)} sub="percentage points" />
             <Stat label="First target" value={seconds(ts.firstLatencyMs)} />
             <Stat label="Disks selected" value={String(ts.distractors)} sub={`${ts.repeats} repeat${ts.repeats === 1 ? "" : "s"}`} />
-            <Stat label="Search path" value={String(Math.round(ts.pathDistance))} sub="board units" />
+            <Stat
+              label={SEARCH_DISTANCE_LABEL}
+              value={boardWidths(ts.pathDistance)}
+              sub={SEARCH_DISTANCE_HINT}
+              title={SEARCH_DISTANCE_HINT}
+            />
           </section>
 
           <section className="review-grid">

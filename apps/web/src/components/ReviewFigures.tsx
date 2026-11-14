@@ -118,9 +118,21 @@ export function LineDeviations({ trials, total }: { trials: readonly TrialRecord
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "warn" }) {
+export function Stat({
+  label,
+  value,
+  sub,
+  tone,
+  title,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "good" | "warn";
+  title?: string;
+}) {
   return (
-    <div className={`stat ${tone ?? ""}`}>
+    <div className={`stat ${tone ?? ""}`} title={title}>
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
       {sub && <span className="stat-sub">{sub}</span>}

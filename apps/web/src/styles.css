@@ -379,7 +379,7 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .stats .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .stat-label { font-size: 0.74rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
 .stat-value { font-family: var(--serif); font-size: 1.85rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.stat-sub { font-size: 0.8rem; color: var(--muted); }
+.stat-sub { font-size: 0.8rem; color: var(--muted); line-height: 1.35; }
 .review-grid { display: grid !important; grid-template-columns: minmax(0, 1.9fr) minmax(200px, 0.85fr); gap: 18px; align-items: start; }
 .plot { margin: 0; padding: 0 14px 14px; }
 .plot .board-surface { stroke: none; fill: var(--surface-2); }
