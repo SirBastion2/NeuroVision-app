@@ -7,13 +7,14 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm run test -w @neurovision/domain && npm run test -w @neurovision/gaze && npm run test -w @neurovision/web",
+    "test": "npm run test -w @neurovision/domain && npm run test -w @neurovision/gaze && npm run test -w @neurovision/web && npm run test -w @neurovision/storage && npm run test -w @neurovision/api && npm run test -w @neurovision/worker",
     "test:e2e": "npm run test:e2e -w @neurovision/web",
-    "build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/web",
+    "build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/web && npm run build -w @neurovision/storage && npm run build -w @neurovision/api && npm run build -w @neurovision/worker",
     "build:standalone": "npm run build:standalone -w @neurovision/web",
     "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.19.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   },

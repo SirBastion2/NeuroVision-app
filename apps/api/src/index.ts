@@ -1,13 +1,11 @@
 import { buildServer } from "./server.js";
+import { openRuntime } from "./runtime.js";
 
-const port = Number(process.env.PORT ?? 3001);
-const host = process.env.HOST ?? "0.0.0.0";
-
-const app = await buildServer();
-
+const runtime = await openRuntime(process.env);
+const app = await buildServer(runtime);
 try {
-  await app.listen({ port, host });
+  await app.listen({ port: runtime.config.port, host: runtime.config.host });
 } catch (error) {
-  app.log.error(error);
+  app.log.error({ message: error instanceof Error ? error.message : "listen failed" }, "server failed to start");
   process.exit(1);
 }
