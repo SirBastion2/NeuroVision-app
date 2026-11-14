@@ -7,6 +7,8 @@ import {
   type SessionRecord,
 } from "@neurovision/domain";
 
+export const STORAGE_AVAILABLE = true;
+
 /** Browser envelope. Records must already be domain SessionRecords. */
 export const ENVELOPE_KEY = "spatial-patterns:envelope:v1";
 export const PROFILE_KEY = "spatial-patterns:profile:v1";

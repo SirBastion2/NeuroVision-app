@@ -13,7 +13,7 @@ import { BatteryPage } from "./checks/pages";
 import { BrandMark, Wordmark } from "./components/Brand";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { TaskRunner } from "./components/TaskRunner";
-import { batteryEnabled } from "./data/batterySession";
+import { batteryEnabled, shouldPersistBattery } from "./data/batterySession";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
 import { TIME_LIMIT_MS, createSession, newLineTrial, newPracticeTrial, newTargetSelectionTrial } from "./lib/session";
@@ -29,14 +29,17 @@ import { MyProfile } from "./screens/MyProfile";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
 import {
+  DEMO_LOCAL_IDENTITY,
   createAppServices,
   participantIdForExport,
   shouldEnqueueUpload,
+  shouldPersistSession,
   showApiControls,
   type Me,
   type ProcessingSnapshot,
   type UploadQueueState,
 } from "./services";
+import type { BatteryRecord } from "@neurovision/domain";
 import "./styles.css";
 
 type Theme = "light" | "dark";
@@ -98,6 +101,8 @@ export function App() {
   const [processing, setProcessing] = useState<Record<string, ProcessingSnapshot>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkRunning, setCheckRunning] = useState(false);
+  const [batteries, setBatteries] = useState<BatteryRecord[]>([]);
+  const [activity, setActivity] = useState<Array<{ bucket: string; count: number }>>([]);
   const main = useRef<HTMLElement>(null);
   const enqueued = useRef(new Set<string>());
   const { session, screen } = state;
@@ -134,11 +139,21 @@ export function App() {
         });
       return;
     }
-    void services.getMe().then(setSignedIn);
+    void services.getMe().then(async (me) => {
+      if (me) {
+        setSignedIn(me);
+        return;
+      }
+      try {
+        setSignedIn(await services.signInLocal(DEMO_LOCAL_IDENTITY));
+      } catch {
+        setSignedIn(null);
+      }
+    });
   }, [apiEnabled, services]);
 
   useEffect(() => {
-    if (!state.ended || !session || session.source !== "live") return;
+    if (!state.ended || !session || !shouldPersistSession(session)) return;
     let cancelled = false;
     void (async () => {
       const result = await store.save(session);
@@ -151,7 +166,11 @@ export function App() {
       ) {
         enqueued.current.add(session.id);
         try {
-          await services.enqueueUpload({ session });
+          await services.enqueueUpload({
+            session,
+            participantId: signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject,
+            assignmentId: `assign-${signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject}`,
+          });
         } catch (error) {
           if (cancelled) return;
           setSaveError(error instanceof Error ? error.message : String(error));
@@ -161,13 +180,15 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [state.ended, session, store, services, apiEnabled]);
+  }, [state.ended, session, store, services, apiEnabled, signedIn]);
 
   useEffect(() => {
     if (screen === "history" || screen === "my-profile") {
       void store.load().then(setStored);
+      void services.listBatteries().then(setBatteries);
+      void services.sessionActivity().then(setActivity);
     }
-  }, [screen, store]);
+  }, [screen, store, services]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -206,13 +227,26 @@ export function App() {
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
   const saveRun = useCallback(
     (s: SessionRecord) => {
+      if (!shouldPersistSession(s)) return;
       void (async () => {
         const result = await store.save(s);
         setSaveError(result.error);
         setStored(await store.load());
+        if (shouldEnqueueUpload({ ended: true, session: s, apiEnabled }) && !enqueued.current.has(s.id)) {
+          enqueued.current.add(s.id);
+          try {
+            await services.enqueueUpload({
+              session: s,
+              participantId: signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject,
+              assignmentId: `assign-${signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject}`,
+            });
+          } catch (error) {
+            setSaveError(error instanceof Error ? error.message : String(error));
+          }
+        }
       })();
     },
-    [store],
+    [store, services, apiEnabled, signedIn],
   );
 
   const trial = useMemo(() => {
@@ -237,9 +271,14 @@ export function App() {
   });
 
   const onSignIn = () => {
-    void services.beginSignIn().then((redirect) => {
-      window.location.assign(redirect.url);
-    });
+    void services
+      .signInLocal(DEMO_LOCAL_IDENTITY)
+      .then(setSignedIn)
+      .catch(() => {
+        void services.beginSignIn().then((redirect) => {
+          window.location.assign(redirect.url);
+        });
+      });
   };
 
   const onExport = async () => {
@@ -369,6 +408,7 @@ export function App() {
             onProfile={() => go("my-profile")}
             onGaze={() => go("gaze")}
             showBattery={showBattery}
+            apiEnabled={apiEnabled}
             onBattery={showBattery ? () => go("battery-intro") : undefined}
             onStarry={() => go("starry")}
             onDemo={() => go("demo")}
@@ -380,7 +420,18 @@ export function App() {
         {screen === "battery-run" && state.batteryConfig && showBattery && (
           <BatteryRun
             config={state.batteryConfig}
-            onFinished={(record) => dispatch({ type: "battery-finished", record })}
+            onFinished={(record) => {
+              dispatch({ type: "battery-finished", record });
+              if (!shouldPersistBattery(record)) return;
+              void (async () => {
+                try {
+                  if (apiEnabled) await services.uploadBattery(record);
+                } catch (error) {
+                  setSaveError(error instanceof Error ? error.message : String(error));
+                }
+                setBatteries(await services.listBatteries());
+              })();
+            }}
             onStop={home}
             onRunning={setCheckRunning}
           />
@@ -477,7 +528,10 @@ export function App() {
         {screen === "history" && (
           <History
             stored={stored}
+            batteries={batteries}
+            activity={activity}
             onOpen={(s) => dispatch({ type: "open", session: s })}
+            onOpenBattery={(record) => dispatch({ type: "battery-finished", record })}
             onDelete={async (id) => {
               const result = await store.remove(id);
               setSaveError(result.error);

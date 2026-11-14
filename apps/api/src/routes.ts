@@ -17,7 +17,9 @@ import {
   exportParticipant,
   finalizeSession,
   listParticipants,
+  listSessions,
   putBatch,
+  putBattery,
   putSession,
   readSession,
   readSummaries,
@@ -128,6 +130,10 @@ export async function registerRoutes(app: FastifyInstance, deps: Deps): Promise<
     return createAssignment(deps, actorOf(request), body);
   });
 
+  app.get("/api/v1/sessions", async (request) => {
+    return listSessions(deps, actorOf(request));
+  });
+
   app.put("/api/v1/sessions/:sessionId", async (request) => {
     const { sessionId } = z.object({ sessionId: id }).parse(request.params);
     const body = z
@@ -140,6 +146,11 @@ export async function registerRoutes(app: FastifyInstance, deps: Deps): Promise<
       })
       .parse(request.body);
     return putSession(deps, actorOf(request), sessionId, body);
+  });
+
+  app.put("/api/v1/sessions/:sessionId/battery", async (request) => {
+    const { sessionId } = z.object({ sessionId: id }).parse(request.params);
+    return putBattery(deps, actorOf(request), sessionId, request.body);
   });
 
   app.put("/api/v1/sessions/:sessionId/batches/:batchId", async (request) => {

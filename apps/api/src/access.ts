@@ -59,7 +59,10 @@ export async function assertMeasurementRead(deps: Deps, actor: Actor, participan
 
 export async function assertCanAssign(deps: Deps, actor: Actor, participant: ParticipantRow): Promise<void> {
   if (actor.role === "participant") {
-    throw new HttpError(403, "forbidden", "Participants cannot manage assignments.");
+    if (participant.subject !== actor.subject) {
+      throw new HttpError(403, "forbidden", "Participants cannot manage assignments.");
+    }
+    return;
   }
   if (actor.role === "admin") return;
   await assertMeasurementRead(deps, actor, participant);

@@ -28,6 +28,7 @@ interface Props {
   onProfile: () => void;
   onGaze: () => void;
   showBattery?: boolean;
+  apiEnabled?: boolean;
   onBattery?: () => void;
   onStarry?: () => void;
   onDemo?: () => void;
@@ -79,6 +80,7 @@ export function Home({
   onProfile,
   onGaze,
   showBattery = false,
+  apiEnabled = false,
   onBattery,
   onStarry,
   onDemo,
@@ -166,7 +168,12 @@ export function Home({
             Begin assessment
             <span aria-hidden> →</span>
           </button>
-          <p className="fineprint">About three minutes. Data stays in this browser.</p>
+          <p className="fineprint">
+            About three minutes.{" "}
+            {apiEnabled
+              ? "Completed runs save to the server when it is reachable; this browser is the offline fallback."
+              : "Data stays in this browser."}
+          </p>
         </form>
 
         <div className="side-cards">

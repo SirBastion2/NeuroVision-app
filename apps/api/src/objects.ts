@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
@@ -7,6 +8,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { one, type Database } from "./db.js";
 
 /**
  * LOCAL ADAPTER.
@@ -88,18 +90,68 @@ export class S3ObjectStore {
   }
 }
 
-export type ObjectStore = MemoryObjectStore | S3ObjectStore;
+/**
+ * Durable fallback when S3/MinIO env vars are absent. Trace bytes live in Postgres.
+ */
+export class PostgresObjectStore {
+  readonly kind = "postgres" as const;
+
+  constructor(private readonly db: Database) {}
+
+  async put(key: string, body: Uint8Array, contentType = "application/octet-stream"): Promise<void> {
+    await this.db.query(
+      `INSERT INTO object_blobs (object_key, body, content_type) VALUES ($1, $2, $3)
+       ON CONFLICT (object_key) DO UPDATE SET body = EXCLUDED.body, content_type = EXCLUDED.content_type`,
+      [key, Buffer.from(body), contentType],
+    );
+  }
+
+  async get(key: string): Promise<Uint8Array | null> {
+    const row = await one<{ body: Buffer | Uint8Array | string }>(
+      this.db,
+      "SELECT body FROM object_blobs WHERE object_key = $1",
+      [key],
+    );
+    if (!row) return null;
+    return bytesOf(row.body);
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.db.query("DELETE FROM object_blobs WHERE object_key = $1", [key]);
+  }
+}
+
+export type ObjectStore = MemoryObjectStore | S3ObjectStore | PostgresObjectStore;
+
+function bytesOf(value: Buffer | Uint8Array | string): Uint8Array {
+  if (typeof value === "string") return Uint8Array.from(Buffer.from(value, "base64"));
+  if (value instanceof Uint8Array) return value;
+  return new Uint8Array(value);
+}
 
 function isMissing(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("name" in error)) return false;
   return error.name === "NoSuchKey" || error.name === "NotFound";
 }
 
-export function createObjectStoreFromEnv(env: NodeJS.ProcessEnv): ObjectStore {
-  const driver = env.OBJECT_STORE ?? "memory";
+function hasS3Config(env: NodeJS.ProcessEnv): boolean {
+  return Boolean(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY);
+}
+
+export function createObjectStoreFromEnv(env: NodeJS.ProcessEnv, db?: Database): ObjectStore {
+  const requested = env.OBJECT_STORE?.trim().toLowerCase();
+  const driver = requested || (hasS3Config(env) ? "s3" : db ? "postgres" : "memory");
   if (driver === "memory") return new MemoryObjectStore();
+  if (driver === "postgres") {
+    if (!db) return new MemoryObjectStore();
+    return new PostgresObjectStore(db);
+  }
   if (driver !== "s3") {
-    throw new Error(`Unsupported OBJECT_STORE "${driver}". Use "memory" or "s3".`);
+    throw new Error(`Unsupported OBJECT_STORE "${driver}". Use "memory", "postgres", or "s3".`);
+  }
+  if (!hasS3Config(env)) {
+    if (db) return new PostgresObjectStore(db);
+    return new MemoryObjectStore();
   }
   const endpoint = required(env.S3_ENDPOINT, "S3_ENDPOINT");
   const bucket = required(env.S3_BUCKET, "S3_BUCKET");

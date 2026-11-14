@@ -85,10 +85,12 @@ export {
   type UploadQueueState,
 } from "./upload-queue";
 export {
+  DEMO_LOCAL_IDENTITY,
   jobForSession,
   participantIdForExport,
   processingLabel,
   shouldEnqueueUpload,
+  shouldPersistSession,
   showApiControls,
 } from "./screen-wiring";
 export { canonicalJson, contentHash, sha256Hex } from "./hash";

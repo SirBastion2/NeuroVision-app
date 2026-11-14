@@ -87,8 +87,8 @@ describe("battery run wiring", () => {
     assert.match(greyHtml, /Which bar looks darker/);
   });
 
-  it("hides the battery entry when the API client is on", () => {
-    assert.equal(batteryEnabled(true), false);
+  it("keeps the battery entry when the API client is on", () => {
+    assert.equal(batteryEnabled(true), true);
     Object.assign(globalThis, {
       window: { innerWidth: 1280, innerHeight: 900, devicePixelRatio: 1 },
     });

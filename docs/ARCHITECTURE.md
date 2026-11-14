@@ -183,7 +183,8 @@ Screens talk to domain, gaze, storage, and the HTTP API through `apps/web/src/se
 | `startSession` | Create a live assessment `SessionRecord` with the fixed target-selection layout and five line-bisection trials |
 | `recordClick` / `finishTrial` | Append a classified `ResponseEvent` and close a trial |
 | `completeSession` / `score` | Mark the record complete and run `scoreSession` |
-| `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write) |
+| `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write). When the API client is on, `listHistory` merges server sessions and falls back to the browser store. |
+| `listBatteries` / `uploadBattery` / `sessionActivity` | Battery records and a daily activity bucket from `GET /api/v1/sessions`. Full live batteries also save locally. The hidden-scene demo is never stored. |
 | `comparableHistory` | `summarizeAssessmentTrend` / `areSessionsComparable` over saved records |
 | `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
 | `loadGazeLabData` | Demonstration click sequence, two gaze streams, calibration report, plus simulated lab traces from `@neurovision/gaze` |
@@ -215,7 +216,10 @@ The client matches the routes `apps/api` registers. Requests use `credentials: "
 | `completeAuthCallback` | `GET /api/v1/auth/callback` |
 | `signInLocal` | `POST /api/v1/auth/local` |
 | `logout` | `POST /api/v1/auth/logout` |
+| `listSessions` | `GET /api/v1/sessions` (sessions, batteries, daily activity) |
 | `putSession` | `PUT /api/v1/sessions/:sessionId` |
+| `putBattery` | `PUT /api/v1/sessions/:sessionId/battery` |
+| `createAssignment` | `POST /api/v1/assignments` |
 | `putBatch` | `PUT /api/v1/sessions/:sessionId/batches/:batchId` |
 | `finalizeSession` | `POST /api/v1/sessions/:sessionId/finalize` |
 | `createTraceUpload` | `POST /api/v1/sessions/:sessionId/trace-uploads` |

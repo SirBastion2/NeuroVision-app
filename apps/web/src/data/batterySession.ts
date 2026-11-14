@@ -75,9 +75,14 @@ export function runnableBatterySteps(mode: BatteryMode, sceneAvailable = BATTERY
   return batteryStepOrder(mode).filter((step) => step !== "scene" || sceneAvailable);
 }
 
-/** Battery local save is off while the API client is on; the upload queue only handles sessions. */
-export function batteryEnabled(apiClientEnabled: boolean): boolean {
-  return apiClientEnabled !== true;
+/** The battery stays on Home whether or not the API client is configured. */
+export function batteryEnabled(_apiClientEnabled?: boolean): boolean {
+  return true;
+}
+
+/** Hidden scene (demo mode) is not a scored test and is never persisted. */
+export function shouldPersistBattery(record: { mode: BatteryMode; source: string }): boolean {
+  return record.mode === "full" && record.source === "live";
 }
 
 export function batteryKeyValueStore(options: BatteryStoreOptions = {}): KeyValueStore {
@@ -142,6 +147,7 @@ export async function saveBatterySession(
   options: AssembleBatteryOptions & BatteryStoreOptions = {},
 ): Promise<BatteryRecord> {
   const record = assembleBatteryRecord(config, outputs, options);
+  if (!shouldPersistBattery(record)) return record;
   const store = createWebBatteryStore(options);
   return store.save(record);
 }
