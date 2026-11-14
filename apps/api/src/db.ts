@@ -1,5 +1,5 @@
 import pg from "pg";
-import { pgConnectionConfig } from "./env.js";
+import { pgConnectionConfig, type PgPoolOptions } from "./env.js";
 import { SCHEMA_SQL } from "./schema.js";
 
 const { Pool } = pg;
@@ -38,8 +38,8 @@ export function wrapDatabase(client: QueryClient): Database {
   };
 }
 
-export function createPgDatabase(connectionString: string): Database {
-  const pool = new Pool(pgConnectionConfig(connectionString));
+export function createPgDatabase(connectionString: string, options: PgPoolOptions = {}): Database {
+  const pool = new Pool(pgConnectionConfig(connectionString, options));
   const client: QueryClient = {
     query: async (sql, params) => pool.query(sql, params),
     exec: (sql) => pool.query(sql),

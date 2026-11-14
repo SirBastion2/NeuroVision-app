@@ -70,7 +70,22 @@ export type {
   GazeSampleWithProvenance,
 } from "./gaze.js";
 
-export { ROLES, isRole, parseRole, isOrganization, parseOrganization, isMembership, parseMembership, isParticipant, parseParticipant } from "./organization.js";
+export {
+  ROLES,
+  PARTICIPANT_ID_MIN,
+  PARTICIPANT_ID_MAX,
+  PARTICIPANT_ID_PATTERN,
+  isRole,
+  parseRole,
+  isOrganization,
+  parseOrganization,
+  isMembership,
+  parseMembership,
+  isParticipant,
+  parseParticipant,
+  isParticipantId,
+  parseParticipantId,
+} from "./organization.js";
 export type { Role, Organization, Membership, Participant } from "./organization.js";
 
 export {

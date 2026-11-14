@@ -3,6 +3,11 @@ import { isNonEmptyString, isObject, isOneOf, parseFail } from "./guard.js";
 export const ROLES = ["owner", "admin", "reviewer", "participant"] as const;
 export type Role = (typeof ROLES)[number];
 
+/** Letters, digits, and dash. Used as the local-identity subject and participant id. */
+export const PARTICIPANT_ID_MIN = 3;
+export const PARTICIPANT_ID_MAX = 32;
+export const PARTICIPANT_ID_PATTERN = /^[A-Za-z0-9-]{3,32}$/;
+
 export interface Organization {
   id: string;
   name: string;
@@ -72,4 +77,14 @@ export function parseParticipant(value: unknown): Participant {
     label: value.label,
     subject: value.subject,
   };
+}
+
+export function isParticipantId(value: unknown): value is string {
+  return typeof value === "string" && PARTICIPANT_ID_PATTERN.test(value);
+}
+
+export function parseParticipantId(value: unknown): string {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!isParticipantId(trimmed)) parseFail("participant id");
+  return trimmed;
 }

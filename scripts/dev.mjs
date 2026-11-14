@@ -14,7 +14,7 @@ if (!existsSync(envFile)) {
 const env = { ...process.env, VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || "/" };
 
 console.log("API http://127.0.0.1:3001  web http://127.0.0.1:5173");
-console.log("Demo identity: participant-demo / org-demo (auto-signed in when the API is up).");
+console.log("Local identity: enter a participant ID (org-demo). Same ID on another device shares history.");
 
 const api = spawn("npm", ["run", "dev", "-w", "@neurovision/api"], { cwd: root, stdio: "inherit", env });
 const web = spawn("npm", ["run", "dev", "-w", "@neurovision/web"], { cwd: root, stdio: "inherit", env });

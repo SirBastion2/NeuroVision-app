@@ -22,6 +22,7 @@ export async function buildServer(options: BuildServerOptions) {
     logger: options.logger ?? { level: "info" },
     disableRequestLogging: true,
     bodyLimit: 1_048_576,
+    trustProxy: true,
   });
   await app.register(cookie);
   app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => {

@@ -13,7 +13,9 @@
     "build:standalone": "npm run build:standalone -w @neurovision/web",
     "verify": "node scripts/verify.mjs",
     "dev": "node scripts/dev.mjs",
-    "dev:backend": "node apps/api/scripts/dev-backend.mjs"
+    "dev:backend": "node apps/api/scripts/dev-backend.mjs",
+    "migrate": "tsx apps/api/src/migrate-cli.ts",
+    "vercel-build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/storage && npm run build:site -w @neurovision/web"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

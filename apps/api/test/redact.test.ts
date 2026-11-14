@@ -88,9 +88,13 @@ describe("redaction and runtime guards", () => {
     }
   });
 
-  it("refuses local identity and memory storage in production", () => {
+  it("refuses memory storage in production and allows local identity", () => {
     const config = loadConfig({ NODE_ENV: "production", IDENTITY_MODE: "local" });
-    assert.throws(() => assertRuntimeSafe(config, "memory"), /OIDC/);
+    assert.equal(config.cookieSecure, true);
+    assert.doesNotThrow(() => assertRuntimeSafe(config, "postgres"));
+    assert.throws(() => assertRuntimeSafe(config, "memory"), /memory/);
+    const oidcMissing = loadConfig({ NODE_ENV: "production", IDENTITY_MODE: "oidc" });
+    assert.throws(() => assertRuntimeSafe(oidcMissing, "postgres"), /OIDC/);
     const oidc = loadConfig({
       NODE_ENV: "production",
       IDENTITY_MODE: "oidc",

@@ -247,11 +247,58 @@ The web app does not run OIDC PKCE in the browser. Sign-in navigates to the API:
 | --- | --- |
 | `GET /api/v1/auth/login` | API starts the provider redirect (PKCE lives on the server) |
 | `GET /api/v1/auth/callback` | API exchanges the code, sets `nv_session` / `nv_csrf`, redirects to `/` |
-| `POST /api/v1/auth/local` | Local identity for `IDENTITY_MODE=local` |
+| `POST /api/v1/auth/local` | Local identity for `IDENTITY_MODE=local`. Body `{ subject, orgId }`. `subject` is the participant ID (letters, digits, dash; 3–32 chars) and is provisioned as a participant in `org-demo` when missing. |
 | `GET /api/v1/me` | Current subject, org, role, and CSRF token |
 | `POST /api/v1/auth/logout` | Clears the API session cookies |
 
 `beginSignIn` returns `{ url }` for `/api/v1/auth/login`. `completeSignIn` forwards `code` and `state` to `/api/v1/auth/callback`. These controls are hidden when the API client is disabled (standalone or empty `VITE_API_BASE_URL`).
+
+When `IDENTITY_MODE=local` (and `VITE_IDENTITY_MODE` is not `oidc`), the web app shows a start step for a participant ID instead of signing in as a fixed subject. The last ID is remembered in the browser. Account menu includes Switch participant. History loads that participant's sessions from `GET /api/v1/sessions`, so the same ID on another device shows the same sessions. Browser storage remains the offline cache, keyed per participant.
+
+## Shared URL (Vercel)
+
+One Vercel project serves the Vite static build and the Fastify API as a Function so cookies stay same-origin.
+
+| Setting | Value |
+| --- | --- |
+| Framework | Other (`null`) |
+| Install command | `npm ci` |
+| Build command | `npm run vercel-build` |
+| Output directory | `apps/web/dist` |
+| API | `api/index.ts` and `api/[...path].ts` wrap `buildServer` from `@neurovision/api` |
+| Rewrites | `/health` → `/api/health` (the handler maps that path back to Fastify `GET /health`) |
+
+`vercel-build` compiles domain, gaze, and storage, then the Vite site (`tsc` + `vite build`). Set `VITE_API_BASE_URL=/` and `VITE_IDENTITY_MODE=local` as **build** env so the static app calls same-origin `/api` and `/health`.
+
+Required project env (Production / Preview). Do not commit secrets.
+
+| Variable | Role |
+| --- | --- |
+| `DATABASE_URL` | Tiger Cloud / Timescale Postgres URL (`uselibpqcompat=true&sslmode=require` is stripped for `pg`) |
+| `IDENTITY_MODE` | `local` for the participant-ID start step |
+| `VITE_API_BASE_URL` | `/` (build-time) |
+| `VITE_IDENTITY_MODE` | `local` (build-time) |
+
+Optional: `COOKIE_SECURE` (defaults to true when `NODE_ENV=production`), `DEMO_SEED` (omit or `true` to seed `org-demo`; `false` to skip), `PG_POOL_MAX` (Vercel uses a pool of 1). Migrations run on cold start (`CREATE … IF NOT EXISTS`, advisory lock) and via `npm run migrate`.
+
+Deploy with the Vercel CLI from the repository root:
+
+```bash
+npx vercel login
+npx vercel link
+npx vercel env add DATABASE_URL production
+npx vercel env add IDENTITY_MODE production
+npx vercel env add VITE_API_BASE_URL production
+npx vercel env add VITE_IDENTITY_MODE production
+# optional:
+npx vercel env add COOKIE_SECURE production
+npx vercel env add DEMO_SEED production
+npx vercel --prod --yes
+```
+
+When prompted: `IDENTITY_MODE=local`, `VITE_API_BASE_URL=/`, `VITE_IDENTITY_MODE=local`, `COOKIE_SECURE=true`. `DATABASE_URL` is the hosted Postgres URL. Preview env can use the same names with `preview` instead of `production`.
+
+Cold-start migrations are idempotent. To apply them without a request: `npm run migrate` (reads `DATABASE_URL` from `.env` or the shell).
 
 ## Standalone HTML build
 

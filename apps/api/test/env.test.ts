@@ -14,6 +14,11 @@ describe("hosted Postgres connection strings", () => {
     assert.equal(config.connectionString?.includes("uselibpqcompat"), false);
     assert.equal(config.connectionString?.includes("sslmode"), false);
     assert.deepEqual(config.ssl, { rejectUnauthorized: false });
+    const pooled = pgConnectionConfig(
+      "postgres://user:secret@example.test:5432/tsdb?sslmode=require",
+      { max: 1 },
+    );
+    assert.equal(pooled.max, 1);
   });
 
   it("keeps verify-full certificate checks", () => {
@@ -68,7 +73,11 @@ describe("optional object store", () => {
     const store = createObjectStoreFromEnv({ OBJECT_STORE: "memory" });
     assert.equal(store.kind, "memory");
     const config = loadConfig({ NODE_ENV: "production", IDENTITY_MODE: "oidc", OIDC_ISSUER: "https://idp.test", OIDC_CLIENT_ID: "id", OIDC_CLIENT_SECRET: "secret", OIDC_REDIRECT_URI: "http://localhost/callback" });
+    assert.equal(config.cookieSecure, true);
     assert.throws(() => assertRuntimeSafe(config, "memory"));
     assert.doesNotThrow(() => assertRuntimeSafe(config, "postgres"));
+    const local = loadConfig({ NODE_ENV: "production", IDENTITY_MODE: "local", COOKIE_SECURE: "false" });
+    assert.equal(local.cookieSecure, false);
+    assert.doesNotThrow(() => assertRuntimeSafe(local, "postgres"));
   });
 });

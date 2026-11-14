@@ -1,9 +1,8 @@
 import type { Database } from "./db.js";
 
 /**
- * Idempotent HackPrinceton demo identities.
- * Applied only when IDENTITY_MODE=local and DEMO_SEED is not "false".
- * Production refuses local identity, so this never runs there.
+ * Idempotent demo identities for IDENTITY_MODE=local.
+ * Applied when DEMO_SEED is not "false". Uses ON CONFLICT so cold starts are safe.
  */
 export const DEMO_ORG_ID = "org-demo";
 

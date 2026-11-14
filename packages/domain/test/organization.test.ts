@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  isParticipantId,
   parseMembership,
   parseOrganization,
   parseParticipant,
+  parseParticipantId,
   parseRole,
   ROLES,
 } from "../src/index.ts";
@@ -35,5 +37,20 @@ describe("organization contracts", () => {
       () => parseMembership({ orgId: "org-1", subject: "sub-1", role: "owner-admin" }),
       /invalid membership/,
     );
+  });
+
+  it("accepts participant ids of letters, digits, and dashes between 3 and 32 characters", () => {
+    assert.equal(parseParticipantId("P-014"), "P-014");
+    assert.equal(parseParticipantId("  ab3  "), "ab3");
+    assert.equal(isParticipantId("participant-demo"), true);
+    assert.equal(isParticipantId("a".repeat(32)), true);
+    assert.equal(isParticipantId("ab"), false);
+    assert.equal(isParticipantId("a".repeat(33)), false);
+    assert.equal(isParticipantId("user_name"), false);
+    assert.equal(isParticipantId("id.1"), false);
+    assert.equal(isParticipantId("id 1"), false);
+    assert.throws(() => parseParticipantId("ab"), /invalid participant id/);
+    assert.throws(() => parseParticipantId("user_name"), /invalid participant id/);
+    assert.throws(() => parseParticipantId(""), /invalid participant id/);
   });
 });

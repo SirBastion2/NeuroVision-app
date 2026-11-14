@@ -2,9 +2,11 @@ import type { SessionRecord } from "@neurovision/domain";
 import type { ProcessingSnapshot } from "./api-client";
 import type { UploadJob, UploadQueueState } from "./upload-queue";
 
+export const LOCAL_ORG_ID = "org-demo";
+
 export const DEMO_LOCAL_IDENTITY = {
   subject: "participant-demo",
-  orgId: "org-demo",
+  orgId: LOCAL_ORG_ID,
 } as const;
 
 /** API-backed chrome is shown only when the service layer has an API base URL. */

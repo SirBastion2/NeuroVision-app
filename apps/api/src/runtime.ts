@@ -17,12 +17,22 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): AppConf
   return loadConfig(env);
 }
 
-export async function openRuntime(env: NodeJS.ProcessEnv = process.env): Promise<Runtime> {
+export interface OpenRuntimeOptions {
+  /** pg pool size. Defaults to 1 on Vercel, otherwise the driver default. */
+  poolMax?: number;
+}
+
+export async function openRuntime(env: NodeJS.ProcessEnv = process.env, options: OpenRuntimeOptions = {}): Promise<Runtime> {
   loadRootEnv(env);
   const config = loadConfig(env);
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required.");
-  const db = createPgDatabase(databaseUrl);
+  const vercelPool = env.VERCEL === "1" || env.VERCEL === "true";
+  const fromEnv = env.PG_POOL_MAX ? Number(env.PG_POOL_MAX) : undefined;
+  const poolMax =
+    options.poolMax ??
+    (fromEnv !== undefined && Number.isInteger(fromEnv) && fromEnv > 0 ? fromEnv : vercelPool ? 1 : undefined);
+  const db = createPgDatabase(databaseUrl, poolMax !== undefined ? { max: poolMax } : {});
   await migrate(db);
   const objects = createObjectStoreFromEnv(env, db);
   assertRuntimeSafe(config, objects.kind);

@@ -162,7 +162,7 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
         } else {
           saveSession(storage, valid);
         }
-        if (shouldMirrorClinician(standalone)) upsertClinicianHistory(valid);
+        if (shouldMirrorClinician(standalone)) upsertClinicianHistory(valid, storage);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -179,7 +179,7 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
           const sessions = envelope.sessions.filter((item) => item.id !== id);
           storage.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
         }
-        if (shouldMirrorClinician(standalone)) removeFromClinicianHistory(id);
+        if (shouldMirrorClinician(standalone)) removeFromClinicianHistory(id, storage);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };

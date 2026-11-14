@@ -10,7 +10,7 @@ Copy `.env.example` to `.env` and set `DATABASE_URL` (hosted Postgres with `usel
 npm run dev
 ```
 
-That starts the API on port 3001 and the web app on port 5173. The Vite dev server proxies `/api` and `/health`. Demo identity is `IDENTITY_MODE=local`; the web app signs in as `participant-demo` / `org-demo`. S3/MinIO and OIDC are not required. Traces fall back to Postgres when S3 env vars are absent.
+That starts the API on port 3001 and the web app on port 5173. The Vite dev server proxies `/api` and `/health`. Identity is `IDENTITY_MODE=local`; the web app asks for a participant ID and posts it to `/api/v1/auth/local` with `org-demo`. S3/MinIO and OIDC are not required. Traces fall back to Postgres when S3 env vars are absent.
 
 ## Docker (optional)
 
@@ -26,11 +26,11 @@ npm run dev:backend
 
 That copies `.env.example` to `.env` when `.env` is missing, then runs `docker compose up --build`. Postgres, MinIO, the API (port 3001), and the worker come up together. With `IDENTITY_MODE=local` the API seeds the demo organization on startup. Set `DEMO_SEED=false` to skip that.
 
-`NODE_ENV` stays `development` in Compose. Production refuses local identity and the in-memory object store.
+`NODE_ENV` stays `development` in Compose. Production refuses the in-memory object store. `IDENTITY_MODE=local` is allowed when that env is set; `COOKIE_SECURE` defaults to true in production.
 
-## Demo sign-in
+## Local sign-in
 
-`IDENTITY_MODE=local` accepts only subjects that already have a membership. It is disabled when `IDENTITY_MODE=oidc`.
+`IDENTITY_MODE=local` accepts a participant ID (`subject`) of 3–32 letters, digits, or dashes and keeps `org-demo` as the org. Unknown IDs are created as participants. It is disabled when `IDENTITY_MODE=oidc`.
 
 ```bash
 curl -i -X POST http://localhost:3001/api/v1/auth/local \
@@ -43,6 +43,7 @@ curl -i -X POST http://localhost:3001/api/v1/auth/local \
 | `admin-demo` | admin | Create participants and assignments. Cannot read measurements. |
 | `reviewer-demo` | reviewer | Read the demo participant's sessions. |
 | `participant-demo` | participant | Start sessions for `participant-demo`. |
+| any other valid ID | participant | Created on first local sign-in; history is scoped to that ID. |
 
 The response sets `nv_session` (HttpOnly) and `nv_csrf`. Send the CSRF value as `x-csrf-token` on POST, PUT, and DELETE.
 

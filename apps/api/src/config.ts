@@ -56,10 +56,14 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
         }
       : null;
 
+  const cookieSecureEnv = env.COOKIE_SECURE?.trim().toLowerCase();
+  const cookieSecure =
+    cookieSecureEnv === "true" ? true : cookieSecureEnv === "false" ? false : env.NODE_ENV === "production";
+
   return {
     env: env.NODE_ENV ?? "development",
     identityMode,
-    cookieSecure: env.COOKIE_SECURE === "true",
+    cookieSecure,
     port: integer(env.PORT, 3001),
     host: env.HOST ?? "0.0.0.0",
     sessionTtlMs: integer(env.SESSION_TTL_SECONDS, 60 * 60 * 12) * 1000,
@@ -72,13 +76,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   };
 }
 
-/** Local identity and the memory object store are development adapters. */
+/** The memory object store is a local adapter. Local identity is allowed when IDENTITY_MODE=local. */
 export function assertRuntimeSafe(config: AppConfig, objectStore: "memory" | "s3" | "postgres"): void {
   if (config.env !== "production") return;
-  if (config.identityMode !== "oidc" || !config.oidc) {
-    throw new Error("Production requires OIDC identity configuration.");
-  }
   if (objectStore === "memory") {
     throw new Error("Production requires a durable object store (S3 or Postgres). The memory adapter is local only.");
+  }
+  if (config.identityMode === "oidc" && !config.oidc) {
+    throw new Error("Production OIDC identity requires OIDC configuration.");
   }
 }

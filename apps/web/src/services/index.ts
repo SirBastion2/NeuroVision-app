@@ -62,9 +62,25 @@ export {
   isApiEnabled,
   isStandaloneRuntime,
   readEnv,
+  readIdentityMode,
   readRuntimeConfig,
+  type IdentityMode,
   type WebRuntimeConfig,
 } from "./runtime-config";
+export {
+  LAST_PARTICIPANT_ID_KEY,
+  LOCAL_ORG_ID as PARTICIPANT_LOCAL_ORG_ID,
+  isParticipantId,
+  parseParticipantId,
+  participantIdMessage,
+  readLastParticipantId,
+  writeLastParticipantId,
+} from "./participant-id";
+export {
+  PARTICIPANT_SCOPE_PREFIX,
+  createScopedKeyValueStore,
+  scopedStorageKey,
+} from "./scoped-store";
 export {
   createMemoryKeyValueStore,
   createPackageHistoryStoreAdapter,
@@ -86,6 +102,7 @@ export {
 } from "./upload-queue";
 export {
   DEMO_LOCAL_IDENTITY,
+  LOCAL_ORG_ID,
   jobForSession,
   participantIdForExport,
   processingLabel,

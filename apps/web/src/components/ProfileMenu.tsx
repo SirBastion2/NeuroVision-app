@@ -4,11 +4,12 @@ interface Props {
   initials: string;
   onMyProfile: () => void;
   onClinicianDashboard: () => void;
+  onSwitchParticipant?: () => void;
   disabled?: boolean;
 }
 
 /** Circular account control with My Profile + Clinician Dashboard. */
-export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, disabled }: Props) {
+export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, onSwitchParticipant, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -71,6 +72,20 @@ export function ProfileMenu({ initials, onMyProfile, onClinicianDashboard, disab
               Clinician Dashboard
             </button>
           </li>
+          {onSwitchParticipant ? (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onSwitchParticipant();
+                }}
+              >
+                Switch participant
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>

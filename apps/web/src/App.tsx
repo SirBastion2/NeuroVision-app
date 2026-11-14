@@ -26,15 +26,22 @@ import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
 import { MyProfile } from "./screens/MyProfile";
+import { ParticipantStart } from "./screens/ParticipantStart";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
 import {
   DEMO_LOCAL_IDENTITY,
+  LOCAL_ORG_ID,
   createAppServices,
+  createMemoryKeyValueStore,
+  createScopedKeyValueStore,
+  getBrowserKeyValueStore,
   participantIdForExport,
+  readLastParticipantId,
   shouldEnqueueUpload,
   shouldPersistSession,
   showApiControls,
+  writeLastParticipantId,
   type Me,
   type ProcessingSnapshot,
   type UploadQueueState,
@@ -76,8 +83,16 @@ const ASSESSMENT_STEPS: { label: string; screens: Screen[] }[] = [
 ];
 
 export function App() {
-  const services = useMemo(() => createAppServices(), []);
+  const [participantId, setParticipantId] = useState<string | null>(null);
+  const browserKv = useMemo(() => getBrowserKeyValueStore(), []);
+  const scopedKv = useMemo(() => {
+    if (!participantId) return browserKv;
+    if (!browserKv) return createMemoryKeyValueStore();
+    return createScopedKeyValueStore(browserKv, participantId);
+  }, [browserKv, participantId]);
+  const services = useMemo(() => createAppServices({ keyValueStore: scopedKv }), [scopedKv]);
   const apiEnabled = showApiControls(services.apiEnabled);
+  const localIdentity = apiEnabled && services.identityMode === "local";
   const showBattery = batteryEnabled(apiEnabled);
   const store = useMemo(
     () =>
@@ -87,16 +102,20 @@ export function App() {
           listHistory: () => services.listHistory(),
           remove: (id) => services.remove(id),
         },
+        storage: scopedKv,
         standalone: services.storeKind === "memory",
       }),
-    [services],
+    [services, scopedKv],
   );
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
   const [stored, setStored] = useState<LoadResult>({ sessions: [], rejected: 0, error: null });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [signedIn, setSignedIn] = useState<Me | null>(null);
+  const [authReady, setAuthReady] = useState(!apiEnabled);
+  const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [lastParticipantId, setLastParticipantId] = useState(() => readLastParticipantId(browserKv));
   const [queue, setQueue] = useState<UploadQueueState>(() => services.queueState());
   const [processing, setProcessing] = useState<Record<string, ProcessingSnapshot>>({});
   const [actionError, setActionError] = useState<string | null>(null);
@@ -116,41 +135,65 @@ export function App() {
     }
   }, [theme]);
 
-  useEffect(() => void store.load().then(setStored), [store]);
-  useEffect(() => services.subscribeQueue(setQueue), [services]);
+  useEffect(() => {
+    if (localIdentity && !signedIn) return;
+    void store.load().then(setStored);
+  }, [store, localIdentity, signedIn]);
+  useEffect(() => {
+    setQueue(services.queueState());
+    return services.subscribeQueue(setQueue);
+  }, [services]);
   useEffect(() => {
     void services.drainQueue();
   }, [services]);
 
   useEffect(() => {
-    if (!apiEnabled) return;
+    if (!apiEnabled) {
+      setAuthReady(true);
+      return;
+    }
+    let cancelled = false;
     const url = new URL(window.location.href);
-    if (url.searchParams.get("code") && url.searchParams.get("state")) {
-      void services
-        .completeSignIn(url)
-        .then((result) => {
-          if ("subject" in result) setSignedIn(result);
+    void (async () => {
+      try {
+        if (url.searchParams.get("code") && url.searchParams.get("state")) {
+          const result = await services.completeSignIn(url);
+          if (cancelled) return;
+          if ("subject" in result) {
+            setSignedIn(result);
+            setParticipantId(result.subject);
+            try {
+              setLastParticipantId(writeLastParticipantId(result.subject, browserKv));
+            } catch {
+              setLastParticipantId(result.subject);
+            }
+          }
           url.searchParams.delete("code");
           url.searchParams.delete("state");
           window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-        })
-        .catch((error: unknown) => {
-          setAuthError(error instanceof Error ? error.message : String(error));
-        });
-      return;
-    }
-    void services.getMe().then(async (me) => {
-      if (me) {
-        setSignedIn(me);
-        return;
+          return;
+        }
+        const me = await services.getMe();
+        if (cancelled) return;
+        if (me) {
+          setSignedIn(me);
+          setParticipantId(me.subject);
+          try {
+            setLastParticipantId(writeLastParticipantId(me.subject, browserKv));
+          } catch {
+            setLastParticipantId(me.subject);
+          }
+        }
+      } catch (error: unknown) {
+        if (!cancelled) setAuthError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!cancelled) setAuthReady(true);
       }
-      try {
-        setSignedIn(await services.signInLocal(DEMO_LOCAL_IDENTITY));
-      } catch {
-        setSignedIn(null);
-      }
-    });
-  }, [apiEnabled, services]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, services, browserKv]);
 
   useEffect(() => {
     if (!state.ended || !session || !shouldPersistSession(session)) return;
@@ -168,8 +211,8 @@ export function App() {
         try {
           await services.enqueueUpload({
             session,
-            participantId: signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject,
-            assignmentId: `assign-${signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject}`,
+            participantId: signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject,
+            assignmentId: `assign-${signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject}`,
           });
         } catch (error) {
           if (cancelled) return;
@@ -180,7 +223,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [state.ended, session, store, services, apiEnabled, signedIn]);
+  }, [state.ended, session, store, services, apiEnabled, signedIn, participantId]);
 
   useEffect(() => {
     if (screen === "history" || screen === "my-profile") {
@@ -237,8 +280,8 @@ export function App() {
           try {
             await services.enqueueUpload({
               session: s,
-              participantId: signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject,
-              assignmentId: `assign-${signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject}`,
+              participantId: signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject,
+              assignmentId: `assign-${signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject}`,
             });
           } catch (error) {
             setSaveError(error instanceof Error ? error.message : String(error));
@@ -246,7 +289,7 @@ export function App() {
         }
       })();
     },
-    [store, services, apiEnabled, signedIn],
+    [store, services, apiEnabled, signedIn, participantId],
   );
 
   const trial = useMemo(() => {
@@ -270,16 +313,52 @@ export function App() {
     activeProfileId: stored.sessions[0]?.profileId ?? null,
   });
 
-  const onSignIn = () => {
-    void services
-      .signInLocal(DEMO_LOCAL_IDENTITY)
-      .then(setSignedIn)
-      .catch(() => {
-        void services.beginSignIn().then((redirect) => {
-          window.location.assign(redirect.url);
-        });
-      });
+  const applySignedIn = (me: Me) => {
+    setSignedIn(me);
+    setParticipantId(me.subject);
+    try {
+      setLastParticipantId(writeLastParticipantId(me.subject, browserKv));
+    } catch {
+      setLastParticipantId(me.subject);
+    }
+    setAuthError(null);
   };
+
+  const onParticipantStart = (id: string) => {
+    setAuthBusy(true);
+    setAuthError(null);
+    void services
+      .signInLocal({ subject: id, orgId: LOCAL_ORG_ID })
+      .then(applySignedIn)
+      .catch((error: unknown) => {
+        setAuthError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => setAuthBusy(false));
+  };
+
+  const onSwitchParticipant = () => {
+    void services.signOut().finally(() => {
+      setSignedIn(null);
+      setParticipantId(null);
+      setStored({ sessions: [], rejected: 0, error: null });
+      setBatteries([]);
+      setActivity([]);
+      dispatch({ type: "home" });
+    });
+  };
+
+  const onSignIn = () => {
+    if (localIdentity) {
+      setAuthReady(true);
+      return;
+    }
+    void services.beginSignIn().then((redirect) => {
+      window.location.assign(redirect.url);
+    });
+  };
+
+  const needsParticipant = localIdentity && authReady && !signedIn;
+  const checkingAuth = localIdentity && !authReady;
 
   const onExport = async () => {
     if (!exportId) return;
@@ -313,7 +392,9 @@ export function App() {
           <Wordmark />
         </button>
 
-        {inAssessment ? (
+        {needsParticipant || checkingAuth ? (
+          <div className="topbar-center-spacer" aria-hidden />
+        ) : inAssessment ? (
           <ol className="stepper" aria-label="Assessment progress">
             {steps.map((s, i) => (
               <li
@@ -354,18 +435,28 @@ export function App() {
         {!focusMode && (
           <div className="topbar-right">
             {apiEnabled &&
-              (signedIn ? (
+              signedIn && (
                 <>
                   <span className="small">{signedIn.subject}</span>
-                  <button className="ghost" type="button" onClick={() => void services.signOut().then(() => setSignedIn(null))}>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() =>
+                      void services.signOut().then(() => {
+                        setSignedIn(null);
+                        if (localIdentity) setParticipantId(null);
+                      })
+                    }
+                  >
                     Sign out
                   </button>
                 </>
-              ) : (
-                <button type="button" onClick={onSignIn}>
-                  Sign in
-                </button>
-              ))}
+              )}
+            {apiEnabled && !signedIn && !localIdentity && (
+              <button type="button" onClick={onSignIn}>
+                Sign in
+              </button>
+            )}
             <button
               className="theme-toggle"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -380,21 +471,40 @@ export function App() {
                 )}
               </svg>
             </button>
-            <ProfileMenu
-              initials={avatarInitials(stored.sessions)}
-              onMyProfile={() => go("my-profile")}
-              onClinicianDashboard={() => go("profile")}
-            />
+            {!needsParticipant && !checkingAuth && (
+              <ProfileMenu
+                initials={signedIn?.subject ? signedIn.subject.slice(0, 2).toUpperCase() : avatarInitials(stored.sessions)}
+                onMyProfile={() => go("my-profile")}
+                onClinicianDashboard={() => go("profile")}
+                onSwitchParticipant={localIdentity && signedIn ? onSwitchParticipant : undefined}
+              />
+            )}
           </div>
         )}
       </header>
 
-      <main ref={main} tabIndex={-1} key={screen} className="screen">
-        {authError && (
+      <main ref={main} tabIndex={-1} key={needsParticipant ? "participant-start" : checkingAuth ? "auth-check" : screen} className="screen">
+        {authError && !needsParticipant && (
           <p className="notice error" role="alert">
             {authError}
           </p>
         )}
+        {checkingAuth && (
+          <section className="intro card narrow">
+            <h1>Opening session</h1>
+            <p className="lede">Checking this browser for a signed-in participant.</p>
+          </section>
+        )}
+        {needsParticipant && (
+          <ParticipantStart
+            initialId={lastParticipantId}
+            busy={authBusy}
+            error={authError}
+            onSubmit={onParticipantStart}
+          />
+        )}
+        {!needsParticipant && !checkingAuth && (
+        <>
         {apiEnabled && queue.pending + queue.uploading + queue.blocked > 0 && (
           <p className="notice" role="status">
             Upload queue: {queue.pending} queued, {queue.uploading} uploading, {queue.blocked} blocked, {queue.acknowledged} sent.
@@ -557,6 +667,8 @@ export function App() {
           />
         )}
         {screen === "profile" && <ProfileDashboard onBackToPatient={() => go("my-profile")} />}
+        </>
+        )}
       </main>
 
       {!focusMode && (

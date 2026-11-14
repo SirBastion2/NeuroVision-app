@@ -91,9 +91,20 @@ function stripUnknownParams(connectionString: string): { href: string; sslmode: 
  * Hosted Postgres (Tiger Cloud) appends `uselibpqcompat=true&sslmode=require`.
  * `pg` does not accept `uselibpqcompat` as a startup parameter.
  */
-export function pgConnectionConfig(connectionString: string): PoolConfig {
+export interface PgPoolOptions {
+  /** Pool size. Serverless invocations should pass 1. */
+  max?: number;
+}
+
+export function pgConnectionConfig(connectionString: string, options: PgPoolOptions = {}): PoolConfig {
   const { href, sslmode } = stripUnknownParams(connectionString);
-  const config: PoolConfig = { connectionString: href };
+  const config: PoolConfig = {
+    connectionString: href,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000,
+    allowExitOnIdle: true,
+  };
+  if (options.max !== undefined) config.max = options.max;
   if (sslmode === "require" || sslmode === "prefer") {
     config.ssl = { rejectUnauthorized: false };
   } else if (sslmode === "verify-ca" || sslmode === "verify-full") {

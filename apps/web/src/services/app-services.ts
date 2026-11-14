@@ -121,6 +121,7 @@ export interface AppServices {
   readonly storeKind: HistoryStore["kind"];
   readonly contractsVersion: string;
   readonly apiEnabled: boolean;
+  readonly identityMode: "local" | "oidc";
   readonly api: ApiClient;
   readonly auth: ApiAuthClient;
   readonly queue: UploadQueue;
@@ -220,6 +221,7 @@ function replaceTrial(session: SessionRecord, trial: TrialRecord): SessionRecord
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const config = options.config ?? readRuntimeConfig();
   const standalone = options.standalone ?? config.standalone;
+  const identityMode = config.identityMode === "oidc" ? "oidc" : "local";
   const store = resolveHistoryStore({
     preferred: options.store,
     standalone,
@@ -274,6 +276,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     storeKind: store.kind,
     contractsVersion: CONTRACTS_VERSION,
     apiEnabled: api.enabled,
+    identityMode,
     api,
     auth,
     queue,

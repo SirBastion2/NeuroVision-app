@@ -1,10 +1,12 @@
 import { Buffer } from "node:buffer";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
+import { parseParticipantId } from "@neurovision/domain";
 import { createAppSession, finishOidcLogin, startOidcLogin, writeSessionCookies, clearSessionCookies } from "./auth.js";
 import type { BatchPayload } from "./contracts.provisional.js";
 import type { Actor, Deps } from "./deps.js";
 import { HttpError } from "./errors.js";
+import { ensureLocalParticipant } from "./local-identity.js";
 import { commitLegacy, previewLegacy } from "./legacy.js";
 import { metricsText, readMetrics } from "./metrics.js";
 import {
@@ -60,15 +62,16 @@ export async function registerRoutes(app: FastifyInstance, deps: Deps): Promise<
       throw new HttpError(404, "not_found", "Local sign-in is disabled.");
     }
     const body = z.object({ subject: z.string().min(1).max(200), orgId: id }).parse(request.body);
-    const membership = await deps.db.query<{ role: Actor["role"]; revoked_at: Date | string | null }>(
-      "SELECT role, revoked_at FROM memberships WHERE org_id = $1 AND subject = $2",
-      [body.orgId, body.subject],
-    );
-    const row = membership.rows[0];
-    if (!row || row.revoked_at) throw new HttpError(403, "forbidden", "No active membership for this local identity.");
-    const session = await createAppSession(deps, body.subject, body.orgId);
+    let subject: string;
+    try {
+      subject = parseParticipantId(body.subject);
+    } catch {
+      throw new HttpError(400, "validation", "Participant ID must be 3–32 letters, digits, or dashes.");
+    }
+    const membership = await ensureLocalParticipant(deps.db, body.orgId, subject);
+    const session = await createAppSession(deps, subject, body.orgId);
     writeSessionCookies(reply, deps.config, session.id, session.csrf, session.expires);
-    return { subject: body.subject, orgId: body.orgId, role: row.role };
+    return { subject, orgId: body.orgId, role: membership.role };
   });
 
   app.get("/api/v1/auth/login", { config: { public: true } }, async (_request, reply) => {

@@ -1,6 +1,9 @@
+export type IdentityMode = "local" | "oidc";
+
 export interface WebRuntimeConfig {
   apiBaseUrl: string;
   standalone: boolean;
+  identityMode?: IdentityMode;
 }
 
 type EnvRecord = Record<string, string | boolean | undefined>;
@@ -10,9 +13,13 @@ function processEnv(): EnvRecord | undefined {
   return globalProcess?.env;
 }
 
-function viteEnv(): EnvRecord | undefined {
-  const meta = import.meta as ImportMeta & { env?: EnvRecord };
-  return meta.env;
+function viteEnv(): EnvRecord {
+  const env = (import.meta as ImportMeta & { env?: EnvRecord }).env;
+  return {
+    VITE_API_BASE_URL: env?.VITE_API_BASE_URL ?? import.meta.env?.VITE_API_BASE_URL,
+    VITE_STANDALONE: env?.VITE_STANDALONE ?? import.meta.env?.VITE_STANDALONE,
+    VITE_IDENTITY_MODE: env?.VITE_IDENTITY_MODE ?? import.meta.env?.VITE_IDENTITY_MODE,
+  };
 }
 
 /** Read a Vite or process env value. Empty when unset. */
@@ -35,12 +42,18 @@ export function isStandaloneRuntime(env?: EnvRecord): boolean {
   return isFileProtocol();
 }
 
+export function readIdentityMode(env?: EnvRecord): IdentityMode {
+  return readEnv("VITE_IDENTITY_MODE", env) === "oidc" ? "oidc" : "local";
+}
+
 export function readRuntimeConfig(env?: EnvRecord): WebRuntimeConfig {
   const standalone = isStandaloneRuntime(env);
-  const apiBaseUrl = standalone ? "" : readEnv("VITE_API_BASE_URL", env).replace(/\/+$/, "");
+  const raw = standalone ? "" : readEnv("VITE_API_BASE_URL", env);
+  const apiBaseUrl = raw === "/" ? "/" : raw.replace(/\/+$/, "");
   return {
     apiBaseUrl,
     standalone,
+    identityMode: readIdentityMode(env),
   };
 }
 
