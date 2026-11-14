@@ -1,10 +1,21 @@
 import { bisectionObservation, type BisectionLine, type BisectionResponse } from "./bisection.js";
 import { scoreClock, type ClockErrorType, type ClockFace, type ClockNumeral, type ClockResponse, type ClockScore, type ClockSide, type ClockTrial, type StackPosition } from "./clock.js";
-import { combineEvidence, type EvidenceResult, type TestId, type TestNorm, type TestObservation } from "./evidence.js";
+import {
+  combineEvidence,
+  scoringNormsFromSamples,
+  type EvidenceResult,
+  type ModelIndexSample,
+  type ModelTestId,
+  type TestId,
+  type TestNorm,
+  type TestObservation,
+} from "./evidence.js";
 import { greyscalesNormFor, scoreGreyscales, type BarPosition, type DarkSide, type GreyscalesResponse, type GreyscalesScore, type GreyscalesTrial, type ReadingDirection } from "./greyscales.js";
-import { isFiniteNumber, isIsoTimestamp, isNonEmptyString, isObject, isOneOf, parseFail } from "./guard.js";
+import { isFiniteNumber, isInteger, isIsoTimestamp, isNonEmptyString, isObject, isOneOf, parseFail } from "./guard.js";
 import { generateScene, scoreScene, type HideSide, type SceneScore, type SceneTap } from "./scene.js";
+import { cancellationObservationFromCounts } from "./scoring.js";
 import { SESSION_SOURCES, type SessionSource } from "./session.js";
+import { starryObservationFromCounts } from "./starry.js";
 
 export const BATTERY_CONTRACT_VERSION = "battery-1.0.0";
 
@@ -19,7 +30,28 @@ const STACK_POSITIONS: readonly StackPosition[] = ["top", "bottom"];
 const DARK_SIDES: readonly DarkSide[] = ["left", "right"];
 const BAR_POSITIONS: readonly BarPosition[] = ["top", "bottom"];
 const TEST_IDS: readonly TestId[] = ["scene", "clock", "greyscales", "bisection", "detection", "cancellation"];
-const NORM_SOURCES: readonly TestNorm["source"][] = ["hacker-norms", "literature", "assumed", "uncalibrated"];
+const NORM_SOURCES: readonly TestNorm["source"][] = ["hacker-norms", "literature", "assumed", "fitted", "uncalibrated"];
+const BISECTION_ERROR_COUNT = 5;
+
+export interface SideHitCounts {
+  hits: number;
+  targets: number;
+}
+
+export interface SideOmissionCounts {
+  omissions: number;
+  targets: number;
+}
+
+export interface DetectionCounts {
+  left: SideHitCounts;
+  right: SideHitCounts;
+}
+
+export interface CancellationCounts {
+  left: SideOmissionCounts;
+  right: SideOmissionCounts;
+}
 
 export interface BatteryRecord {
   contract: typeof BATTERY_CONTRACT_VERSION;
@@ -36,6 +68,14 @@ export interface BatteryRecord {
   clock: { trials: ClockTrial[]; responses: ClockResponse[] };
   greyscales: { trials: GreyscalesTrial[]; responses: GreyscalesResponse[] } | null;
   bisection: { lines: BisectionLine[]; responses: BisectionResponse[] } | null;
+  /** Per-side hits/targets for Starry Night Eq. (1). Null when the test was not run. */
+  detection: DetectionCounts | null;
+  /** Per-side omissions/targets for Hollow Rings Eq. (1). Null when the test was not run. */
+  cancellation: CancellationCounts | null;
+  /** True when this run is a healthy-control sample for Eq. (9) fitting. */
+  healthyControl: boolean;
+  /** True when this run is a synthetic test fixture, not a field session. */
+  fixture: boolean;
   normsUsed: Partial<Record<TestId, TestNorm>>;
 }
 
@@ -44,6 +84,8 @@ export interface BatteryScore {
   clock: ClockScore;
   greyscales: GreyscalesScore | null;
   bisection: { errors: number[]; observation: TestObservation } | null;
+  detection: TestObservation | null;
+  cancellation: TestObservation | null;
   evidence: EvidenceResult;
 }
 
@@ -260,6 +302,46 @@ function parseBisectionBlock(value: unknown): BatteryRecord["bisection"] {
   };
 }
 
+function parseCount(value: unknown, key: "hits" | "omissions" | "targets"): number {
+  if (!isInteger(value) || value < 0) parseFail("battery record");
+  if (key === "targets" && value === 0) parseFail("battery record");
+  return value;
+}
+
+function parseSideHits(value: unknown): SideHitCounts {
+  if (!isObject(value)) parseFail("battery record");
+  const hits = parseCount(value.hits, "hits");
+  const targets = parseCount(value.targets, "targets");
+  if (hits > targets) parseFail("battery record");
+  return { hits, targets };
+}
+
+function parseSideOmissions(value: unknown): SideOmissionCounts {
+  if (!isObject(value)) parseFail("battery record");
+  const omissions = parseCount(value.omissions, "omissions");
+  const targets = parseCount(value.targets, "targets");
+  if (omissions > targets) parseFail("battery record");
+  return { omissions, targets };
+}
+
+function parseDetectionBlock(value: unknown): DetectionCounts | null {
+  if (value === undefined || value === null) return null;
+  if (!isObject(value)) parseFail("battery record");
+  return { left: parseSideHits(value.left), right: parseSideHits(value.right) };
+}
+
+function parseCancellationBlock(value: unknown): CancellationCounts | null {
+  if (value === undefined || value === null) return null;
+  if (!isObject(value)) parseFail("battery record");
+  return { left: parseSideOmissions(value.left), right: parseSideOmissions(value.right) };
+}
+
+function parseFlag(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value !== "boolean") parseFail("battery record");
+  return value;
+}
+
 export function isBatteryRecord(value: unknown): value is BatteryRecord {
   try {
     parseBatteryRecord(value);
@@ -298,7 +380,66 @@ export function parseBatteryRecord(value: unknown): BatteryRecord {
     clock: parseClockBlock(value.clock),
     greyscales: parseGreyscalesBlock(value.greyscales),
     bisection: parseBisectionBlock(value.bisection),
+    detection: parseDetectionBlock(value.detection),
+    cancellation: parseCancellationBlock(value.cancellation),
+    healthyControl: parseFlag(value.healthyControl, false),
+    fixture: parseFlag(value.fixture, false),
     normsUsed: parseNormsUsed(value.normsUsed),
+  };
+}
+
+export function isHealthyControlSample(record: BatteryRecord): boolean {
+  return record.healthyControl && record.consent && record.mode === "full" && record.source === "live";
+}
+
+export function detectionObservationFromRecord(counts: DetectionCounts): TestObservation {
+  return starryObservationFromCounts(
+    { hits: counts.left.hits, n: counts.left.targets },
+    { hits: counts.right.hits, n: counts.right.targets },
+  );
+}
+
+export function cancellationObservationFromRecord(counts: CancellationCounts): TestObservation | null {
+  return cancellationObservationFromCounts(counts.left, counts.right);
+}
+
+/** Eq. (1) indices from stored counts and the five signed bisection errors. Null if any model test is incomplete. */
+export function modelIndicesFromBattery(record: BatteryRecord): ModelIndexSample | null {
+  if (!record.detection || !record.cancellation || !record.bisection) return null;
+  const detection = detectionObservationFromRecord(record.detection);
+  const cancellation = cancellationObservationFromRecord(record.cancellation);
+  const bisection = bisectionObservation(record.bisection.lines, record.bisection.responses);
+  if (!cancellation || bisection.errors.length < BISECTION_ERROR_COUNT) return null;
+  return {
+    detection: detection.value,
+    cancellation: cancellation.value,
+    bisection: bisection.observation.value,
+  };
+}
+
+export function applyScoringNorms(record: BatteryRecord, norms: Partial<Record<ModelTestId, TestNorm>>): BatteryRecord {
+  return parseBatteryRecord({
+    ...record,
+    normsUsed: { ...record.normsUsed, ...norms },
+  });
+}
+
+export function scoringNormsFromBatteries(records: readonly BatteryRecord[]): {
+  n: number;
+  source: "assumed" | "fitted";
+  norms: Record<ModelTestId, TestNorm>;
+} {
+  const samples: ModelIndexSample[] = [];
+  for (const record of records) {
+    if (!isHealthyControlSample(record)) continue;
+    const indices = modelIndicesFromBattery(record);
+    if (indices) samples.push(indices);
+  }
+  const norms = scoringNormsFromSamples(samples);
+  return {
+    n: samples.length,
+    source: samples.length >= 5 ? "fitted" : "assumed",
+    norms,
   };
 }
 
@@ -327,12 +468,18 @@ export function scoreBatteryRecord(record: BatteryRecord): BatteryScore {
   observations.push(clockScore.observation);
   if (greyscalesScore) observations.push(greyscalesScore.observation);
   if (bisectionScore) observations.push(bisectionScore.observation);
+  const detection = record.detection ? detectionObservationFromRecord(record.detection) : null;
+  const cancellation = record.cancellation ? cancellationObservationFromRecord(record.cancellation) : null;
+  if (detection) observations.push(detection);
+  if (cancellation) observations.push(cancellation);
 
   return {
     scene: sceneScore,
     clock: clockScore,
     greyscales: greyscalesScore,
     bisection: bisectionScore,
+    detection,
+    cancellation,
     evidence: combineEvidence(observations, normsFor(record)),
   };
 }

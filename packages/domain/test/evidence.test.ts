@@ -114,9 +114,12 @@ test("per-test factors point the right way and are at least 1", () => {
 
 test("fitted norms replace assumed values and are labeled", () => {
   const n = fitNorms([0.01, -0.02, 0.03, 0, -0.01, 0.02]);
-  assert.ok(n && n.source === "hacker-norms");
+  assert.ok(n && n.source === "fitted");
+  assert.equal(n.sample?.n, 6);
   const r = combineEvidence([obs("cancellation", 0)], { cancellation: n! });
   assert.equal(r.usesAssumedNorms, false);
+  assert.equal(r.usesFittedNorms, true);
+  assert.ok(r.notes.some((note) => note.includes("fitted from 6 healthy-control sessions")));
   assert.equal(fitNorms([1, 2]), null);
   assert.equal(NORM_FIT_MIN_N, 5);
   assert.equal(NORM_FIT_KAPPA, 8);

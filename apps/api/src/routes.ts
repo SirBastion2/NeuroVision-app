@@ -26,6 +26,7 @@ import {
   readTraceBytes,
   readTraceDownload,
   revokeMembership,
+  scoringNormsForOrg,
   writeTraceContent,
 } from "./sessions.js";
 
@@ -132,6 +133,10 @@ export async function registerRoutes(app: FastifyInstance, deps: Deps): Promise<
 
   app.get("/api/v1/sessions", async (request) => {
     return listSessions(deps, actorOf(request));
+  });
+
+  app.get("/api/v1/norms", async (request) => {
+    return scoringNormsForOrg(deps, actorOf(request));
   });
 
   app.put("/api/v1/sessions/:sessionId", async (request) => {

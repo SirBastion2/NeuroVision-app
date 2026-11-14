@@ -183,6 +183,22 @@ function median(values: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+/** Eq. (1) Starry Night: left hit rate − right hit rate, from stored per-side hits/targets. */
+export function starryObservationFromCounts(
+  left: { hits: number; n: number },
+  right: { hits: number; n: number },
+): TestObservation {
+  const rateL = left.n ? left.hits / left.n : 0;
+  const rateR = right.n ? right.hits / right.n : 0;
+  return {
+    test: "detection",
+    label: "Starry Night",
+    value: rateL - rateR,
+    se: seProportionDiff(left.hits, left.n, right.hits, right.n),
+    n: left.n + right.n,
+  };
+}
+
 /** Lateral index = left hit rate minus right hit rate (negative = left weaker), Eq. (1). */
 export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], presses: StarryPress[] = []): StarryScore {
   const byId = new Map(responses.map((x) => [x.trialId, x]));
@@ -201,22 +217,14 @@ export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], 
     return { col, ...s, rate: s.n ? s.hits / s.n : null };
   });
   const falseAlarms = presses.filter((p) => p.trialId === null).length;
-  const rateL = left.n ? left.hits / left.n : 0;
-  const rateR = right.n ? right.hits / right.n : 0;
-  const value = rateL - rateR;
+  const observation = starryObservationFromCounts(left, right);
   return {
     left,
     right,
     columns,
     falseAlarms,
     rtGapMs: left.medianRtMs !== null && right.medianRtMs !== null ? left.medianRtMs - right.medianRtMs : null,
-    observation: {
-      test: "detection",
-      label: "Starry Night",
-      value,
-      se: seProportionDiff(left.hits, left.n, right.hits, right.n),
-      n: left.n + right.n,
-    },
-    healthyRange: compareToNorm(value, STARRY_LATERALITY),
+    observation,
+    healthyRange: compareToNorm(observation.value, STARRY_LATERALITY),
   };
 }

@@ -13,6 +13,7 @@
 import {
   ASSUMED_NORM_NOTICE,
   DEFAULT_NORMS,
+  fittedNormNotice,
   isCalibratedNorm,
   type NormCitation,
   type NormSample,
@@ -30,7 +31,7 @@ export function isModelTest(test: TestId): test is ModelTestId {
   return (MODEL_TEST_IDS as readonly TestId[]).includes(test);
 }
 
-export { ASSUMED_NORM_NOTICE };
+export { ASSUMED_NORM_NOTICE, fittedNormNotice };
 
 export interface TestNorm {
   /** Healthy mean of the lateral index. Null when the metric is uncalibrated. */
@@ -99,6 +100,7 @@ export interface EvidenceResult {
   tests: TestEvidence[];
   notes: string[];
   usesAssumedNorms: boolean;
+  usesFittedNorms: boolean;
   usesUncalibratedNorms: boolean;
 }
 
@@ -286,8 +288,14 @@ export function combineEvidence(
     }
   }
   const usesAssumedNorms = used.some((r) => r.norm.source === "assumed");
+  const fittedNs = used
+    .filter((r) => r.norm.source === "fitted")
+    .map((r) => r.norm.sample?.n)
+    .filter((n): n is number => n != null);
+  const usesFittedNorms = fittedNs.length > 0;
   const usesUncalibratedNorms = rows.some((r) => r.norm.source === "uncalibrated" || r.norm.calibrated === false);
   if (usesAssumedNorms) notes.push(ASSUMED_NORM_NOTICE);
+  if (usesFittedNorms) notes.push(fittedNormNotice(fittedNs[0]!));
   if (usesUncalibratedNorms) notes.push("Clock, greyscales, gaze, and Hidden scene do not enter the evidence model.");
 
   return {
@@ -298,6 +306,7 @@ export function combineEvidence(
     tests,
     notes,
     usesAssumedNorms,
+    usesFittedNorms,
     usesUncalibratedNorms,
   };
 }
@@ -330,9 +339,37 @@ export function fitNorms(values: number[], sensitivity = 1, prior?: TestNorm, ps
     mean: m,
     healthySd: Math.max(s, 1e-3),
     sensitivity,
-    source: "hacker-norms",
+    source: "fitted",
     calibrated: true,
     cutoff: prior?.cutoff ?? null,
-    note: usablePrior ? `Fitted from ${n} event participants, shrunk toward the prior norm.` : `Fitted from ${n} event participants.`,
+    sample: { n, ageRange: "healthy-control" },
+    note: usablePrior
+      ? `Fitted from ${n} healthy-control sessions, shrunk toward the Table 2 placeholder (Eq. 9).`
+      : `Fitted from ${n} healthy-control sessions.`,
   };
+}
+
+export interface ModelIndexSample {
+  detection: number;
+  cancellation: number;
+  bisection: number;
+}
+
+/** Table 2 placeholders, or Eq. (9) fits once n ≥ 5. */
+export function scoringNormsFromSamples(samples: readonly ModelIndexSample[]): Record<ModelTestId, TestNorm> {
+  const priors: Record<ModelTestId, TestNorm> = {
+    detection: DEFAULT_NORMS.detection,
+    cancellation: DEFAULT_NORMS.cancellation,
+    bisection: DEFAULT_NORMS.bisection,
+  };
+  const result: Record<ModelTestId, TestNorm> = { ...priors };
+  for (const test of MODEL_TEST_IDS) {
+    const fitted = fitNorms(
+      samples.map((sample) => sample[test]),
+      priors[test].sensitivity,
+      priors[test],
+    );
+    if (fitted) result[test] = fitted;
+  }
+  return result;
 }

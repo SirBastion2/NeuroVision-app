@@ -7,7 +7,7 @@
  * a notice. Clock, greyscales, gaze, and Hidden scene do not enter the model.
  */
 
-export type NormSource = "hacker-norms" | "literature" | "assumed" | "uncalibrated";
+export type NormSource = "hacker-norms" | "literature" | "assumed" | "fitted" | "uncalibrated";
 export type CutoffDirection = "above" | "below" | "absolute";
 export type HealthyRangeStatus = "within" | "outside" | "uncalibrated";
 
@@ -67,6 +67,11 @@ export interface TestNormShape {
 /** Notice attached to any reading that used Table 2 placeholders. */
 export const ASSUMED_NORM_NOTICE =
   "Healthy-range means and SDs are assumed placeholders, not measured values.";
+
+/** Notice attached when scoring uses Eq. (9) fitted healthy-control norms. */
+export function fittedNormNotice(n: number): string {
+  return `Healthy-range means and SDs are fitted from ${n} healthy-control sessions (Eq. 9).`;
+}
 
 const PLACEHOLDER_NOTE =
   "Assumed placeholder (Table 2). Not a measured healthy-control sample; replace by fitting (Eq. 9) once n ≥ 5.";
@@ -293,14 +298,19 @@ export function compareToNorm(value: number | null | undefined, metric: MetricNo
   }
 
   const zPart = z == null ? "" : ` (z = ${formatZ(z)})`;
-  const assumed = metric.source === "assumed" ? ` ${ASSUMED_NORM_NOTICE}` : "";
+  let notice = "";
+  if (metric.source === "assumed") notice = ` ${ASSUMED_NORM_NOTICE}`;
+  else if (metric.source === "fitted") {
+    const n = metric.sample?.n;
+    notice = ` ${n != null ? fittedNormNotice(n) : "Healthy-range means and SDs are fitted (Eq. 9)."}`;
+  }
   return {
     metricId: metric.id,
     calibrated: true,
     z,
     beyondCutoff,
     status: beyondCutoff ? "outside" : "within",
-    text: `${beyondCutoff ? `Outside the healthy range${zPart}.` : `Within the healthy range${zPart}.`}${assumed}`,
+    text: `${beyondCutoff ? `Outside the healthy range${zPart}.` : `Within the healthy range${zPart}.`}${notice}`,
   };
 }
 

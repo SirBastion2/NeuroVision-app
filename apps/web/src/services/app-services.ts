@@ -136,6 +136,7 @@ export interface AppServices {
   remove(id: string): Promise<void>;
   listHistory(): Promise<SessionRecord[]>;
   listBatteries(): Promise<BatteryRecord[]>;
+  scoringNorms(): Promise<{ n: number; source: "assumed" | "fitted"; notice: string; norms: unknown }>;
   uploadBattery(record: BatteryRecord): Promise<BatteryRecord>;
   sessionActivity(): Promise<Array<{ bucket: string; count: number }>>;
   comparableHistory(sessions?: readonly SessionRecord[]): Promise<ComparableHistory>;
@@ -397,6 +398,10 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       } catch {
         return local;
       }
+    },
+
+    async scoringNorms() {
+      return api.getNorms();
     },
 
     async uploadBattery(record) {

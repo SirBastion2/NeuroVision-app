@@ -180,6 +180,7 @@ export interface ApiClient {
   logout(): Promise<{ signedOut: boolean }>;
   listParticipants(): Promise<{ participants: ParticipantListItem[] }>;
   listSessions(): Promise<{ sessions: unknown[]; batteries: unknown[]; activity: Array<{ bucket: string; count: number }> }>;
+  getNorms(): Promise<{ n: number; source: "assumed" | "fitted"; notice: string; norms: unknown }>;
   createAssignment(input: {
     id?: string;
     participantId: string;
@@ -383,6 +384,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         batteries: body.batteries ?? [],
         activity: body.activity ?? [],
       };
+    },
+
+    async getNorms() {
+      return json<{ n: number; source: "assumed" | "fitted"; notice: string; norms: unknown }>("/api/v1/norms");
     },
 
     async createAssignment(input) {

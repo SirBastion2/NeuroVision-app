@@ -18,6 +18,8 @@ Standard errors follow Eq. (2): adjusted proportions `(x + 1/2) / (n + 1)` for t
 
 These placeholders will be replaced by fitted values once at least five healthy participants are available. Fitting uses Eq. (9) with κ = 8 shrinkage toward the placeholder.
 
+A consented full live battery can be marked `healthyControl`. `GET /api/v1/norms` loads those samples, recomputes each Eq. (1) index from stored Starry Night hits/targets, Hollow Rings omissions/targets, and the five signed bisection errors, then runs Eq. (9) per test. Below five samples, scoring keeps Table 2 and the assumed-placeholders notice. At five or more, scoring uses fitted µ̂ and σ̂, records n, sets `source: "fitted"`, and the notice says the values are fitted. Synthetic pipeline samples are labeled `fixture`. The z and posterior equations are unchanged.
+
 ## Tests that do not enter the model
 
 | Measure | Why it is not scored |

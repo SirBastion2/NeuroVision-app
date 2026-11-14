@@ -198,6 +198,7 @@ export {
   median,
   hollowRingsLateralIndex,
   hollowRingsObservation,
+  cancellationObservationFromCounts,
   scoreTargetSelection,
   scoreLineBisection,
   summarizeLineBisection,
@@ -224,14 +225,16 @@ export {
   verdictFor,
   seProportionDiff,
   fitNorms,
+  scoringNormsFromSamples,
   DEFAULT_NORMS,
   MODEL_TEST_IDS,
   isModelTest,
   ASSUMED_NORM_NOTICE,
+  fittedNormNotice,
   NORM_FIT_MIN_N,
   NORM_FIT_KAPPA,
 } from "./evidence.js";
-export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict, ModelTestId } from "./evidence.js";
+export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict, ModelTestId, ModelIndexSample } from "./evidence.js";
 export {
   METRICS,
   DEFAULT_NORMS as PUBLISHED_NORMS,
@@ -276,8 +279,28 @@ export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, Greyscal
 export { generateBisectionLines, signedErrorPct, bisectionObservation } from "./bisection.js";
 export type { BisectionLine, BisectionResponse } from "./bisection.js";
 
-export { BATTERY_CONTRACT_VERSION, BATTERY_MODES, isBatteryRecord, parseBatteryRecord, scoreBatteryRecord } from "./battery.js";
-export type { BatteryMode, BatteryRecord, BatteryScore } from "./battery.js";
+export {
+  BATTERY_CONTRACT_VERSION,
+  BATTERY_MODES,
+  isBatteryRecord,
+  parseBatteryRecord,
+  scoreBatteryRecord,
+  isHealthyControlSample,
+  detectionObservationFromRecord,
+  cancellationObservationFromRecord,
+  modelIndicesFromBattery,
+  applyScoringNorms,
+  scoringNormsFromBatteries,
+} from "./battery.js";
+export type {
+  BatteryMode,
+  BatteryRecord,
+  BatteryScore,
+  SideHitCounts,
+  SideOmissionCounts,
+  DetectionCounts,
+  CancellationCounts,
+} from "./battery.js";
 
-export { generateStarryTrials, scoreStarry, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
+export { generateStarryTrials, scoreStarry, starryObservationFromCounts, starryDurationS, STARRY_DEFAULTS } from "./starry.js";
 export type { StarrySide, StarryTrial, StarryResponse, StarryPress, StarryScore, StarrySideSummary } from "./starry.js";

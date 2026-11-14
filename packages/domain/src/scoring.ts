@@ -126,6 +126,17 @@ export function hollowRingsObservation(left: SelectionCounts, right: SelectionCo
   };
 }
 
+/** Eq. (1) Hollow Rings from stored per-side omissions/targets. */
+export function cancellationObservationFromCounts(
+  left: { omissions: number; targets: number },
+  right: { omissions: number; targets: number },
+): TestObservation | null {
+  return hollowRingsObservation(
+    withRate({ hits: left.targets - left.omissions, available: left.targets, firstLatencyMs: null }),
+    withRate({ hits: right.targets - right.omissions, available: right.targets, firstLatencyMs: null }),
+  );
+}
+
 export function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
