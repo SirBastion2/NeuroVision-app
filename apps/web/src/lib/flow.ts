@@ -13,6 +13,7 @@ export type Screen =
   | "practice-reflection"
   | "history"
   | "gaze"
+  | "my-profile"
   | "profile";
 
 export interface FlowState {

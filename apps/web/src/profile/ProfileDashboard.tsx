@@ -73,7 +73,11 @@ function GazeQuickStats({ wide }: { wide: boolean }) {
   );
 }
 
-export function ProfileDashboard() {
+interface ProfileDashboardProps {
+  onBackToPatient?: () => void;
+}
+
+export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
   const services = useMemo(() => createServices(), []);
   const [tab, setTab] = useState<TabId>("overview");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -162,14 +166,19 @@ export function ProfileDashboard() {
     <section className="profile-dashboard" aria-labelledby="profile-title">
       <div className="profile-heading">
         <div>
-          <p className="eyebrow">Clinician profile</p>
+          <p className="eyebrow">Clinician dashboard</p>
           <h2 id="profile-title">Participant dashboard</h2>
           <p className="lede">
             Research observations from validated local sessions. No diagnoses or treatment claims. Live
-            patient assessments from the Patient path appear here automatically.
+            assessments from the patient Home path appear here automatically.
           </p>
         </div>
         <div className="profile-actions">
+          {onBackToPatient ? (
+            <button type="button" onClick={onBackToPatient}>
+              Back to Patient View
+            </button>
+          ) : null}
           <button type="button" disabled={busy} onClick={() => void seedDemos()}>
             Load demonstration history
           </button>
@@ -196,7 +205,7 @@ export function ProfileDashboard() {
           <h3>Sessions</h3>
           {sessions.length === 0 ? (
             <p className="muted">
-              No stored sessions yet. Run a live assessment under Patient, or load labeled demonstrations.
+              No stored sessions yet. Run a live assessment from Home, or load labeled demonstrations.
             </p>
           ) : (
             <ul>

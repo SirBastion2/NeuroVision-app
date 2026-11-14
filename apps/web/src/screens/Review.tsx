@@ -219,7 +219,7 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
         </button>
         {session.source === "live" && (
           <button className="primary" onClick={onProfile}>
-            Open clinician Profile
+            Open Clinician Dashboard
           </button>
         )}
         <button onClick={onHome}>Home</button>

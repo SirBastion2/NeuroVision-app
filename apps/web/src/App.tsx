@@ -8,6 +8,7 @@ import {
   type TrialRecord,
 } from "@neurovision/domain";
 import { BrandMark, Wordmark } from "./components/Brand";
+import { ProfileMenu } from "./components/ProfileMenu";
 import { TaskRunner } from "./components/TaskRunner";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
@@ -17,6 +18,7 @@ import { GazeLab } from "./screens/GazeLab";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
+import { MyProfile } from "./screens/MyProfile";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
 import "./styles.css";
@@ -32,6 +34,15 @@ function initialTheme(): Theme {
     /* storage unavailable: fall through to the system setting */
   }
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function avatarInitials(sessions: LoadResult["sessions"]): string {
+  const live = [...sessions].reverse().find((item) => item.source === "live");
+  const alias = live?.alias?.trim();
+  if (!alias) return "NV";
+  const parts = alias.split(/[\s-_]+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+  return alias.slice(0, 2).toUpperCase();
 }
 
 const ASSESSMENT_STEPS: { label: string; screens: Screen[] }[] = [
@@ -65,11 +76,16 @@ export function App() {
     setStored(store.load());
   }, [state.ended, session, store]);
 
+  // Refresh patient store when opening History / My Profile after clinician or assessment writes.
+  useEffect(() => {
+    if (screen === "history" || screen === "my-profile") setStored(store.load());
+  }, [screen, store]);
+
   // Move focus to the new screen's heading for keyboard and screen-reader users.
   useEffect(() => {
     window.scrollTo(0, 0);
     if (screen.endsWith("-task")) return;
-    const heading = main.current?.querySelector<HTMLElement>("h1");
+    const heading = main.current?.querySelector<HTMLElement>("h1, h2");
     if (heading) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
@@ -97,7 +113,9 @@ export function App() {
   const focusMode = inAssessment || screen === "practice-task";
   const stepIndex = ASSESSMENT_STEPS.findIndex((s) => s.screens.includes(screen));
   const cue = state.practice?.config;
-  const clinicianMode = screen === "profile";
+  const showPrimaryNav = !focusMode && !inAssessment;
+  const centerNavOn: Screen | null =
+    screen === "home" || screen === "history" || screen === "gaze" ? screen : null;
 
   return (
     <div className={`app ${focusMode ? "focus-mode" : ""}`}>
@@ -106,64 +124,59 @@ export function App() {
           <BrandMark size={34} />
           <Wordmark />
         </button>
+
         {inAssessment ? (
           <ol className="stepper" aria-label="Assessment progress">
             {ASSESSMENT_STEPS.map((s, i) => (
-              <li key={s.label} className={i < stepIndex ? "done" : i === stepIndex ? "current" : ""} aria-current={i === stepIndex ? "step" : undefined}>
+              <li
+                key={s.label}
+                className={i < stepIndex ? "done" : i === stepIndex ? "current" : ""}
+                aria-current={i === stepIndex ? "step" : undefined}
+              >
                 <span>{i + 1}</span>
                 {s.label}
               </li>
             ))}
           </ol>
+        ) : showPrimaryNav ? (
+          <nav className="topbar-center" aria-label="Primary">
+            <button type="button" className={centerNavOn === "home" ? "on" : ""} onClick={home}>
+              Home
+            </button>
+            <button type="button" className={centerNavOn === "history" ? "on" : ""} onClick={() => go("history")}>
+              History
+            </button>
+            <button type="button" className={centerNavOn === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
+              Gaze Lab
+            </button>
+          </nav>
         ) : (
-          !focusMode && (
-            <div className="topbar-navs">
-              <nav aria-label="Role">
-                <button
-                  type="button"
-                  className={!clinicianMode ? "on" : ""}
-                  onClick={home}
-                >
-                  Patient
-                </button>
-                <button
-                  type="button"
-                  className={clinicianMode ? "on" : ""}
-                  onClick={() => go("profile")}
-                >
-                  Clinician
-                </button>
-              </nav>
-              {!clinicianMode && (
-                <nav aria-label="Patient tools">
-                  <button type="button" className={screen === "home" ? "on" : ""} onClick={home}>
-                    Home
-                  </button>
-                  <button type="button" className={screen === "history" ? "on" : ""} onClick={() => go("history")}>
-                    History
-                  </button>
-                  <button type="button" className={screen === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
-                    Gaze lab
-                  </button>
-                </nav>
-              )}
-            </div>
-          )
+          <div className="topbar-center-spacer" aria-hidden />
         )}
-        <button
-          className="theme-toggle"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          disabled={screen.endsWith("-task")}
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden>
-            {theme === "dark" ? (
-              <path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.600 5.600l1.400 1.400m10 10 1.400 1.400m0-12.800L17 7M7 17l-1.400 1.400M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
-            ) : (
-              <path d="M20 14.500A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500Z" />
-            )}
-          </svg>
-        </button>
+
+        {!focusMode && (
+          <div className="topbar-right">
+            <button
+              className="theme-toggle"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              disabled={screen.endsWith("-task")}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden>
+                {theme === "dark" ? (
+                  <path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.600 5.600l1.400 1.400m10 10 1.400 1.400m0-12.800L17 7M7 17l-1.400 1.400M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+                ) : (
+                  <path d="M20 14.500A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500Z" />
+                )}
+              </svg>
+            </button>
+            <ProfileMenu
+              initials={avatarInitials(stored.sessions)}
+              onMyProfile={() => go("my-profile")}
+              onClinicianDashboard={() => go("profile")}
+            />
+          </div>
+        )}
       </header>
 
       <main ref={main} tabIndex={-1} key={screen} className="screen">
@@ -172,7 +185,7 @@ export function App() {
             onStart={start}
             onOpen={(s) => dispatch({ type: "open", session: s })}
             onHistory={() => go("history")}
-            onProfile={() => go("profile")}
+            onProfile={() => go("my-profile")}
             onGaze={() => go("gaze")}
           />
         )}
@@ -238,7 +251,12 @@ export function App() {
           />
         )}
         {screen === "practice-reflection" && session && cue && (
-          <PracticeReflection session={session} config={cue} onAnother={(config) => dispatch({ type: "next-practice", config })} onReview={() => go("review")} />
+          <PracticeReflection
+            session={session}
+            config={cue}
+            onAnother={(config) => dispatch({ type: "next-practice", config })}
+            onReview={() => go("review")}
+          />
         )}
         {screen === "history" && (
           <History
@@ -252,13 +270,25 @@ export function App() {
           />
         )}
         {screen === "gaze" && <GazeLab onHome={home} />}
-        {screen === "profile" && <ProfileDashboard />}
+        {screen === "my-profile" && (
+          <MyProfile
+            sessions={stored.sessions}
+            onHome={home}
+            onHistory={() => go("history")}
+            onOpen={(s) => dispatch({ type: "open", session: s })}
+            onClinicianDashboard={() => go("profile")}
+          />
+        )}
+        {screen === "profile" && <ProfileDashboard onBackToPatient={() => go("my-profile")} />}
       </main>
 
       {!focusMode && (
         <footer className="footer">
           <span>NeuroVision · Spatial Attention Lab</span>
-          <span>Research prototype · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this browser</span>
+          <span>
+            Research prototype · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this
+            browser
+          </span>
         </footer>
       )}
     </div>

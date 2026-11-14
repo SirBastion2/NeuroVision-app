@@ -165,9 +165,9 @@ export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
             </span>
           </button>
           <button className="card link-card" onClick={onProfile}>
-            <Eyebrow plain>Clinician</Eyebrow>
-            <h3>Open Profile dashboard</h3>
-            <p>After a live assessment, switch here to see the same session with gaze, notes, and PDF.</p>
+            <Eyebrow plain>My Profile</Eyebrow>
+            <h3>Your saved assessments</h3>
+            <p>See live sessions from this browser. Clinician tools stay under the account menu.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>
