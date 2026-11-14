@@ -58,10 +58,21 @@ export interface BatteryStoreOptions {
 const DEMO_STEPS: readonly BatteryStep[] = ["scene", "clock"];
 const FULL_STEPS: readonly BatteryStep[] = ["scene", "clock", "greyscales", "bisection"];
 
+/**
+ * Scene UI is owned by another workstream. Keep `scene` in the step order as a
+ * placeholder and skip it until that screen exists. Do not import a scene screen here.
+ */
+export const BATTERY_SCENE_SCREEN = false;
+
 let standaloneMemory: KeyValueStore | null = null;
 
 export function batteryStepOrder(mode: BatteryMode): readonly BatteryStep[] {
   return mode === "demo" ? DEMO_STEPS : FULL_STEPS;
+}
+
+/** Step order with absent screens (currently scene) dropped so a run can proceed. */
+export function runnableBatterySteps(mode: BatteryMode, sceneAvailable = BATTERY_SCENE_SCREEN): BatteryStep[] {
+  return batteryStepOrder(mode).filter((step) => step !== "scene" || sceneAvailable);
 }
 
 /** Battery local save is off while the API client is on; the upload queue only handles sessions. */
@@ -141,6 +152,7 @@ export function useBatterySession(options: BatteryStoreOptions = {}) {
     store,
     enabled: batteryEnabled,
     stepOrder: batteryStepOrder,
+    runnableSteps: runnableBatterySteps,
     assemble: assembleBatteryRecord,
     save: (config: BatteryIntroConfig, outputs: BatteryTaskOutputs, extra: AssembleBatteryOptions = {}) =>
       saveBatterySession(config, outputs, { ...options, store, ...extra }),

@@ -168,12 +168,12 @@ function quantile(weights: number[], q: number): number {
 
 export function verdictFor(post: Record<Hypothesis, number>, hasData: boolean): { key: Verdict; text: string } {
   if (!hasData) return { key: "no-data", text: "Not enough data yet." };
-  if (post.left >= 0.95) return { key: "strong-left", text: "Strong evidence of a left-side lean." };
-  if (post.right >= 0.95) return { key: "strong-right", text: "Strong evidence of a right-side lean." };
-  if (post.left >= 0.8) return { key: "left", text: "The evidence leans toward the left side being weaker." };
-  if (post.right >= 0.8) return { key: "right", text: "The evidence leans toward the right side being weaker." };
-  if (post.none >= 0.8) return { key: "balanced", text: "Attention looks balanced across both sides." };
-  return { key: "inconclusive", text: "Inconclusive. More trials would settle it." };
+  if (post.left >= 0.95) return { key: "strong-left", text: "Evidence for a left-side lean, outside the healthy range." };
+  if (post.right >= 0.95) return { key: "strong-right", text: "Evidence for a right-side lean, outside the healthy range." };
+  if (post.left >= 0.8) return { key: "left", text: "Evidence for a left-side lean, outside the healthy range." };
+  if (post.right >= 0.8) return { key: "right", text: "Evidence for a right-side lean, outside the healthy range." };
+  if (post.none >= 0.8) return { key: "balanced", text: "Within the healthy range on both sides." };
+  return { key: "inconclusive", text: "Mixed reading; more trials would settle whether this sits outside the healthy range." };
 }
 
 /**

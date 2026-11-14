@@ -117,6 +117,40 @@ describe("flow", () => {
     assert.equal(st.screen, "practice-reflection");
     assert.equal(st.session!.practice.length, 1);
   });
+
+  test("battery start walks intro config into the run, then results", () => {
+    let st = flowReducer(initialFlow, {
+      type: "battery-start",
+      config: { mode: "demo", hide: "left", seed: 11, readingDirection: null, consent: false },
+    });
+    assert.equal(st.screen, "battery-run");
+    assert.equal(st.batteryConfig?.mode, "demo");
+    st = flowReducer(st, {
+      type: "battery-finished",
+      record: {
+        contract: "battery-1.0.0",
+        id: "b-test",
+        mode: "demo",
+        hide: "left",
+        seed: 11,
+        readingDirection: null,
+        consent: false,
+        source: "demonstration",
+        startedAt: "2026-11-14T12:00:00.000Z",
+        completedAt: "2026-11-14T12:04:00.000Z",
+        scene: { taps: [] },
+        clock: { trials: [], responses: [] },
+        greyscales: null,
+        bisection: null,
+        normsUsed: {},
+      },
+    });
+    assert.equal(st.screen, "battery-results");
+    assert.equal(st.batteryRecord?.id, "b-test");
+    st = flowReducer(st, { type: "home" });
+    assert.equal(st.screen, "home");
+    assert.equal(st.batteryRecord, null);
+  });
 });
 
 describe("history", () => {

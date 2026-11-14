@@ -14,6 +14,7 @@ import {
   assembleBatteryRecord,
   batteryEnabled,
   batteryStepOrder,
+  runnableBatterySteps,
   saveBatterySession,
   type BatteryIntroConfig,
   type BatteryTaskOutputs,
@@ -113,6 +114,9 @@ describe("batterySession", () => {
     assert.equal(record.bisection, null);
     assert.deepEqual(batteryStepOrder("demo"), ["scene", "clock"]);
     assert.deepEqual(batteryStepOrder("full"), ["scene", "clock", "greyscales", "bisection"]);
+    assert.deepEqual(runnableBatterySteps("demo"), ["clock"]);
+    assert.deepEqual(runnableBatterySteps("full"), ["clock", "greyscales", "bisection"]);
+    assert.deepEqual(runnableBatterySteps("full", true), ["scene", "clock", "greyscales", "bisection"]);
   });
 
   it("returns false from batteryEnabled when the API client is on", () => {

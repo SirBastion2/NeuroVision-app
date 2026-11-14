@@ -9,10 +9,10 @@ const HOW: Record<InputModality, string> = {
   keyboard: "Move the cursor with the arrow keys and press Enter on",
 };
 
-export function TargetIntro({ input, onBegin, onCancel }: { input: InputModality; onBegin: () => void; onCancel: () => void }) {
+export function TargetIntro({ input, step = "Task 1 of 2", onBegin, onCancel }: { input: InputModality; step?: string; onBegin: () => void; onCancel: () => void }) {
   return (
     <section className="intro card narrow">
-      <Eyebrow>Task 1 of 2 · Target selection</Eyebrow>
+      <Eyebrow>{step} · Target selection</Eyebrow>
       <h1>Find every hollow ring</h1>
       <div className="legend">
         <figure>
