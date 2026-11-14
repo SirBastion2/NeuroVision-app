@@ -37,7 +37,7 @@ packages/gaze         Gaze streams, replay, calibration (Agent C)
 docs/                 This map and folder ownership
 ```
 
-`packages/storage` and `packages/gaze` are owned by later workstreams; they are not created in this commit.
+`packages/storage` is owned by Agent B and is not created in the Agent A scaffold. `packages/gaze` is owned by Agent C (provider, calibration, quality gates, analysis, domain bridges).
 
 ## Workstreams
 
