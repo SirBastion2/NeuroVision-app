@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  ASSUMED_NORM_NOTICE,
   BISECTION_LATERAL_INDEX,
   BISECTION_SIGNED_ERROR_PCT,
   CLOCK_LATERALITY,
@@ -9,7 +10,7 @@ import {
   GREYSCALES_LTR,
   GREYSCALES_OTHER,
   GREYSCALES_RTL,
-  HOLLOW_RINGS_OMISSION_ASYMMETRY,
+  HOLLOW_RINGS_LATERAL_INDEX,
   SCENE_LATERALITY,
   STARRY_LATERALITY,
   STAR_CANCELLATION_COC,
@@ -18,46 +19,45 @@ import {
   scoreClock,
   scoreSession,
   generateClockTrials,
+  MODEL_TEST_IDS,
 } from "../src/index.ts";
 import { makeSession } from "./session-factory.ts";
 
-describe("published norms", () => {
-  it("converts Azouvi 20 cm millimetres into percent of line length", () => {
-    assert.equal(BISECTION_SIGNED_ERROR_PCT.calibrated, true);
-    assert.equal(BISECTION_SIGNED_ERROR_PCT.source, "literature");
-    assert.ok(BISECTION_SIGNED_ERROR_PCT.citation?.doi);
-    assert.equal(BISECTION_SIGNED_ERROR_PCT.sample?.n, 457);
-    assert.ok(Math.abs((BISECTION_SIGNED_ERROR_PCT.mean ?? 0) - -0.475) < 1e-12);
-    assert.ok(Math.abs((BISECTION_SIGNED_ERROR_PCT.sd ?? 0) - 2.075) < 1e-12);
-    assert.ok(Math.abs((BISECTION_SIGNED_ERROR_PCT.cutoff ?? 0) - 3.25) < 1e-12);
-    assert.equal(BISECTION_LATERAL_INDEX.mean, -(BISECTION_SIGNED_ERROR_PCT.mean ?? 0));
-    assert.equal(DEFAULT_NORMS.bisection.mean, BISECTION_LATERAL_INDEX.mean);
-    assert.equal(DEFAULT_NORMS.bisection.source, "literature");
+describe("Table 2 placeholder norms", () => {
+  it("sets Starry Night, Hollow Rings, and line bisection to assumed Table 2 values", () => {
+    assert.equal(STARRY_LATERALITY.source, "assumed");
+    assert.equal(STARRY_LATERALITY.mean, 0);
+    assert.equal(STARRY_LATERALITY.sd, 0.15);
+    assert.equal(HOLLOW_RINGS_LATERAL_INDEX.source, "assumed");
+    assert.equal(HOLLOW_RINGS_LATERAL_INDEX.mean, 0);
+    assert.equal(HOLLOW_RINGS_LATERAL_INDEX.sd, 0.06);
+    assert.equal(BISECTION_LATERAL_INDEX.source, "assumed");
+    assert.equal(BISECTION_LATERAL_INDEX.mean, 1);
+    assert.equal(BISECTION_LATERAL_INDEX.sd, 3);
+    assert.equal(BISECTION_SIGNED_ERROR_PCT.mean, -1);
+    assert.equal(BISECTION_SIGNED_ERROR_PCT.sd, 3);
+    assert.equal(DEFAULT_NORMS.detection.mean, 0);
+    assert.equal(DEFAULT_NORMS.detection.healthySd, 0.15);
+    assert.equal(DEFAULT_NORMS.cancellation.mean, 0);
+    assert.equal(DEFAULT_NORMS.cancellation.healthySd, 0.06);
+    assert.equal(DEFAULT_NORMS.bisection.mean, 1);
+    assert.equal(DEFAULT_NORMS.bisection.healthySd, 3);
+    assert.equal(DEFAULT_NORMS.detection.sensitivity, 1);
+    assert.equal(DEFAULT_NORMS.cancellation.sensitivity, 1);
+    assert.equal(DEFAULT_NORMS.bisection.sensitivity, 1);
+    assert.deepEqual([...MODEL_TEST_IDS].sort(), ["bisection", "cancellation", "detection"].sort());
   });
 
-  it("converts Friedrich & Elias greyscales scores into the app bias units", () => {
-    assert.ok(Math.abs((GREYSCALES_LTR.mean ?? 0) - 34.6 / 96) < 1e-12);
-    assert.ok(Math.abs((GREYSCALES_LTR.sd ?? 0) - 37.67 / 96) < 1e-12);
-    assert.ok(Math.abs((GREYSCALES_RTL.mean ?? 0) - 0.99 / 96) < 1e-12);
-    assert.equal(GREYSCALES_LTR.sample?.n, 54);
-    assert.equal(GREYSCALES_RTL.sample?.n, 43);
-    assert.equal(greyscalesNormFor("left-to-right").mean, GREYSCALES_LTR.mean);
-    assert.equal(greyscalesNormFor("right-to-left").mean, GREYSCALES_RTL.mean);
-    assert.equal(greyscalesNormFor("both-or-other").source, "uncalibrated");
-    assert.equal(GREYSCALES_OTHER.calibrated, false);
-  });
-
-  it("maps Azouvi bells laterality onto hollow-ring percentage points", () => {
-    assert.ok(Math.abs((HOLLOW_RINGS_OMISSION_ASYMMETRY.mean ?? 0) - 0.05 * (100 / 15)) < 1e-12);
-    assert.ok(Math.abs((HOLLOW_RINGS_OMISSION_ASYMMETRY.cutoff ?? 0) - 2 * (100 / 15)) < 1e-12);
-    assert.equal(HOLLOW_RINGS_OMISSION_ASYMMETRY.sample?.n, 576);
-    assert.equal(STAR_CANCELLATION_COC.cutoff, 0.081);
-    assert.equal(STAR_CANCELLATION_COC.mean, null);
-    assert.equal(STAR_CANCELLATION_COC.calibrated, true);
-  });
-
-  it("marks clock, Starry Night, scene, and gaze as uncalibrated", () => {
-    for (const metric of [CLOCK_LATERALITY, STARRY_LATERALITY, SCENE_LATERALITY, GAZE_LEFT_FRACTION]) {
+  it("keeps clock, greyscales, scene, gaze, and screening CoC out of the model", () => {
+    for (const metric of [
+      CLOCK_LATERALITY,
+      STAR_CANCELLATION_COC,
+      SCENE_LATERALITY,
+      GAZE_LEFT_FRACTION,
+      GREYSCALES_LTR,
+      GREYSCALES_RTL,
+      GREYSCALES_OTHER,
+    ]) {
       assert.equal(metric.calibrated, false);
       assert.equal(metric.source, "uncalibrated");
       assert.equal(metric.mean, null);
@@ -66,19 +66,21 @@ describe("published norms", () => {
     }
     assert.equal(DEFAULT_NORMS.clock.source, "uncalibrated");
     assert.equal(DEFAULT_NORMS.scene.source, "uncalibrated");
-    assert.equal(DEFAULT_NORMS.detection.source, "uncalibrated");
+    assert.equal(DEFAULT_NORMS.greyscales.source, "uncalibrated");
+    assert.equal(greyscalesNormFor("left-to-right").source, "uncalibrated");
   });
 });
 
 describe("compareToNorm", () => {
-  it("flags rightward bisection beyond the published cutoff", () => {
+  it("flags a signed bisection error more than 2 SD from the Table 2 placeholder", () => {
     const inside = compareToNorm(3, BISECTION_SIGNED_ERROR_PCT);
-    const outside = compareToNorm(4, BISECTION_SIGNED_ERROR_PCT);
+    const outside = compareToNorm(6, BISECTION_SIGNED_ERROR_PCT);
     assert.equal(inside.status, "within");
     assert.equal(inside.beyondCutoff, false);
     assert.equal(outside.status, "outside");
     assert.match(outside.text, /Outside the healthy range/);
-    assert.doesNotMatch(outside.text, /sever|diagnos/i);
+    assert.match(outside.text, new RegExp(ASSUMED_NORM_NOTICE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(outside.text, /sever|diagnos|prototype/i);
   });
 
   it("does not invent a reading for uncalibrated metrics", () => {
@@ -90,20 +92,24 @@ describe("compareToNorm", () => {
   });
 });
 
-describe("scoring uses the norms module", () => {
-  it("compares hollow-ring omission laterality to the published cancellation cutoff", () => {
+describe("scoring uses the Table 2 placeholders", () => {
+  it("compares Hollow Rings laterality with Eq. (1) right−left omission rates", () => {
     const left = scoreSession(makeSession({ id: "left-gap", alias: "left", leftHits: 6, rightHits: 12 }));
+    assert.equal(left.targetSelection?.lateralIndex, 0 / 12 - 6 / 12);
     assert.equal(left.spatialPattern.kind, "left-omission");
-    assert.equal(left.spatialPattern.laterality?.metricId, HOLLOW_RINGS_OMISSION_ASYMMETRY.id);
+    assert.equal(left.spatialPattern.laterality?.metricId, HOLLOW_RINGS_LATERAL_INDEX.id);
     assert.equal(left.spatialPattern.laterality?.status, "outside");
     assert.match(left.spatialPattern.description, /healthy range/);
+    assert.equal(left.targetSelection?.observation?.test, "cancellation");
+    assert.equal(left.targetSelection?.observation?.value, left.targetSelection?.lateralIndex);
 
     const balanced = scoreSession(makeSession({ id: "bal", alias: "bal", leftHits: 10, rightHits: 10 }));
     assert.equal(balanced.spatialPattern.kind, "balanced");
     assert.equal(balanced.spatialPattern.laterality?.status, "within");
+    assert.ok(Math.abs(balanced.targetSelection?.lateralIndex ?? 1) < 1e-12);
   });
 
-  it("compares line-bisection median error to the Azouvi 20 cm norm", () => {
+  it("compares line-bisection median error to the Table 2 signed-error placeholder", () => {
     const result = scoreSession(
       makeSession({
         id: "bisect",
@@ -117,6 +123,10 @@ describe("scoring uses the norms module", () => {
     assert.equal(result.lineBisection.healthyRange?.metricId, BISECTION_SIGNED_ERROR_PCT.id);
     assert.equal(result.lineBisection.healthyRange?.status, "within");
     assert.ok(result.lineBisection.healthyRange?.calibrated);
+    assert.match(
+      result.lineBisection.healthyRange?.text ?? "",
+      new RegExp(ASSUMED_NORM_NOTICE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
   });
 
   it("keeps the clock check uncalibrated", () => {

@@ -71,7 +71,8 @@ export function bisectionObservation(lines: BisectionLine[], responses: Bisectio
       test: "bisection",
       label: "Line bisection",
       value: -mean,
-      se: Math.max(0.5, sd / Math.sqrt(Math.max(1, errors.length))),
+      // Eq. (2) companion: sample SD of the five signed errors, divided by √5.
+      se: sd / Math.sqrt(5),
       n: errors.length,
     },
   };

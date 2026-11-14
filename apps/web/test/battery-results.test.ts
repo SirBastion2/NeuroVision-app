@@ -73,7 +73,7 @@ describe("BatteryResults", () => {
     assert.match(html, new RegExp(display.evidence.verdict.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(html, /in units of normal person-to-person variation; negative means the left side is weaker/);
     assert.match(html, /Screening aid, not a diagnosis/);
-    assert.match(html, /Some tests have no published healthy range and were not scored against norms/);
+    assert.match(html, /do not enter the evidence model/);
     assert.match(html, /Uncalibrated/);
     assert.match(html, /Show patient example/);
     assert.match(html, /Export JSON/);
@@ -81,7 +81,7 @@ describe("BatteryResults", () => {
     const countedLabels = display.counted.map((row) => row.label);
     assert.deepEqual(
       countedLabels.map((label) => label.replace(/,.*/, "")).sort(),
-      ["Greyscales", "Line bisection"].sort(),
+      ["Line bisection"].sort(),
     );
     const ledgerLabels = display.ledger.map((row) => row.label.replace(/,.*/, "")).sort();
     assert.deepEqual(ledgerLabels, ["Clock check", "Greyscales", "Line bisection", "Scene search"].sort());

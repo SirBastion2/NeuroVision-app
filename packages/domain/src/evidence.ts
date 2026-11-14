@@ -10,10 +10,27 @@
  * Pure functions only: no DOM, no I/O. Healthy means/SDs live in norms.ts.
  */
 
-import { DEFAULT_NORMS, isCalibratedNorm, type NormCitation, type NormSample, type NormSource } from "./norms.js";
+import {
+  ASSUMED_NORM_NOTICE,
+  DEFAULT_NORMS,
+  isCalibratedNorm,
+  type NormCitation,
+  type NormSample,
+  type NormSource,
+} from "./norms.js";
 
-export type TestId = "scene" | "clock" | "greyscales" | "bisection" | "detection";
+export type TestId = "scene" | "clock" | "greyscales" | "bisection" | "detection" | "cancellation";
 export type Hypothesis = "none" | "left" | "right";
+
+/** Only these three tests enter the shared-θ model (Section 4). */
+export const MODEL_TEST_IDS = ["detection", "cancellation", "bisection"] as const satisfies readonly TestId[];
+export type ModelTestId = (typeof MODEL_TEST_IDS)[number];
+
+export function isModelTest(test: TestId): test is ModelTestId {
+  return (MODEL_TEST_IDS as readonly TestId[]).includes(test);
+}
+
+export { ASSUMED_NORM_NOTICE };
 
 export interface TestNorm {
   /** Healthy mean of the lateral index. Null when the metric is uncalibrated. */
@@ -162,12 +179,12 @@ function quantile(weights: number[], q: number): number {
 
 export function verdictFor(post: Record<Hypothesis, number>, hasData: boolean): { key: Verdict; text: string } {
   if (!hasData) return { key: "no-data", text: "Not enough data yet." };
-  if (post.left >= 0.95) return { key: "strong-left", text: "Evidence for a left-side lean, outside the healthy range." };
-  if (post.right >= 0.95) return { key: "strong-right", text: "Evidence for a right-side lean, outside the healthy range." };
-  if (post.left >= 0.8) return { key: "left", text: "Evidence for a left-side lean, outside the healthy range." };
-  if (post.right >= 0.8) return { key: "right", text: "Evidence for a right-side lean, outside the healthy range." };
-  if (post.none >= 0.8) return { key: "balanced", text: "Within the healthy range on both sides." };
-  return { key: "inconclusive", text: "Mixed reading; more trials would settle whether this sits outside the healthy range." };
+  if (post.left >= 0.95) return { key: "strong-left", text: "Strong evidence of a left-side lean, outside the healthy range." };
+  if (post.right >= 0.95) return { key: "strong-right", text: "Strong evidence of a right-side lean, outside the healthy range." };
+  if (post.left >= 0.8) return { key: "left", text: "Leans toward the left, outside the healthy range." };
+  if (post.right >= 0.8) return { key: "right", text: "Leans toward the right, outside the healthy range." };
+  if (post.none >= 0.8) return { key: "balanced", text: "Balanced — within the healthy range on both sides." };
+  return { key: "inconclusive", text: "Inconclusive; more trials would settle it." };
 }
 
 /**
@@ -189,7 +206,12 @@ export function combineEvidence(
   const rows = observations.map((o) => {
     const norm = normFor(o.test);
     const z = standardize(o, norm);
-    const included = isCalibratedNorm(norm) && Number.isFinite(z) && o.n > 0 && (!o.induced || !!options.includeInduced);
+    const included =
+      isModelTest(o.test) &&
+      isCalibratedNorm(norm) &&
+      Number.isFinite(z) &&
+      o.n > 0 &&
+      (!o.induced || !!options.includeInduced);
     return { o, norm, z, k: Number.isFinite(norm.sensitivity) ? norm.sensitivity : 1, included };
   });
   const used = rows.filter((r) => r.included);
@@ -256,17 +278,17 @@ export function combineEvidence(
   const notes: string[] = [];
   for (const t of tests) {
     if (t.induced && !t.included) notes.push(`${t.label} was produced on purpose for the demonstration, so it isn't counted.`);
-    if (t.normSource === "uncalibrated" && !t.induced) {
-      notes.push(`${t.label} has no published healthy range, so it is not scored against norms.`);
+    if ((t.normSource === "uncalibrated" || !isModelTest(t.test)) && !t.induced) {
+      notes.push(`${t.label} does not enter the evidence model.`);
     }
     if (t.discordant) {
-      notes.push(`${t.label} disagrees with the other tests. Neglect can affect some tasks and not others, so this is worth a closer look.`);
+      notes.push(`${t.label} disagrees with the other tests (|r| > 2.5). That disagreement is reported, not averaged away.`);
     }
   }
   const usesAssumedNorms = used.some((r) => r.norm.source === "assumed");
   const usesUncalibratedNorms = rows.some((r) => r.norm.source === "uncalibrated" || r.norm.calibrated === false);
-  if (usesAssumedNorms) notes.push("Some healthy norms are still marked assumed and are not from published data.");
-  if (usesUncalibratedNorms) notes.push("Some tests have no published healthy range and were not scored against norms.");
+  if (usesAssumedNorms) notes.push(ASSUMED_NORM_NOTICE);
+  if (usesUncalibratedNorms) notes.push("Clock, greyscales, gaze, and Hidden scene do not enter the evidence model.");
 
   return {
     posterior: post,
@@ -292,8 +314,11 @@ export function seProportionDiff(x1: number, n1: number, x2: number, n2: number)
  * Small samples underestimate spread, which would make the model overconfident,
  * so the fit is shrunk toward a prior norm worth `pseudoN` participants.
  */
-export function fitNorms(values: number[], sensitivity = 1, prior?: TestNorm, pseudoN = 8): TestNorm | null {
-  if (values.length < 5) return null;
+export const NORM_FIT_MIN_N = 5;
+export const NORM_FIT_KAPPA = 8;
+
+export function fitNorms(values: number[], sensitivity = 1, prior?: TestNorm, pseudoN = NORM_FIT_KAPPA): TestNorm | null {
+  if (values.length < NORM_FIT_MIN_N) return null;
   const n = values.length;
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));

@@ -16,8 +16,8 @@ Domain scoring is the only interpreter of recorded events. It walks events in el
 
 `@neurovision/domain` also exports these battery scorers (pure functions; they do not replace `scoreSession`):
 
-- norms: `METRICS`, `compareToNorm`, `deviationUnit`, `greyscalesMetric`, `toTestNorm`, `DEFAULT_NORMS` (`MetricNorm`, `HealthyRangeReading`, `NormCitation`). Published healthy-range means/SDs/cutoffs with sample and citation. Uncalibrated metrics are marked and not scored.
-- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`)
+- norms: `METRICS`, `compareToNorm`, `deviationUnit`, `greyscalesMetric`, `toTestNorm`, `DEFAULT_NORMS` (`MetricNorm`, `HealthyRangeReading`, `NormCitation`). Table 2 assumed placeholders for Starry Night, Hollow Rings, and line bisection; a notice is attached to any result that uses them. Clock, greyscales, gaze, and Hidden scene are uncalibrated and do not enter the model.
+- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS`, `MODEL_TEST_IDS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`). Shared-θ model on Starry Night, Hollow Rings, and line bisection only.
 - scene: `generateScene`, `scoreScene`, `hitTest`, `centerOfCancellation`, `SCENE_DEFAULTS` (`HideSide`, `SceneConfig`, `Scene`, `Lantern`, `Building`, `SceneWindow`, `SceneTap`, `SceneTapResult`, `SceneScore`)
 - clock: `generateClockTrials`, `scoreClock`, `numeralAngle`, `CLOCK_DEFAULTS` (`ClockSide`, `ClockErrorType`, `StackPosition`, `ClockNumeral`, `ClockFace`, `ClockTrial`, `ClockResponse`, `ClockScore`)
 - greyscales: `generateGreyscalesTrials`, `scoreGreyscales`, `chosenDarkSide`, `greyscalesNormFor`, `GREYSCALES_DEFAULTS` (`DarkSide`, `BarPosition`, `ReadingDirection`, `GreyscalesTrial`, `GreyscalesResponse`, `GreyscalesScore`)

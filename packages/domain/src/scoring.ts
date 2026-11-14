@@ -1,9 +1,10 @@
 import { LINE_Y_TOLERANCE, regionOfStimulus, type BoardRegion, type BoardSide } from "./board.js";
 import { sortEvents } from "./events.js";
 import { isOnLineSegment, lineLength, lineMidpoint } from "./layouts.js";
+import { seProportionDiff, type TestObservation } from "./evidence.js";
 import {
   BISECTION_SIGNED_ERROR_PCT,
-  HOLLOW_RINGS_OMISSION_ASYMMETRY,
+  HOLLOW_RINGS_LATERAL_INDEX,
   compareToNorm,
   type HealthyRangeReading,
 } from "./norms.js";
@@ -38,7 +39,11 @@ export interface TargetSelectionScore {
   available: number;
   omissions: number;
   hitRate: number;
+  /** Left omission rate minus right, in percentage points. Practice heuristic only. */
   omissionAsymmetry: number | null;
+  /** Eq. (1): right omission rate − left omission rate (0–1). Negative = left weaker. */
+  lateralIndex: number | null;
+  observation: TestObservation | null;
   firstLatencyMs: number | null;
   distractors: number;
   repeats: number;
@@ -100,6 +105,24 @@ function withRate(counts: Omit<SelectionCounts, "omissionRate" | "omissions"> & 
     omissions,
     omissionRate: counts.available === 0 ? null : (100 * omissions) / counts.available,
     firstLatencyMs: counts.firstLatencyMs,
+  };
+}
+
+/** Eq. (1) Hollow Rings: right omission rate − left omission rate. */
+export function hollowRingsLateralIndex(left: SelectionCounts, right: SelectionCounts): number | null {
+  if (left.available === 0 || right.available === 0) return null;
+  return right.omissions / right.available - left.omissions / left.available;
+}
+
+export function hollowRingsObservation(left: SelectionCounts, right: SelectionCounts): TestObservation | null {
+  const value = hollowRingsLateralIndex(left, right);
+  if (value == null) return null;
+  return {
+    test: "cancellation",
+    label: "Hollow Rings",
+    value,
+    se: seProportionDiff(right.omissions, right.available, left.omissions, left.available),
+    n: left.available + right.available,
   };
 }
 
@@ -191,6 +214,8 @@ export function scoreTargetSelection(trial: TrialRecord): TargetSelectionScore {
     omissions: available - hits,
     hitRate: hits / (available || 1),
     omissionAsymmetry: left.omissionRate === null || right.omissionRate === null ? null : left.omissionRate - right.omissionRate,
+    lateralIndex: hollowRingsLateralIndex(left, right),
+    observation: hollowRingsObservation(left, right),
     firstLatencyMs: orderedHits[0]?.elapsed ?? null,
     distractors,
     repeats,
@@ -246,19 +271,18 @@ export function summarizeSpatialPattern(score: TargetSelectionScore | null): Spa
     };
   }
 
-  const laterality = compareToNorm(score.omissionAsymmetry, HOLLOW_RINGS_OMISSION_ASYMMETRY);
-  const cutoff = HOLLOW_RINGS_OMISSION_ASYMMETRY.cutoff ?? Number.POSITIVE_INFINITY;
-  const asymmetry = score.omissionAsymmetry ?? 0;
+  const index = score.lateralIndex;
+  const laterality = compareToNorm(index, HOLLOW_RINGS_LATERAL_INDEX);
   let kind: SpatialPatternKind = "balanced";
   let description = "Omission laterality is within the healthy range.";
 
   if (score.hitRate < 0.5) {
     kind = "low-selection";
     description = "Fewer than half of the targets were selected, so laterality is not compared to the healthy range.";
-  } else if (asymmetry >= cutoff) {
+  } else if (laterality.beyondCutoff && (index ?? 0) < 0) {
     kind = "left-omission";
     description = "Left-side omissions sit outside the healthy range for cancellation laterality.";
-  } else if (asymmetry <= -cutoff) {
+  } else if (laterality.beyondCutoff && (index ?? 0) > 0) {
     kind = "right-omission";
     description = "Right-side omissions sit outside the healthy range for cancellation laterality.";
   }

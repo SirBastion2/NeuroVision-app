@@ -18,7 +18,7 @@ const CLOCK_ERROR_TYPES: readonly ClockErrorType[] = ["swap", "missing", "shift"
 const STACK_POSITIONS: readonly StackPosition[] = ["top", "bottom"];
 const DARK_SIDES: readonly DarkSide[] = ["left", "right"];
 const BAR_POSITIONS: readonly BarPosition[] = ["top", "bottom"];
-const TEST_IDS: readonly TestId[] = ["scene", "clock", "greyscales", "bisection", "detection"];
+const TEST_IDS: readonly TestId[] = ["scene", "clock", "greyscales", "bisection", "detection", "cancellation"];
 const NORM_SOURCES: readonly TestNorm["source"][] = ["hacker-norms", "literature", "assumed", "uncalibrated"];
 
 export interface BatteryRecord {

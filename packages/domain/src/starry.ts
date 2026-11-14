@@ -16,7 +16,7 @@
  * Neglect predicts more misses and slower hits on the left, often getting worse
  * the further left the target sits. Pure functions only.
  */
-import type { TestObservation } from "./evidence.js";
+import { seProportionDiff, type TestObservation } from "./evidence.js";
 import { STARRY_LATERALITY, compareToNorm, type HealthyRangeReading } from "./norms.js";
 
 export type StarrySide = "left" | "right";
@@ -183,13 +183,7 @@ function median(values: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-function seDiff(x1: number, n1: number, x2: number, n2: number): number {
-  const p1 = (x1 + 0.5) / (n1 + 1);
-  const p2 = (x2 + 0.5) / (n2 + 1);
-  return Math.sqrt((p1 * (1 - p1)) / Math.max(1, n1) + (p2 * (1 - p2)) / Math.max(1, n2));
-}
-
-/** Lateral index = left hit rate minus right hit rate (negative = left weaker), as the evidence model expects. */
+/** Lateral index = left hit rate minus right hit rate (negative = left weaker), Eq. (1). */
 export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], presses: StarryPress[] = []): StarryScore {
   const byId = new Map(responses.map((x) => [x.trialId, x]));
   const summarize = (ts: StarryTrial[]) => {
@@ -220,7 +214,7 @@ export function scoreStarry(trials: StarryTrial[], responses: StarryResponse[], 
       test: "detection",
       label: "Starry Night",
       value,
-      se: seDiff(left.hits, left.n, right.hits, right.n),
+      se: seProportionDiff(left.hits, left.n, right.hits, right.n),
       n: left.n + right.n,
     },
     healthyRange: compareToNorm(value, STARRY_LATERALITY),

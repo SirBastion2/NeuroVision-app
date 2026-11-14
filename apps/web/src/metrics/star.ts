@@ -2,7 +2,7 @@ import { STAR_CANCELLATION_COC, compareToNorm } from "@neurovision/domain";
 import type { StarLayout, StarMetrics, TapEvent } from "./types";
 import { binOf, mean, normX } from "./math";
 
-export const COC_FLAG_THRESHOLD = STAR_CANCELLATION_COC.cutoff ?? 0.081;
+export const COC_FLAG_THRESHOLD = STAR_CANCELLATION_COC.cutoff;
 export const BINS = 6;
 
 interface Seg {
