@@ -4,7 +4,7 @@ Later agents should read `docs/ARCHITECTURE.md` as the repository map, then use 
 
 | Folder | Owner | Notes |
 | --- | --- | --- |
-| `packages/domain` | Agent A | Versioned contracts, session validation, scoring, practice rules, history comparability, demonstration records. Gaze types only. |
+| `packages/domain` | Agent A | Versioned contracts, session validation, scoring, practice rules, history comparability, demonstration records, organization/assignment/ingestion types, requested-mode mapping, imported-source and gaze-sample provenance. Gaze types only. |
 | `docs/` | Agent A | Architecture map and this ownership file. Other agents update their own rows when they add folders. |
 | `apps/web` | Agents D+E | Task runner, screens, board, review, practice, history. Must match the UI reference design. |
 | `apps/web` boot shell | Agent A (initial) | Minimal React + Vite app that boots. D+E replace the shell with the product UI. Keep the existing brand header. |

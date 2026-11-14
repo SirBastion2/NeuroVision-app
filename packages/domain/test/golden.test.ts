@@ -47,7 +47,7 @@ const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as {
 
 describe("golden sessions", () => {
   it("pins CONTRACTS_VERSION to the fixture file", () => {
-    assert.equal(CONTRACTS_VERSION, "1.0.0");
+    assert.equal(CONTRACTS_VERSION, "1.1.0");
     assert.equal(fixture.contractsVersion, CONTRACTS_VERSION);
     assert.ok(fixture.cases.length >= 5);
   });

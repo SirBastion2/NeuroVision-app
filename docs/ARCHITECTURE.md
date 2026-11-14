@@ -51,7 +51,89 @@ scripts/              `npm run verify` and the standalone-file check
 | D+E | Task runner and UI (must match the UI reference design) | `apps/web` screens, board, instructions, review, practice, history chrome |
 | F | Integration across tasks, scoring, storage, gaze, and delivery | `apps/web/src/services/`, static / standalone HTML packaging, `npm run verify` |
 
-Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session records must pass `parseSessionRecord` before they are written. Scoring and practice rules are pure functions with no DOM access.
+Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session records must pass `parseSessionRecord` before they are written. Scoring and practice rules are pure functions with no DOM access. `@neurovision/domain` is the contract: other packages must import these types and `parse*` validators from it. Local copies in other packages are not the contract.
+
+## Contracts
+
+`CONTRACTS_VERSION` is **1.1.0**. Increment it when a stored session field is added, removed, or changes meaning. `PracticeRound.transfer` is a stored session field (optional boolean: `true` means transfer-cue isolation).
+
+Runtime validators follow `parseSessionRecord`: each `parse*` function throws if the value is invalid and returns a typed, copied object.
+
+### Organization and identity
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `Role` | `"owner" \| "admin" \| "reviewer" \| "participant"` | Membership role. `ROLES` / `parseRole`. |
+| `Organization` | `{ id, name }` | Tenant. `parseOrganization`. |
+| `Membership` | `{ orgId, subject, role }` | Subject membership in an organization. `parseMembership`. |
+| `Participant` | `{ orgId, participantId, label, subject }` | Org-scoped participant. Identity is `orgId` + `participantId`. `subject` is the bound identity or `null`. `parseParticipant`. |
+
+### Assignments
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `ExposureStatus` | `"unseen" \| "seen" \| "unknown"` | Whether the assigned form has been shown. `parseExposureStatus`. |
+| `AssignmentManifest` | `{ protocol, scorer, taskIds, source, input, accessibilityId, configHash, requestedMode }` | Immutable snapshot of what a participant is asked to run. `parseAssignmentManifest`. |
+| `TaskAssignment` | `{ id, orgId, participantId, revision, supersedes, createdAt, exposureStatus, manifest }` | One immutable revision. `revision` starts at 1. `supersedes` is the previous revision number, or `null` on the first. `parseTaskAssignment`. |
+| `appendAssignmentRevision` | helper | Appends a revision and returns a **new** array. Does not mutate the input array or existing revision objects. Identity (`id`, `orgId`, `participantId`) cannot change across revisions. |
+
+### Ingestion states
+
+Three separate unions. Each has `parse*`, `canTransition*`, and `transition*` (throws on a disallowed edge). Same-state is not a transition.
+
+| Union | Values | Allowed transitions |
+| --- | --- | --- |
+| `CompletionState` | `active`, `complete`, `interrupted` | `active → complete \| interrupted`. `complete` and `interrupted` are terminal. |
+| `SyncState` | `local`, `queued`, `uploading`, `acknowledged`, `blocked` | `local → queued \| uploading`; `queued → uploading \| blocked`; `uploading → acknowledged \| blocked \| queued`; `blocked → queued \| uploading`. `acknowledged` is terminal. |
+| `ProcessingState` | `pending`, `running`, `ready`, `failed` | `pending → running \| failed`; `running → ready \| failed`; `failed → pending \| running`. `ready` is terminal. |
+
+Constants: `COMPLETION_STATES`, `SYNC_STATES`, `PROCESSING_STATES`, plus `*_TRANSITIONS`.
+
+### Upload batch
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `TraceUploadRequest` | `{ declaredByteCount, declaredExpandedBytes, declaredChecksum, contentType }` | Declared trace object for upload. Expanded size must be ≥ compressed size. `parseTraceUploadRequest`. |
+| `BatchPayload` | `{ sequence, parentBatchId, records, traces }` | Ordered batch of `SessionRecord`s and `TraceUploadRequest`s. Sequence starts at 1 with `parentBatchId: null`; later sequences require a parent id. `parseBatchPayload`, `batchPayloadFromSession`. |
+
+### Gaze sample provenance
+
+`GazeSample` stays `{ elapsed, x, y }`. Do not put capture/inference timing on the sample.
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `GazeSampleProvenanceRequest` | `{ captureMs, inferenceDoneMs, timestampBasis }` | Timing provenance. `timestampBasis` is `"frame" \| "estimated"`. `inferenceDoneMs >= captureMs`. `parseGazeSampleProvenanceRequest`. |
+| `GazeSampleWithProvenance` | `{ sample, provenance }` | Pairing. `attachGazeSampleProvenance` copies the sample as `{ elapsed, x, y }` and the provenance alongside it. |
+| `parseGazeSample` | helper | Returns only `{ elapsed, x, y }`, stripping any extra fields. |
+
+### Requested mode
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `RequestedMode` | `"assessment" \| "practice" \| "transfer"` | What the runner is asked to present. `parseRequestedMode`. |
+| `mapRequestedMode` | helper | Mapping onto `SessionRecord`. |
+| `practiceRoundForRequestedMode` | helper | Builds the practice record for `practice` and `transfer`. Throws for `assessment`. |
+
+Mapping:
+
+- **assessment** → `SessionRecord` trials (assessment layouts). Not stored in `SessionRecord.practice`.
+- **practice** → `SessionRecord.practice` with `transfer` false.
+- **transfer** → transfer-cue isolation. Same practice record array, with `transfer: true`.
+
+`isTransferPracticeRound` is true only when `transfer === true`.
+
+### Session source vocabulary
+
+`SessionSource` remains `"live" \| "demonstration"`. Do not add `observed`. `parseSessionRecord` rejects any other source string, including `simulated` and `observed`.
+
+Imported records keep their original string separately:
+
+| Export | Kind | Meaning |
+| --- | --- | --- |
+| `ImportedSource` | `"live" \| "simulated"` | Original imported source string. |
+| `ImportedSourceProvenance` | `{ original }` | Provenance wrapper. `parseImportedSourceProvenance`. |
+| `mapImportedSource` | helper | `live → live`, `simulated → demonstration`. |
+| `sessionSourceFromImport` | helper | Applies the mapping and refuses to store a simulated import as `live`. |
 
 ## Contracts consumers
 
@@ -59,7 +141,12 @@ Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session r
 - Review and history render `ScoringResult` (hits, omissions, midpoint errors, response order, spatial pattern).
 - Practice setup starts from `suggestPractice`.
 - Gaze lab consumes `GazeStream` (samples + tracking-gap intervals) and `CalibrationQualityReport` shapes; Agent C implements behavior.
-- Storage persists `SessionRecord` with `source: "live" | "demonstration"`.
+- Storage persists `SessionRecord` with `source: "live" | "demonstration"`. Imported `simulated` records are stored as `demonstration` and keep `ImportedSourceProvenance.original`.
+- Organization APIs persist `Organization`, `Membership` (`Role`), and org-scoped `Participant`.
+- Assignment APIs persist immutable `TaskAssignment` revisions (`appendAssignmentRevision`); the runner records `ExposureStatus` when a form is first shown.
+- Upload uses `BatchPayload` and `TraceUploadRequest`. Ingestion tracks `CompletionState`, `SyncState`, and `ProcessingState` with the allowed transitions above.
+- Gaze capture attaches `GazeSampleProvenanceRequest` alongside each `GazeSample`; it does not extend the sample.
+- The task runner uses `RequestedMode`. Practice stays on `SessionRecord.practice`; transfer is a practice round with `transfer: true`.
 - History charts call `areSessionsComparable` / `summarizeAssessmentTrend` (live assessment sessions only; practice and demonstration records are excluded from the trend).
 - Practice setup also calls `configurePracticeRound` (chosen cue, density, optional self-paced row marker) and `reflectPracticeRound` after a recorded round.
 - Gaze lab and history consume exported demonstration `SessionRecord`s (`DEMONSTRATION_SESSIONS`), `GAZE_LAB_CLICK_SEQUENCE`, `GAZE_LAB_STREAMS`, and `EXAMPLE_CALIBRATION_REPORT`.
