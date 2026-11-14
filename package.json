@@ -15,10 +15,12 @@
     "dev": "node scripts/dev.mjs",
     "dev:backend": "node apps/api/scripts/dev-backend.mjs",
     "migrate": "tsx apps/api/src/migrate-cli.ts",
-    "vercel-build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/storage && npm run build:site -w @neurovision/web"
+    "bundle:vercel-api": "node scripts/bundle-vercel-api.mjs",
+    "vercel-build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/storage && npm run build:site -w @neurovision/web && npm run bundle:vercel-api && node scripts/check-vercel-bundle.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   },

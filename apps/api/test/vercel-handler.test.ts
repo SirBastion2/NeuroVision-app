@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { after, before, describe, it } from "node:test";
 import type { AddressInfo } from "node:net";
-import { createVercelHandler } from "../src/vercel-handler.js";
+import { createVercelHandler, resolveVercelUrl } from "../src/vercel-handler.js";
 import { createHarness } from "./harness.js";
+
+function reqWith(url: string, headers: IncomingMessage["headers"] = {}): IncomingMessage {
+  return { url, headers } as IncomingMessage;
+}
 
 describe("Vercel handler", { concurrency: false }, () => {
   let harness: Awaited<ReturnType<typeof createHarness>>;
@@ -49,5 +53,25 @@ describe("Vercel handler", { concurrency: false }, () => {
     assert.equal(body.subject, "handler-1");
     assert.equal(body.orgId, "org-demo");
     assert.equal(body.role, "participant");
+  });
+
+  it("keeps Fastify paths after a rewrite to /api", () => {
+    assert.equal(resolveVercelUrl(reqWith("/api/v1/auth/local")), "/api/v1/auth/local");
+    assert.equal(resolveVercelUrl(reqWith("/health")), "/health");
+    assert.equal(resolveVercelUrl(reqWith("/api/health")), "/health");
+    assert.equal(
+      resolveVercelUrl(reqWith("/api", { "x-vercel-original-path": "/api/v1/me" })),
+      "/api/v1/me",
+    );
+    assert.equal(
+      resolveVercelUrl(reqWith("/api", { "x-vercel-original-path": "/health" })),
+      "/health",
+    );
+    assert.equal(
+      resolveVercelUrl(
+        reqWith("/api?x=1", { "x-now-route-matches": encodeURIComponent(JSON.stringify({ "1": "v1/sessions" })) }),
+      ),
+      "/api/v1/sessions?x=1",
+    );
   });
 });

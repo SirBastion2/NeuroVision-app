@@ -3,7 +3,14 @@
   "installCommand": "npm ci",
   "buildCommand": "VITE_API_BASE_URL=/ VITE_IDENTITY_MODE=local npm run vercel-build",
   "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "api/_bundle/**",
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
-    { "source": "/health", "destination": "/api/health" }
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" }
   ]
 }

@@ -265,10 +265,10 @@ One Vercel project serves the Vite static build and the Fastify API as a Functio
 | Install command | `npm ci` |
 | Build command | `npm run vercel-build` |
 | Output directory | `apps/web/dist` |
-| API | `api/index.ts` and `api/[...path].ts` wrap `buildServer` from `@neurovision/api` |
-| Rewrites | `/health` → `/api/health` (the handler maps that path back to Fastify `GET /health`) |
+| API | `api/index.js` imports the esbuild bundle of `buildServer` (`api/_bundle/server.mjs`) |
+| Rewrites | `/api/(.*)` and `/health` → `/api` (the function). Fastify still sees `/api/v1/...` and `/health` |
 
-`vercel-build` compiles domain, gaze, and storage, then the Vite site (`tsc` + `vite build`). Set `VITE_API_BASE_URL=/` and `VITE_IDENTITY_MODE=local` as **build** env so the static app calls same-origin `/api` and `/health`.
+`vercel-build` compiles domain, gaze, and storage, builds the Vite site (`tsc` + `vite build`), then bundles the API handler with esbuild so workspace `@neurovision/*` TypeScript is inlined (`pg` stays external). Set `VITE_API_BASE_URL=/` and `VITE_IDENTITY_MODE=local` as **build** env so the static app calls same-origin `/api` and `/health`.
 
 Required project env (Production / Preview). Do not commit secrets.
 
