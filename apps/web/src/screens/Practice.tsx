@@ -143,10 +143,12 @@ export function PracticeReflection({ session, config, onAnother, onReview }: Ref
 
       <section className="review-grid">
         <div className="card pad-0">
-          <div className="card-head">
-            <h3>This round</h3>
-          </div>
-          <ResponseOrderPlot layout={last.trial.layout} orderedHits={r.orderedHits} events={last.trial.events} />
+          <ResponseOrderPlot
+            layout={last.trial.layout}
+            orderedHits={r.orderedHits}
+            events={last.trial.events}
+            heading="This round"
+          />
         </div>
         <div className="stats">
           <Stat label="Left half found" value={`${r.hits.left} / ${score.left.available}`} sub={vs ? `${delta(vs.omissions.left)} omissions vs assessment` : undefined} />

@@ -20,7 +20,6 @@ interface Props {
   saveError: string | null;
   onPractice: () => void;
   onHistory: () => void;
-  onProfile: () => void;
   onHome: () => void;
 }
 
@@ -41,7 +40,7 @@ const PATTERN_TITLE: Record<SpatialPatternKind, string> = {
   insufficient: "Not enough data",
 };
 
-export function Review({ session, saveError, onPractice, onHistory, onProfile, onHome }: Props) {
+export function Review({ session, saveError, onPractice, onHistory, onHome }: Props) {
   const result = useMemo(() => scoreSession(session), [session]);
   const ts = result.targetSelection;
   const tsTrial = findTargetSelectionTrial(session);
@@ -100,15 +99,16 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
 
           <section className="review-grid">
             <div className="card pad-0">
-              <div className="card-head">
-                <h3>Response order</h3>
-                <span className="small">Ended: {END_LABEL[tsTrial.end]}</span>
-              </div>
-              <ResponseOrderPlot layout={tsTrial.layout} orderedHits={ts.orderedHits} events={tsTrial.events} />
+              <ResponseOrderPlot
+                layout={tsTrial.layout}
+                orderedHits={ts.orderedHits}
+                events={tsTrial.events}
+                headingMeta={<span className="small">Ended: {END_LABEL[tsTrial.end]}</span>}
+              />
             </div>
-            <div className="card">
+            <div className="card regions-card">
               <h3>Omissions by region</h3>
-              <p className="small">Laid out as on the board. Darker means more missed.</p>
+              <p className="small">Darker = more missed.</p>
               <RegionGrid regions={ts.regions} />
             </div>
           </section>
@@ -220,11 +220,6 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
         <button className="ghost" onClick={onHistory}>
           History
         </button>
-        {session.source === "live" && (
-          <button className="primary" onClick={onProfile}>
-            Open Clinician Dashboard
-          </button>
-        )}
         <button onClick={onHome}>Home</button>
       </div>
     </div>

@@ -44,7 +44,7 @@ export function RegionGrid({ regions }: { regions: Record<BoardRegion, Selection
         return (
           <div
             key={region}
-            className={`region ${rate > 0.72 ? "deep" : ""}`}
+            className="region"
             role="cell"
             style={{ ["--miss" as string]: String(rate) }}
             title={`${region.replace("-", " ")}: ${r.omissions} of ${r.available} missed`}

@@ -488,7 +488,6 @@ export function App() {
             saveError={session.source === "live" ? saveError : null}
             onPractice={() => go("practice-setup")}
             onHistory={() => go("history")}
-            onProfile={() => go("profile")}
             onHome={home}
           />
         )}
@@ -538,6 +537,7 @@ export function App() {
               setStored(await store.load());
             }}
             onHome={home}
+            onClinicianDashboard={() => go("profile")}
             apiEnabled={apiEnabled}
             processing={processing}
             queue={queue}

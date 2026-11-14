@@ -24,6 +24,7 @@ interface Props {
   onOpenBattery?: (record: BatteryRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
+  onClinicianDashboard?: () => void;
   apiEnabled?: boolean;
   processing?: Record<string, ProcessingSnapshot>;
   queue?: UploadQueueState;
@@ -47,6 +48,7 @@ export function History({
   onOpenBattery,
   onDelete,
   onHome,
+  onClinicianDashboard,
   apiEnabled = false,
   processing = {},
   queue,
@@ -272,6 +274,11 @@ export function History({
               Delete participant
             </button>
           ))}
+        {onClinicianDashboard && (
+          <button className="ghost" type="button" onClick={onClinicianDashboard}>
+            Clinician Dashboard
+          </button>
+        )}
         <button onClick={onHome}>Home</button>
       </div>
 

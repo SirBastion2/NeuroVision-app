@@ -276,17 +276,20 @@ function CombinedReport({
             </section>
             <section className="review-grid">
               <div className="card pad-0">
-                <div className="card-head">
-                  <h3>Response order</h3>
-                  <span className="small">
-                    Found {pct(ts.hitRate)} · first ring after {seconds(ts.firstLatencyMs)}
-                  </span>
-                </div>
-                <ResponseOrderPlot layout={tsTrial.layout} orderedHits={ts.orderedHits} events={tsTrial.events} />
+                <ResponseOrderPlot
+                  layout={tsTrial.layout}
+                  orderedHits={ts.orderedHits}
+                  events={tsTrial.events}
+                  headingMeta={
+                    <span className="small">
+                      Found {pct(ts.hitRate)} · first ring after {seconds(ts.firstLatencyMs)}
+                    </span>
+                  }
+                />
               </div>
-              <div className="card">
+              <div className="card regions-card">
                 <h3>Omissions by region</h3>
-                <p className="small">Laid out as on the board. Darker means more missed.</p>
+                <p className="small">Darker = more missed.</p>
                 <RegionGrid regions={ts.regions} />
               </div>
             </section>
