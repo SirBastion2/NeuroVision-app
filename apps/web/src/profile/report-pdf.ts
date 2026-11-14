@@ -35,11 +35,13 @@ export function buildClinicianReportPdf(input: ReportInput): Blob {
     }
   };
 
+  doc.setFillColor(244, 241, 234);
+  doc.rect(0, 0, 612, 48, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(34, 56, 42);
-  doc.text("NeuroVision · Clinician session report", 56, y);
-  y += 28;
+  doc.text("NeuroVision · Clinician session report", 56, 32);
+  y = 72;
 
   line(`Profile: ${input.profileAlias}`, 12);
   line(`Generated: ${generatedAt}`, 10, [90, 96, 102]);
