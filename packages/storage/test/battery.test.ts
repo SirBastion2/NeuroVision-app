@@ -53,6 +53,10 @@ function makeBattery(overrides: Partial<BatteryRecord> = {}): BatteryRecord {
       lines,
       responses: lines.map((line) => ({ lineId: line.id, x: (line.x1 + line.x2) / 2 })),
     },
+    detection: null,
+    cancellation: null,
+    healthyControl: false,
+    fixture: false,
     normsUsed: {},
     ...overrides,
   };
