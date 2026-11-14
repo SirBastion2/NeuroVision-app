@@ -9,7 +9,11 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@neurovision/storage": ["./src/services/storage-unavailable.ts"]
+    }
   },
   "include": ["src"]
 }

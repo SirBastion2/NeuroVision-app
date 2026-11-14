@@ -50,7 +50,89 @@ export type {
 export { RESPONSE_EVENT_TYPES, sortEvents, classifyResponse } from "./events.js";
 export type { ResponseEventType, ResponseEvent, ClassifyResponseInput } from "./events.js";
 
-export type { GazeSample, TrackingGap, GazeStream, CalibrationPoint, CalibrationQualityReport } from "./gaze.js";
+export {
+  TIMESTAMP_BASES,
+  isGazeSample,
+  parseGazeSample,
+  isTimestampBasis,
+  isGazeSampleProvenanceRequest,
+  parseGazeSampleProvenanceRequest,
+  attachGazeSampleProvenance,
+} from "./gaze.js";
+export type {
+  GazeSample,
+  TrackingGap,
+  GazeStream,
+  CalibrationPoint,
+  CalibrationQualityReport,
+  TimestampBasis,
+  GazeSampleProvenanceRequest,
+  GazeSampleWithProvenance,
+} from "./gaze.js";
+
+export { ROLES, isRole, parseRole, isOrganization, parseOrganization, isMembership, parseMembership, isParticipant, parseParticipant } from "./organization.js";
+export type { Role, Organization, Membership, Participant } from "./organization.js";
+
+export {
+  EXPOSURE_STATUSES,
+  isExposureStatus,
+  parseExposureStatus,
+  isAssignmentManifest,
+  parseAssignmentManifest,
+  isTaskAssignment,
+  parseTaskAssignment,
+  appendAssignmentRevision,
+} from "./assignment.js";
+export type { ExposureStatus, AssignmentManifest, TaskAssignment, AssignmentRevisionInput } from "./assignment.js";
+
+export {
+  COMPLETION_STATES,
+  SYNC_STATES,
+  PROCESSING_STATES,
+  COMPLETION_TRANSITIONS,
+  SYNC_TRANSITIONS,
+  PROCESSING_TRANSITIONS,
+  isCompletionState,
+  parseCompletionState,
+  isSyncState,
+  parseSyncState,
+  isProcessingState,
+  parseProcessingState,
+  canTransitionCompletion,
+  transitionCompletion,
+  canTransitionSync,
+  transitionSync,
+  canTransitionProcessing,
+  transitionProcessing,
+  isTraceUploadRequest,
+  parseTraceUploadRequest,
+  isBatchPayload,
+  parseBatchPayload,
+  batchPayloadFromSession,
+} from "./ingestion.js";
+export type { CompletionState, SyncState, ProcessingState, TraceUploadRequest, BatchPayload } from "./ingestion.js";
+
+export {
+  REQUESTED_MODES,
+  isRequestedMode,
+  parseRequestedMode,
+  mapRequestedMode,
+  isTransferPracticeRound,
+  practiceRoundForRequestedMode,
+  parseRequestedModeMapping,
+} from "./mode.js";
+export type { RequestedMode, RequestedModeMapping } from "./mode.js";
+
+export {
+  IMPORTED_SOURCES,
+  isImportedSource,
+  parseImportedSource,
+  isImportedSourceProvenance,
+  parseImportedSourceProvenance,
+  mapImportedSource,
+  sessionSourceFromImport,
+} from "./import-source.js";
+export type { ImportedSource, ImportedSourceProvenance } from "./import-source.js";
 
 export {
   SESSION_SOURCES,

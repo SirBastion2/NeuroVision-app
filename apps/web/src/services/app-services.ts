@@ -38,7 +38,23 @@ import {
   labTraceToDomainStream,
   simulatedTrace,
 } from "@neurovision/gaze";
+import {
+  createApiClient,
+  type ApiClient,
+  type DeleteResult,
+  type ExportResult,
+  type HealthResult,
+  type ProcessingSnapshot,
+  type PutSessionInput,
+  type SessionResource,
+  type TraceUploadRequest,
+  type TraceUploadResult,
+} from "./api-client";
 import { resolveHistoryStore, type HistoryStore } from "./history-store";
+import { createOidcClient, type AuthorizationRedirect, type OidcClient, type OidcToken } from "./oidc";
+import { getBrowserKeyValueStore, type KeyValueStore, type PackageStoreFactory } from "./package-store";
+import { deleteParticipant, exportParticipant, pollProcessingState, type PollProcessingOptions } from "./processing";
+import { readRuntimeConfig, type WebRuntimeConfig } from "./runtime-config";
 
 const DEFAULT_VIEWPORT: Viewport = describeViewport(1280, 900);
 const GAZE_LAB_DURATION_MS = 22_000;
@@ -74,11 +90,21 @@ export interface CreateAppServicesOptions {
   store?: HistoryStore;
   now?: () => Date;
   createId?: () => string;
+  config?: WebRuntimeConfig;
+  standalone?: boolean;
+  keyValueStore?: KeyValueStore | null;
+  packageStoreFactory?: PackageStoreFactory | null;
+  api?: ApiClient;
+  oidc?: OidcClient;
+  fetch?: typeof fetch;
 }
 
 export interface AppServices {
   readonly storeKind: HistoryStore["kind"];
   readonly contractsVersion: string;
+  readonly apiEnabled: boolean;
+  readonly api: ApiClient;
+  readonly oidc: OidcClient;
   startSession(input?: StartSessionInput): SessionRecord;
   recordClick(session: SessionRecord, trialId: string, point: Point, elapsed: number): SessionRecord;
   recordTrialClick(trial: TrialRecord, sessionId: string, point: Point, elapsed: number): TrialRecord;
@@ -98,6 +124,15 @@ export interface AppServices {
   startPracticeTrial(session: SessionRecord, choice: PracticeChoice): { trial: TrialRecord; setup: PracticeRoundSetup };
   appendPracticeRound(session: SessionRecord, trial: TrialRecord, config: PracticeSuggestion): SessionRecord;
   reflectPractice(trial: TrialRecord, assessment?: TargetSelectionScore | null): PracticeReflection;
+  health(): Promise<HealthResult>;
+  uploadSession(input: PutSessionInput): Promise<SessionResource>;
+  uploadTrace(sessionId: string, request: TraceUploadRequest, bytes: Uint8Array): Promise<TraceUploadResult>;
+  pollProcessingState(sessionId: string, options?: PollProcessingOptions): Promise<ProcessingSnapshot>;
+  exportParticipant(participantId: string): Promise<ExportResult>;
+  deleteParticipant(participantId: string, input?: { confirm?: true }): Promise<DeleteResult>;
+  beginOidcRedirect(): Promise<AuthorizationRedirect>;
+  completeOidcCallback(url: string | URL): Promise<OidcToken>;
+  getAccessToken(): string | null;
 }
 
 function emptyDecision(): PracticeSuggestion {
@@ -152,9 +187,30 @@ function replaceTrial(session: SessionRecord, trial: TrialRecord): SessionRecord
 }
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
-  const store = resolveHistoryStore(options.store);
+  const config = options.config ?? readRuntimeConfig();
+  const standalone = options.standalone ?? config.standalone;
+  const store = resolveHistoryStore({
+    preferred: options.store,
+    standalone,
+    keyValueStore: options.keyValueStore === undefined ? getBrowserKeyValueStore() : options.keyValueStore,
+    packageStoreFactory: options.packageStoreFactory,
+  });
   const now = options.now ?? (() => new Date());
   const createId = options.createId ?? (() => crypto.randomUUID());
+  const oidc =
+    options.oidc ??
+    createOidcClient({
+      config: standalone ? null : config.oidc,
+      fetch: options.fetch,
+    });
+  const api =
+    options.api ??
+    createApiClient({
+      baseUrl: config.apiBaseUrl,
+      standalone,
+      fetch: options.fetch,
+      getAccessToken: () => oidc.getAccessToken(),
+    });
 
   const recordTrialClick = (
     trial: TrialRecord,
@@ -184,6 +240,9 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   return {
     storeKind: store.kind,
     contractsVersion: CONTRACTS_VERSION,
+    apiEnabled: api.enabled,
+    api,
+    oidc,
 
     startSession(input: StartSessionInput = {}): SessionRecord {
       const id = input.id ?? createId();
@@ -332,5 +391,41 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     },
 
     reflectPractice: reflectPracticeRound,
+
+    health() {
+      return api.health();
+    },
+
+    uploadSession(input) {
+      return api.putSession(input);
+    },
+
+    uploadTrace(sessionId, request, bytes) {
+      return api.uploadTrace(sessionId, request, bytes);
+    },
+
+    pollProcessingState(sessionId, pollOptions) {
+      return pollProcessingState(api, sessionId, pollOptions);
+    },
+
+    exportParticipant(participantId) {
+      return exportParticipant(api, participantId);
+    },
+
+    deleteParticipant(participantId, input) {
+      return deleteParticipant(api, participantId, input);
+    },
+
+    beginOidcRedirect() {
+      return oidc.buildAuthorizationUrl();
+    },
+
+    completeOidcCallback(url) {
+      return oidc.handleCallback(url);
+    },
+
+    getAccessToken() {
+      return oidc.getAccessToken();
+    },
   };
 }

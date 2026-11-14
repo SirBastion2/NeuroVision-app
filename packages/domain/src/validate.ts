@@ -1,4 +1,5 @@
 import { RESPONSE_EVENT_TYPES, type ResponseEvent } from "./events.js";
+import { isFiniteNumber, isIsoTimestamp, isObject, isOneOf } from "./guard.js";
 import type { Stimulus, TaskKind, TaskLayout, LineSegment } from "./layouts.js";
 import {
   INPUT_MODALITIES,
@@ -18,22 +19,6 @@ const TASK_KINDS: readonly TaskKind[] = ["target-selection", "line-bisection"];
 const STIMULUS_KINDS = ["target", "distractor"] as const;
 const SIDES = ["left", "right"] as const;
 const DENSITIES = ["standard", "low"] as const;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function isIsoTimestamp(value: unknown): value is string {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
-}
-
-function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
-  return typeof value === "string" && (allowed as readonly string[]).includes(value);
-}
 
 function isViewport(value: unknown): value is Viewport {
   return (
@@ -160,7 +145,11 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
   return (
     value.trials.every(isTrial) &&
     value.practice.every(
-      (round) => isObject(round) && isTrial(round.trial) && isPracticeSuggestion(round.config),
+      (round) =>
+        isObject(round) &&
+        isTrial(round.trial) &&
+        isPracticeSuggestion(round.config) &&
+        (round.transfer === undefined || typeof round.transfer === "boolean"),
     )
   );
 }

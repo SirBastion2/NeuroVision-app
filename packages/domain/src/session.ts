@@ -43,6 +43,8 @@ export interface PracticeSuggestion {
 export interface PracticeRound {
   trial: TrialRecord;
   config: PracticeSuggestion;
+  /** True when this round was requested as transfer-cue isolation. Absent/false is ordinary practice. */
+  transfer?: boolean;
 }
 
 export interface SessionRecord {

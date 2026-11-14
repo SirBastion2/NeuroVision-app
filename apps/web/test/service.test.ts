@@ -9,7 +9,11 @@ import {
   SCORER_ID,
   parseSessionRecord,
 } from "@neurovision/domain";
-import { createAppServices, createMemoryStore } from "../src/services/index.ts";
+import {
+  createAppServices,
+  createMemoryStore,
+  type PackageStoreFactory,
+} from "../src/services/index.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -143,9 +147,59 @@ describe("app service layer", () => {
     assert.notEqual(gaze.simulated.leftBiased.id, gaze.simulated.bothHalves.id);
   });
 
-  it("uses the in-memory store when packages/storage is absent", () => {
+  it("keeps the web service on its memory store until it adopts packages/storage", () => {
     const services = createAppServices();
-    assert.equal(existsSync(join(repoRoot, "packages/storage")), false);
+    assert.equal(existsSync(join(repoRoot, "packages/storage")), true);
     assert.equal(services.storeKind, "memory");
+    assert.equal(services.apiEnabled, false);
+  });
+
+  it("uses the storage-package HistoryStore as the default when that factory is present", async () => {
+    const inner = createMemoryStore();
+    const factory: PackageStoreFactory = () => ({
+      kind: "package",
+      save: (record) => inner.save(record),
+      load: (id) => inner.load(id),
+      list: () => inner.list(),
+    });
+    const kv = {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    };
+    const services = createAppServices({
+      packageStoreFactory: factory,
+      keyValueStore: kv,
+    });
+    assert.equal(services.storeKind, "package");
+    const started = services.startSession({
+      id: "pkg-1",
+      alias: "Package default",
+      startedAt: "2026-11-14T16:00:00.000Z",
+    });
+    const saved = await services.save(started);
+    const reloaded = await services.load(saved.id);
+    assert.deepEqual(reloaded, saved);
+  });
+
+  it("keeps in-memory history for the standalone build even when a package factory is present", () => {
+    const inner = createMemoryStore();
+    const factory: PackageStoreFactory = () => ({
+      kind: "package",
+      save: (record) => inner.save(record),
+      load: (id) => inner.load(id),
+      list: () => inner.list(),
+    });
+    const services = createAppServices({
+      standalone: true,
+      packageStoreFactory: factory,
+      keyValueStore: {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined,
+      },
+    });
+    assert.equal(services.storeKind, "memory");
+    assert.equal(services.apiEnabled, false);
   });
 });
