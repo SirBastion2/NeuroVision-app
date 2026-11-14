@@ -292,12 +292,6 @@ export function App() {
             <button type="button" className={centerNavOn === "home" ? "on" : ""} onClick={home}>
               Home
             </button>
-            <button type="button" className={centerNavOn === "history" ? "on" : ""} onClick={() => go("history")}>
-              History
-            </button>
-            <button type="button" className={centerNavOn === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
-              Gaze Lab
-            </button>
             <button type="button" className={screen === "starry" ? "on" : ""} onClick={() => go("starry")}>
               Starry Night
             </button>
@@ -309,6 +303,9 @@ export function App() {
             </button>
             <button type="button" className={screen === "scene" ? "on" : ""} onClick={() => go("scene")}>
               Hidden scene
+            </button>
+            <button type="button" className={centerNavOn === "history" ? "on" : ""} onClick={() => go("history")}>
+              History
             </button>
           </nav>
         ) : (
