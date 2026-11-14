@@ -8,11 +8,13 @@ import {
   SCORER_ID,
   scoreSession,
   type InputModality,
+  type LayoutVariant,
   type ResponseEvent,
   type SessionRecord,
   type SessionSource,
   type SessionStatus,
   type TaskKind,
+  type TaskLayout,
   type TrialEndReason,
   type TrialRecord,
   type Viewport,
@@ -27,8 +29,7 @@ export const VIEWPORT: Viewport = {
 
 export const INPUT: InputModality = "mouse-trackpad";
 
-export function targetIds(side: "left" | "right", count: number): string[] {
-  const layout = createTargetSelectionLayout("fixed-a");
+export function targetIds(side: "left" | "right", count: number, layout = createTargetSelectionLayout("fixed-a")): string[] {
   return layout.stimuli
     .filter((stimulus) => stimulus.kind === "target" && stimulus.side === side)
     .slice(0, count)
@@ -68,8 +69,10 @@ export function makeTargetTrial(options: {
   distractorHits?: number;
   repeatHits?: number;
   end?: TrialEndReason;
+  variant?: LayoutVariant;
+  layout?: TaskLayout;
 }): TrialRecord {
-  const layout = createTargetSelectionLayout("fixed-a");
+  const layout = options.layout ?? createTargetSelectionLayout(options.variant ?? "fixed-a");
   const trial: TrialRecord = {
     id: `${options.sessionId}-target`,
     task: "target-selection",
@@ -80,7 +83,10 @@ export function makeTargetTrial(options: {
     input: INPUT,
     viewport: VIEWPORT,
   };
-  const ids = [...targetIds("left", options.leftHits), ...targetIds("right", options.rightHits)];
+  const ids = [
+    ...targetIds("left", options.leftHits, layout),
+    ...targetIds("right", options.rightHits, layout),
+  ];
   const events = eventsForTargets(trial, options.sessionId, ids);
 
   const distractors = layout.stimuli.filter((stimulus) => stimulus.kind === "distractor");
@@ -167,6 +173,11 @@ export function makeSession(options: {
   targetEnd?: TrialEndReason;
   bisectionOffsets?: Array<number | null>;
   skipLastLine?: boolean;
+  variant?: LayoutVariant;
+  layout?: TaskLayout;
+  protocol?: string;
+  scorer?: string;
+  completedAt?: string;
 }): SessionRecord {
   const source = options.source ?? "live";
   const target = makeTargetTrial({
@@ -176,6 +187,8 @@ export function makeSession(options: {
     distractorHits: options.distractorHits,
     repeatHits: options.repeatHits,
     end: options.targetEnd ?? "done",
+    variant: options.variant,
+    layout: options.layout,
   });
   const offsets = options.bisectionOffsets ?? [0, 0, 0, 0, 0];
   const lines = offsets.map((offset, index) =>
@@ -191,14 +204,14 @@ export function makeSession(options: {
     profileId: "local",
     alias: options.alias,
     source,
-    protocol: PROTOCOL_ID,
-    scorer: SCORER_ID,
+    protocol: options.protocol ?? PROTOCOL_ID,
+    scorer: options.scorer ?? SCORER_ID,
     taskIds: ["target-selection", "line-bisection"] as TaskKind[],
     status: options.status ?? "complete",
     input: INPUT,
     viewport: VIEWPORT,
     startedAt: "2026-11-14T14:00:00.000Z",
-    completedAt: "2026-11-14T14:02:00.000Z",
+    completedAt: options.completedAt ?? "2026-11-14T14:02:00.000Z",
     trials: [target, ...lines],
     practice: [],
     decision: {

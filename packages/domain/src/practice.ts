@@ -1,4 +1,5 @@
 import { PRACTICE_RULES_VERSION } from "./version.js";
+import { createPracticeLayout, type BoardDensity, type TaskLayout } from "./layouts.js";
 import type { PracticeCue, PracticeSuggestion } from "./session.js";
 
 export type { PracticeCue };
@@ -10,6 +11,18 @@ export interface PracticeScoreInput {
   valid: boolean;
   hitRate: number;
   omissionAsymmetry: number | null;
+}
+
+export interface PracticeChoice {
+  cue: PracticeCue;
+  density: BoardDensity;
+  /** Self-paced row marker shown during the round. */
+  scanGuide?: boolean;
+}
+
+export interface PracticeRoundSetup {
+  config: PracticeSuggestion;
+  layout: TaskLayout;
 }
 
 const LOW_SELECTION_HIT_RATE = 0.5;
@@ -79,6 +92,45 @@ export function suggestPractice(score: PracticeScoreInput | null): PracticeSugge
     explanation:
       "At least 50% of targets were selected and the side gap is below 25 points. Use standard unguided practice.",
   };
+}
+
+function choiceDiffers(choice: PracticeChoice, suggested: PracticeSuggestion): boolean {
+  return (
+    choice.cue !== suggested.cue ||
+    choice.density !== suggested.density ||
+    Boolean(choice.scanGuide) !== Boolean(suggested.scanGuide)
+  );
+}
+
+function practiceExplanation(choice: PracticeChoice): string {
+  const cue = choice.cue === "none" ? "Unguided practice" : `Cue the ${choice.cue} side`;
+  const density = choice.density === "low" ? "on a lower-density board" : "on a standard-density board";
+  const marker = choice.scanGuide ? " with a self-paced row marker" : "";
+  return `${cue} ${density}${marker}.`;
+}
+
+/** Turn a chosen cue, density, and optional row marker into a practice round config plus layout. */
+export function configurePracticeRound(
+  choice: PracticeChoice,
+  suggested: PracticeSuggestion | null = null,
+): PracticeRoundSetup {
+  const scanGuide = Boolean(choice.scanGuide);
+  const matchesSuggestion = suggested !== null && !choiceDiffers(choice, suggested);
+  const level: 0 | 1 | 2 = choice.cue === "none" ? 0 : matchesSuggestion ? suggested.level : 2;
+  const config: PracticeSuggestion = {
+    version: PRACTICE_RULES_VERSION,
+    cue: choice.cue,
+    density: choice.density,
+    level,
+    explanation: matchesSuggestion ? suggested.explanation : practiceExplanation(choice),
+    metrics: suggested?.metrics ?? null,
+    override:
+      suggested && !matchesSuggestion
+        ? "The chosen practice setup differs from the scored suggestion."
+        : (suggested?.override ?? null),
+    scanGuide,
+  };
+  return { config, layout: createPracticeLayout(choice.density) };
 }
 
 export function fadePracticeCue(

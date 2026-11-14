@@ -10,6 +10,7 @@ export type StimulusKind = "target" | "distractor";
 export type TaskKind = "target-selection" | "line-bisection";
 export type LayoutVariant = "fixed-a" | "fixed-b";
 export type BoardDensity = "standard" | "low";
+export type LayoutVariantFamily = "assessment-fixed" | "practice" | "line-bisection";
 
 export interface Stimulus {
   id: string;
@@ -110,6 +111,14 @@ export function createTargetSelectionLayout(
     id: variant,
     stimuli: fillSides(shuffledSlots(layoutSeed(variant)), counts),
   };
+}
+
+export function layoutVariantFamily(layout: TaskLayout | string): LayoutVariantFamily | null {
+  const id = typeof layout === "string" ? layout : layout.id;
+  if (id === "fixed-a" || id === "fixed-b") return "assessment-fixed";
+  if (id.startsWith("practice-")) return "practice";
+  if (id.startsWith("line-bisection-")) return "line-bisection";
+  return null;
 }
 
 export function createPracticeLayout(density: BoardDensity = "standard"): TaskLayout {
