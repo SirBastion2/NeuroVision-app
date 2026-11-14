@@ -1,0 +1,20 @@
+{
+  "name": "neurovision",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @neurovision/domain",
+    "build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/web"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
