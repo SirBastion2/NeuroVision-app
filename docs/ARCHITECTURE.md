@@ -16,6 +16,7 @@ Domain scoring is the only interpreter of recorded events. It walks events in el
 
 `@neurovision/domain` also exports these battery scorers (pure functions; they do not replace `scoreSession`):
 
+- norms: `METRICS`, `compareToNorm`, `deviationUnit`, `greyscalesMetric`, `toTestNorm`, `DEFAULT_NORMS` (`MetricNorm`, `HealthyRangeReading`, `NormCitation`). Published healthy-range means/SDs/cutoffs with sample and citation. Uncalibrated metrics are marked and not scored.
 - evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`)
 - scene: `generateScene`, `scoreScene`, `hitTest`, `centerOfCancellation`, `SCENE_DEFAULTS` (`HideSide`, `SceneConfig`, `Scene`, `Lantern`, `Building`, `SceneWindow`, `SceneTap`, `SceneTapResult`, `SceneScore`)
 - clock: `generateClockTrials`, `scoreClock`, `numeralAngle`, `CLOCK_DEFAULTS` (`ClockSide`, `ClockErrorType`, `StackPosition`, `ClockNumeral`, `ClockFace`, `ClockTrial`, `ClockResponse`, `ClockScore`)
@@ -260,4 +261,4 @@ The web app does not run OIDC PKCE in the browser. Sign-in navigates to the API:
 - The file opens from disk (`file:`) with no network requests
 - `VITE_STANDALONE` is `true` and `VITE_API_BASE_URL` is empty, so the service layer never calls the API
 
-`npm run verify` runs the production build, all package tests, and the service-layer e2e suite, then writes `docs/RELEASE_EVIDENCE.md`. Merge order for workstreams A–F is in `docs/MERGE_ORDER.md`. The demonstration walkthrough is in `docs/DEMO_REHEARSAL.md`.
+`npm run verify` runs the production build, all package tests, and the service-layer e2e suite, then writes `docs/RELEASE_EVIDENCE.md`. Merge order for workstreams A–F is in `docs/MERGE_ORDER.md`. The demonstration walkthrough is in `docs/DEMO_REHEARSAL.md`. Published healthy-range sources are listed in `docs/NORMS.md`.

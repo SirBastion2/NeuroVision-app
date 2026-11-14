@@ -218,11 +218,44 @@ export { isSessionRecord, parseSessionRecord } from "./validate.js";
 
 export { combineEvidence, standardize, verdictFor, seProportionDiff, fitNorms, DEFAULT_NORMS } from "./evidence.js";
 export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict } from "./evidence.js";
+export {
+  METRICS,
+  DEFAULT_NORMS as PUBLISHED_NORMS,
+  BISECTION_SIGNED_ERROR_PCT,
+  BISECTION_LATERAL_INDEX,
+  GREYSCALES_LTR,
+  GREYSCALES_RTL,
+  GREYSCALES_OTHER,
+  HOLLOW_RINGS_OMISSION_ASYMMETRY,
+  STAR_CANCELLATION_HIT_ASYMMETRY,
+  STAR_CANCELLATION_COC,
+  CLOCK_LATERALITY,
+  STARRY_LATERALITY,
+  SCENE_LATERALITY,
+  GAZE_LEFT_FRACTION,
+  greyscalesMetric,
+  toTestNorm,
+  isCalibratedNorm,
+  isCalibratedMetric,
+  compareToNorm,
+  deviationUnit,
+} from "./norms.js";
+export type {
+  NormSource,
+  CutoffDirection,
+  HealthyRangeStatus,
+  NormCitation,
+  NormSample,
+  MetricNorm,
+  HealthyRangeReading,
+  TestNormShape,
+  MetricId,
+} from "./norms.js";
 export { generateScene, scoreScene, hitTest, centerOfCancellation, SCENE_DEFAULTS } from "./scene.js";
 export type { HideSide, SceneConfig, Scene, Lantern, Building, SceneWindow, SceneTap, SceneTapResult, SceneScore } from "./scene.js";
 export { generateClockTrials, scoreClock, numeralAngle, CLOCK_DEFAULTS } from "./clock.js";
 export type { ClockSide, ClockErrorType, StackPosition, ClockNumeral, ClockFace, ClockTrial, ClockResponse, ClockScore } from "./clock.js";
-export { generateGreyscalesTrials, scoreGreyscales, chosenDarkSide, greyscalesNormFor, GREYSCALES_DEFAULTS } from "./greyscales.js";
+export { generateGreyscalesTrials, scoreGreyscales, chosenDarkSide, greyscalesNormFor, greyscalesHealthyRange, GREYSCALES_DEFAULTS } from "./greyscales.js";
 export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, GreyscalesResponse, GreyscalesScore } from "./greyscales.js";
 export { generateBisectionLines, signedErrorPct, bisectionObservation } from "./bisection.js";
 export type { BisectionLine, BisectionResponse } from "./bisection.js";

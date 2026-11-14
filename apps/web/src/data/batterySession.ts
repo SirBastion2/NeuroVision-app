@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BATTERY_CONTRACT_VERSION,
   DEFAULT_NORMS,
+  greyscalesNormFor,
   parseBatteryRecord,
   type BatteryMode,
   type BatteryRecord,
@@ -104,10 +105,10 @@ function newBatteryId(now: Date): string {
   return `b-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function normsUsedFor(mode: BatteryMode): Partial<Record<TestId, TestNorm>> {
+function normsUsedFor(mode: BatteryMode, readingDirection: ReadingDirection | null): Partial<Record<TestId, TestNorm>> {
   const used: Partial<Record<TestId, TestNorm>> = {};
   for (const test of batteryStepOrder(mode)) {
-    used[test] = DEFAULT_NORMS[test];
+    used[test] = test === "greyscales" && readingDirection ? greyscalesNormFor(readingDirection) : DEFAULT_NORMS[test];
   }
   return used;
 }
@@ -136,7 +137,7 @@ export function assembleBatteryRecord(
     clock: { trials: outputs.clock.trials, responses: outputs.clock.responses },
     greyscales: full && outputs.greyscales ? outputs.greyscales : null,
     bisection: full && outputs.bisection ? outputs.bisection : null,
-    normsUsed: normsUsedFor(config.mode),
+    normsUsed: normsUsedFor(config.mode, config.readingDirection),
   };
   return parseBatteryRecord(record);
 }

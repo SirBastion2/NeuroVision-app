@@ -8,6 +8,7 @@
  * Pure functions only. Self-contained except for a type-only import.
  */
 import type { TestObservation } from "./evidence.js";
+import { CLOCK_LATERALITY, compareToNorm, type HealthyRangeReading } from "./norms.js";
 
 export type ClockSide = "left" | "right";
 export type ClockErrorType = "swap" | "missing" | "shift";
@@ -55,6 +56,7 @@ export interface ClockScore {
   right: ClockSideSummary;
   timeouts: number;
   observation: TestObservation;
+  healthyRange: HealthyRangeReading;
 }
 
 export const CLOCK_DEFAULTS = {
@@ -197,6 +199,7 @@ export function scoreClock(trials: ClockTrial[], responses: ClockResponse[]): Cl
   const timeouts = trials.filter((t) => !byId.get(t.id) || byId.get(t.id)!.choice === null).length;
   const accL = left.n ? left.correct / left.n : 0;
   const accR = right.n ? right.correct / right.n : 0;
+  const value = accL - accR;
   return {
     left,
     right,
@@ -204,9 +207,10 @@ export function scoreClock(trials: ClockTrial[], responses: ClockResponse[]): Cl
     observation: {
       test: "clock",
       label: "Clock check",
-      value: accL - accR,
+      value,
       se: seDiff(left.correct, left.n, right.correct, right.n),
       n: left.n + right.n,
     },
+    healthyRange: compareToNorm(value, CLOCK_LATERALITY),
   };
 }

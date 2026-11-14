@@ -19,7 +19,7 @@ const STACK_POSITIONS: readonly StackPosition[] = ["top", "bottom"];
 const DARK_SIDES: readonly DarkSide[] = ["left", "right"];
 const BAR_POSITIONS: readonly BarPosition[] = ["top", "bottom"];
 const TEST_IDS: readonly TestId[] = ["scene", "clock", "greyscales", "bisection", "detection"];
-const NORM_SOURCES: readonly TestNorm["source"][] = ["hacker-norms", "literature", "assumed"];
+const NORM_SOURCES: readonly TestNorm["source"][] = ["hacker-norms", "literature", "assumed", "uncalibrated"];
 
 export interface BatteryRecord {
   contract: typeof BATTERY_CONTRACT_VERSION;
@@ -143,25 +143,78 @@ function parseBisectionResponse(value: unknown): BisectionResponse {
   return { lineId: value.lineId, x: value.x };
 }
 
-function parseTestNorm(value: unknown): TestNorm {
+function parseOptionalFinite(value: unknown): number | null {
+  if (value === null) return null;
+  if (!isFiniteNumber(value)) parseFail("battery record");
+  return value;
+}
+
+function parseNormSample(value: unknown): NonNullable<TestNorm["sample"]> {
+  if (!isObject(value) || typeof value.ageRange !== "string") parseFail("battery record");
+  const sample: NonNullable<TestNorm["sample"]> = { ageRange: value.ageRange };
+  if (value.n !== undefined) {
+    if (!isFiniteNumber(value.n)) parseFail("battery record");
+    sample.n = value.n;
+  }
+  if (value.notes !== undefined) {
+    if (typeof value.notes !== "string") parseFail("battery record");
+    sample.notes = value.notes;
+  }
+  return sample;
+}
+
+function parseNormCitation(value: unknown): NonNullable<TestNorm["citation"]> {
   if (
     !isObject(value) ||
-    !isFiniteNumber(value.mean) ||
-    !isFiniteNumber(value.healthySd) ||
-    !isFiniteNumber(value.sensitivity) ||
-    !isOneOf(value.source, NORM_SOURCES)
+    typeof value.authors !== "string" ||
+    !isFiniteNumber(value.year) ||
+    typeof value.title !== "string" ||
+    typeof value.journal !== "string" ||
+    typeof value.doi !== "string" ||
+    typeof value.url !== "string"
   ) {
     parseFail("battery record");
   }
+  return {
+    authors: value.authors,
+    year: value.year,
+    title: value.title,
+    journal: value.journal,
+    doi: value.doi,
+    url: value.url,
+  };
+}
+
+function parseTestNorm(value: unknown): TestNorm {
+  if (!isObject(value) || !isFiniteNumber(value.sensitivity) || !isOneOf(value.source, NORM_SOURCES)) {
+    parseFail("battery record");
+  }
+  const uncalibrated = value.source === "uncalibrated";
+  const mean = uncalibrated ? parseOptionalFinite(value.mean ?? null) : parseOptionalFinite(value.mean);
+  const healthySd = uncalibrated ? parseOptionalFinite(value.healthySd ?? null) : parseOptionalFinite(value.healthySd);
+  if (!uncalibrated && (mean == null || healthySd == null)) parseFail("battery record");
   const norm: TestNorm = {
-    mean: value.mean,
-    healthySd: value.healthySd,
+    mean,
+    healthySd,
     sensitivity: value.sensitivity,
     source: value.source,
   };
   if (value.note !== undefined) {
     if (typeof value.note !== "string") parseFail("battery record");
     norm.note = value.note;
+  }
+  if (value.calibrated !== undefined) {
+    if (typeof value.calibrated !== "boolean") parseFail("battery record");
+    norm.calibrated = value.calibrated;
+  }
+  if (value.cutoff !== undefined) {
+    norm.cutoff = parseOptionalFinite(value.cutoff);
+  }
+  if (value.sample !== undefined) {
+    norm.sample = value.sample === null ? null : parseNormSample(value.sample);
+  }
+  if (value.citation !== undefined) {
+    norm.citation = value.citation === null ? null : parseNormCitation(value.citation);
   }
   return norm;
 }
