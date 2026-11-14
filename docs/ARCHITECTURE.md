@@ -12,6 +12,16 @@ The task runner draws every trial on a fixed 960×540 board. Pointers are conver
 
 Domain scoring is the only interpreter of recorded events. It walks events in elapsed-time order (sequence number as a tie-break), counts first target hits, omissions by side and vertical region, distractors, repeats, click-path length, and line midpoint error (percent of line length; right of center is positive). From the target-selection result it also emits a spatial-pattern summary and a practice suggestion (cue left / right / none, board density standard / low).
 
+## Battery scoring modules
+
+`@neurovision/domain` also exports these battery scorers (pure functions; they do not replace `scoreSession`):
+
+- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`)
+- scene: `generateScene`, `scoreScene`, `hitTest`, `centerOfCancellation`, `SCENE_DEFAULTS` (`HideSide`, `SceneConfig`, `Scene`, `Lantern`, `Building`, `SceneWindow`, `SceneTap`, `SceneTapResult`, `SceneScore`)
+- clock: `generateClockTrials`, `scoreClock`, `numeralAngle`, `CLOCK_DEFAULTS` (`ClockSide`, `ClockErrorType`, `StackPosition`, `ClockNumeral`, `ClockFace`, `ClockTrial`, `ClockResponse`, `ClockScore`)
+- greyscales: `generateGreyscalesTrials`, `scoreGreyscales`, `chosenDarkSide`, `greyscalesNormFor`, `GREYSCALES_DEFAULTS` (`DarkSide`, `BarPosition`, `ReadingDirection`, `GreyscalesTrial`, `GreyscalesResponse`, `GreyscalesScore`)
+- bisection: `generateBisectionLines`, `signedErrorPct`, `bisectionObservation` (`BisectionLine`, `BisectionResponse`)
+
 ## Product surfaces
 
 The UI work must match the supplied UI reference design (look, screens, and board layout). Do not copy that file into the repo.
