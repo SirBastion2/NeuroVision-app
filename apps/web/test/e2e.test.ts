@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createAppServices } from "../src/services/index.ts";
+import {
+  ApiOfflineError,
+  createAppServices,
+  createOidcClient,
+} from "../src/services/index.ts";
 import type { SessionRecord } from "@neurovision/domain";
 
 function assessmentTargets(session: SessionRecord, leftHits: number, rightHits: number) {
@@ -126,5 +130,127 @@ describe("service-layer end-to-end flow", () => {
       trendAfterPractice.trend.points.some((point) => point.sessionId === "e2e-live"),
       true,
     );
+  });
+
+  it("polls processing, exports, deletes, and completes OIDC against a mocked API, and stays offline when standalone", async () => {
+    const calls: string[] = [];
+    const states = ["pending", "ready"];
+    const oidcStorage = new Map<string, string>();
+    const oidc = createOidcClient({
+      config: {
+        authorizeUrl: "https://issuer.example.test/authorize",
+        tokenUrl: "https://issuer.example.test/token",
+        clientId: "neurovision-web",
+        redirectUri: "https://app.example.test/callback",
+        scope: "openid",
+      },
+      storage: {
+        getItem: (key) => oidcStorage.get(key) ?? null,
+        setItem: (key, value) => {
+          oidcStorage.set(key, value);
+        },
+        removeItem: (key) => {
+          oidcStorage.delete(key);
+        },
+      },
+      fetch: async () =>
+        new Response(JSON.stringify({ access_token: "e2e-token", token_type: "Bearer" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    });
+
+    const services = createAppServices({
+      now: () => new Date("2026-11-14T17:00:00.000Z"),
+      config: {
+        apiBaseUrl: "https://api.example.test",
+        standalone: false,
+        oidc: {
+          authorizeUrl: "https://issuer.example.test/authorize",
+          tokenUrl: "https://issuer.example.test/token",
+          clientId: "neurovision-web",
+          redirectUri: "https://app.example.test/callback",
+          scope: "openid",
+        },
+      },
+      oidc,
+      fetch: async (input, init) => {
+        const url = String(input);
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.endsWith("/health")) {
+          return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+        }
+        if (url.includes("/exports")) {
+          return new Response(JSON.stringify({ exportId: "e2e-export", bundle: { sessions: [] } }), {
+            status: 200,
+          });
+        }
+        if ((init?.method ?? "GET") === "DELETE") {
+          return new Response(
+            JSON.stringify({ participantId: "e2e-part", deleted: true, idempotent: false }),
+            { status: 200 },
+          );
+        }
+        const processing = states.shift() ?? "ready";
+        return new Response(
+          JSON.stringify({
+            id: "e2e-live",
+            participantId: "e2e-part",
+            assignmentId: "assign-1",
+            assignmentRevision: 1,
+            startedAt: "2026-11-14T17:00:00.000Z",
+            completion: "complete",
+            sync: "acknowledged",
+            processing,
+            sealed: true,
+            sessionRevision: 1,
+            inputHash: "hash",
+            processingDetail: {
+              state: processing,
+              retryable: false,
+              lastError: null,
+              jobStatus: processing,
+            },
+          }),
+          { status: 200 },
+        );
+      },
+    });
+
+    const redirect = await services.beginOidcRedirect();
+    await services.completeOidcCallback(
+      `https://app.example.test/callback?code=e2e-code&state=${redirect.state}`,
+    );
+    assert.equal(services.getAccessToken(), "e2e-token");
+
+    assert.deepEqual(await services.health(), { status: "ok" });
+    const processed = await services.pollProcessingState("e2e-live", {
+      sleep: async () => undefined,
+    });
+    assert.equal(processed.terminal, true);
+    assert.equal(processed.processing, "ready");
+    const exported = await services.exportParticipant("e2e-part");
+    const deleted = await services.deleteParticipant("e2e-part");
+    assert.equal(exported.exportId, "e2e-export");
+    assert.equal(deleted.deleted, true);
+    assert.ok(calls.some((call) => call.includes("/health")));
+    assert.ok(calls.some((call) => call.includes("/api/v1/sessions/e2e-live")));
+    assert.ok(calls.some((call) => call.includes("/exports")));
+    assert.ok(calls.some((call) => call.startsWith("DELETE ")));
+
+    let standaloneCalls = 0;
+    const standalone = createAppServices({
+      standalone: true,
+      fetch: async () => {
+        standaloneCalls += 1;
+        throw new Error("standalone must not call fetch");
+      },
+    });
+    assert.equal(standalone.apiEnabled, false);
+    assert.equal(standalone.storeKind, "memory");
+    await assert.rejects(() => standalone.pollProcessingState("e2e-live"), ApiOfflineError);
+    await assert.rejects(() => standalone.exportParticipant("e2e-part"), ApiOfflineError);
+    await assert.rejects(() => standalone.deleteParticipant("e2e-part"), ApiOfflineError);
+    assert.equal(standaloneCalls, 0);
   });
 });

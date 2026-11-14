@@ -1,4 +1,12 @@
 import { parseSessionRecord, type SessionRecord } from "@neurovision/domain";
+import {
+  getBrowserKeyValueStore,
+  getPackageHistoryStoreFactory,
+  tryCreatePackageHistoryStore,
+  type KeyValueStore,
+  type PackageStoreFactory,
+} from "./package-store";
+import { isStandaloneRuntime } from "./runtime-config";
 
 /** Persistence used by the app service layer. */
 export interface HistoryStore {
@@ -8,9 +16,16 @@ export interface HistoryStore {
   list(): Promise<SessionRecord[]>;
 }
 
+export interface ResolveHistoryStoreOptions {
+  preferred?: HistoryStore;
+  standalone?: boolean;
+  keyValueStore?: KeyValueStore | null;
+  packageStoreFactory?: PackageStoreFactory | null;
+}
+
 /**
- * In-memory history. Used when `packages/storage` is not in the workspace,
- * and as the default store for tests and the standalone file.
+ * In-memory history. Fallback when `packages/storage` is not in the workspace,
+ * and the store used by the standalone file (no durable browser envelope).
  */
 export function createMemoryStore(): HistoryStore {
   const records = new Map<string, SessionRecord>();
@@ -43,6 +58,28 @@ export function guardedStore(store: HistoryStore): HistoryStore {
   };
 }
 
-export function resolveHistoryStore(preferred?: HistoryStore): HistoryStore {
-  return guardedStore(preferred ?? createMemoryStore());
+/**
+ * Default history store: the storage-package HistoryStore when that package
+ * is present and a key-value backend exists. Standalone builds and tests
+ * without the package fall back to in-memory.
+ */
+export function resolveHistoryStore(preferredOrOptions?: HistoryStore | ResolveHistoryStoreOptions): HistoryStore {
+  const options: ResolveHistoryStoreOptions =
+    preferredOrOptions && "save" in preferredOrOptions && "kind" in preferredOrOptions
+      ? { preferred: preferredOrOptions }
+      : (preferredOrOptions as ResolveHistoryStoreOptions | undefined) ?? {};
+
+  if (options.preferred) return guardedStore(options.preferred);
+
+  const standalone = options.standalone ?? isStandaloneRuntime();
+  if (standalone) return guardedStore(createMemoryStore());
+
+  const factory =
+    options.packageStoreFactory === undefined
+      ? getPackageHistoryStoreFactory()
+      : options.packageStoreFactory;
+  const kv =
+    options.keyValueStore === undefined ? getBrowserKeyValueStore() : options.keyValueStore;
+  const fromPackage = tryCreatePackageHistoryStore(kv ?? null, factory);
+  return guardedStore(fromPackage ?? createMemoryStore());
 }

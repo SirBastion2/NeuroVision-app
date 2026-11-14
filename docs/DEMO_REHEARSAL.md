@@ -51,5 +51,5 @@ Using a live session scored like `demo-left-omission`:
 ## 5. Close
 
 1. Reload a saved live session by id and show that `score` is unchanged.
-2. If `packages/storage` is absent, say that history is the in-memory store for this build; a package store is passed into `createAppServices({ store })` when present.
+2. If `packages/storage` is absent, say that history is the in-memory store for this build. When that package is present, `createAppServices()` defaults to its envelope HistoryStore; pass `{ store }` to override. The standalone file always uses in-memory history and makes no API calls.
 3. Leave the audience with the standalone file path from `docs/RELEASE_EVIDENCE.md`.

@@ -153,7 +153,7 @@ Imported records keep their original string separately:
 
 ## App service layer
 
-Screens talk to domain, gaze, and storage through `apps/web/src/services/` (`createAppServices`). The layer does not draw UI.
+Screens talk to domain, gaze, storage, and the HTTP API through `apps/web/src/services/` (`createAppServices`). The layer does not draw UI.
 
 | Method | Role |
 | --- | --- |
@@ -165,8 +165,50 @@ Screens talk to domain, gaze, and storage through `apps/web/src/services/` (`cre
 | `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
 | `loadGazeLabData` | Demonstration click sequence, two gaze streams, calibration report, plus simulated lab traces from `@neurovision/gaze` |
 | `configurePractice` / `startPracticeTrial` / `appendPracticeRound` / `reflectPractice` | Practice setup and `reflectPracticeRound` |
+| `health` / `uploadSession` / `uploadTrace` | Typed calls to the API health, session, and trace-upload routes |
+| `pollProcessingState` | Dashboard polling of processing state with exponential backoff; stops on `ready` or `failed` |
+| `exportParticipant` / `deleteParticipant` | Participant export bundle and confirmed delete |
+| `beginOidcRedirect` / `completeOidcCallback` / `getAccessToken` | Browser OIDC authorization-code + PKCE; access token stays in memory |
 
-`packages/storage` is optional. When it is present, pass its store into `createAppServices({ store })`. When it is absent, the layer uses `createMemoryStore()`.
+### History store
+
+The default store is `createPackageHistoryStore` from `@neurovision/storage` (the envelope HistoryStore, `kind: "package"`) when that package is in the workspace and a key-value backend such as `localStorage` is available. Pass a store into `createAppServices({ store })` to override. The standalone HTML build always uses `createMemoryStore()` (`kind: "memory"`). When `packages/storage` is not in the workspace, the Vite alias and tsconfig path resolve `@neurovision/storage` to `apps/web/src/services/storage-unavailable.ts`, and the default is in-memory.
+
+### HTTP API client
+
+`createApiClient` / `createAppServices` read `VITE_API_BASE_URL`. When that value is empty, or when the standalone build is active (`VITE_STANDALONE=true` or a `file:` page), the client is disabled and service methods throw `ApiOfflineError` without calling `fetch`.
+
+The client matches the routes `apps/api` is expected to expose. **Today `apps/api/src` only registers `GET /health`.** The other paths below are typed in the web client so the dashboard can call them once the API adds them; they are missing from the current API process.
+
+| Client method | Method and path | On `apps/api` today |
+| --- | --- | --- |
+| `health` | `GET /health` | Present |
+| `putSession` | `PUT /api/v1/sessions/:sessionId` | Missing |
+| `createTraceUpload` | `POST /api/v1/sessions/:sessionId/trace-uploads` | Missing |
+| `putTraceContent` | `PUT /api/v1/sessions/:sessionId/trace-uploads/:traceId/content` | Missing |
+| `getSession` / `getProcessingState` / `pollProcessingState` | `GET /api/v1/sessions/:sessionId` (processing field + `processingDetail`) | Missing (no dedicated processing-state route either) |
+| `exportParticipant` | `POST /api/v1/participants/:participantId/exports` | Missing |
+| `deleteParticipant` | `DELETE /api/v1/participants/:participantId` (`{ confirm: true }`) | Missing |
+
+`pollProcessingState` fetches immediately, then waits `initialDelayMs` (default 250ms) doubling each time up to `maxDelayMs` (default 4s) until `processing` is `ready` or `failed`.
+
+When an in-memory OIDC access token is present, requests send `Authorization: Bearer <token>`.
+
+### Browser OIDC (authorization code + PKCE)
+
+`apps/api` currently exposes no auth or OIDC routes. The helper is therefore configured entirely from Vite env:
+
+| Variable | Role |
+| --- | --- |
+| `VITE_OIDC_AUTHORIZE_URL` | Authorization endpoint (`response_type=code`, S256 PKCE) |
+| `VITE_OIDC_TOKEN_URL` | Token endpoint (`grant_type=authorization_code` + `code_verifier`) |
+| `VITE_OIDC_CLIENT_ID` | Public client id |
+| `VITE_OIDC_REDIRECT_URI` | Browser callback URL |
+| `VITE_OIDC_SCOPE` | Optional; default `openid` |
+
+The in-flight PKCE verifier and `state` are stored in `sessionStorage` (or an injected transaction store) so the redirect can complete. The access token is not written to storage. If those env values are unset, `beginOidcRedirect` / `buildAuthorizationUrl` throw `OidcConfigError`.
+
+If `apps/api` later adds cookie-based login (`/api/v1/auth/login` and `/api/v1/auth/callback`), keep this browser PKCE helper behind the Vite config above; do not mix the two token models in the service layer without an explicit choice.
 
 ## Standalone HTML build
 
@@ -176,5 +218,6 @@ Screens talk to domain, gaze, and storage through `apps/web/src/services/` (`cre
 - Output: `apps/web/dist/standalone/index.html`
 - All JavaScript and CSS are inlined; there are no external `script src` or `link href` URLs
 - The file opens from disk (`file:`) with no network requests
+- `VITE_STANDALONE` is `true` and `VITE_API_BASE_URL` is empty, so the service layer never calls the API
 
-`npm run verify` runs the production build, all package tests, and the service-layer e2e suite, then writes `docs/RELEASE_EVIDENCE.md`. Merge order for workstreams A–E is in `docs/MERGE_ORDER.md`. The demonstration walkthrough is in `docs/DEMO_REHEARSAL.md`.
+`npm run verify` runs the production build, all package tests, and the service-layer e2e suite, then writes `docs/RELEASE_EVIDENCE.md`. Merge order for workstreams A–F is in `docs/MERGE_ORDER.md`. The demonstration walkthrough is in `docs/DEMO_REHEARSAL.md`.
