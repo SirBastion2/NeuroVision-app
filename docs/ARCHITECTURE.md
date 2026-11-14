@@ -31,10 +31,12 @@ The UI work must match the supplied UI reference design (look, screens, and boar
 
 ```
 apps/web              React + Vite application (static / standalone HTML)
+apps/web/src/services Thin app service layer (session, scoring, history, fixtures)
 packages/domain       Versioned contracts, validation, scoring
 packages/storage      Browser storage, history, identity (Agent B)
 packages/gaze         Gaze streams, replay, calibration (Agent C)
-docs/                 This map and folder ownership
+docs/                 This map, ownership, merge order, demo rehearsal, release evidence
+scripts/              `npm run verify` and the standalone-file check
 ```
 
 `packages/storage` is owned by Agent B and is not created in the Agent A scaffold. `packages/gaze` is owned by Agent C (provider, calibration, quality gates, analysis, domain bridges).
@@ -47,7 +49,7 @@ docs/                 This map and folder ownership
 | B | Backend, browser storage, identity | `packages/storage`, storage adapters used by `apps/web` |
 | C | Gaze comparison, replay, calibration types consumption | `packages/gaze`, gaze lab wiring in `apps/web` |
 | D+E | Task runner and UI (must match the UI reference design) | `apps/web` screens, board, instructions, review, practice, history chrome |
-| F | Integration across tasks, scoring, storage, gaze, and delivery | Cross-package wiring, static / standalone HTML packaging |
+| F | Integration across tasks, scoring, storage, gaze, and delivery | `apps/web/src/services/`, static / standalone HTML packaging, `npm run verify` |
 
 Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session records must pass `parseSessionRecord` before they are written. Scoring and practice rules are pure functions with no DOM access.
 
@@ -61,3 +63,31 @@ Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session r
 - History charts call `areSessionsComparable` / `summarizeAssessmentTrend` (live assessment sessions only; practice and demonstration records are excluded from the trend).
 - Practice setup also calls `configurePracticeRound` (chosen cue, density, optional self-paced row marker) and `reflectPracticeRound` after a recorded round.
 - Gaze lab and history consume exported demonstration `SessionRecord`s (`DEMONSTRATION_SESSIONS`), `GAZE_LAB_CLICK_SEQUENCE`, `GAZE_LAB_STREAMS`, and `EXAMPLE_CALIBRATION_REPORT`.
+
+## App service layer
+
+Screens talk to domain, gaze, and storage through `apps/web/src/services/` (`createAppServices`). The layer does not draw UI.
+
+| Method | Role |
+| --- | --- |
+| `startSession` | Create a live assessment `SessionRecord` with the fixed target-selection layout and five line-bisection trials |
+| `recordClick` / `finishTrial` | Append a classified `ResponseEvent` and close a trial |
+| `completeSession` / `score` | Mark the record complete and run `scoreSession` |
+| `save` / `load` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write) |
+| `comparableHistory` | `summarizeAssessmentTrend` / `areSessionsComparable` over saved records |
+| `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
+| `loadGazeLabData` | Demonstration click sequence, two gaze streams, calibration report, plus simulated lab traces from `@neurovision/gaze` |
+| `configurePractice` / `startPracticeTrial` / `appendPracticeRound` / `reflectPractice` | Practice setup and `reflectPracticeRound` |
+
+`packages/storage` is optional. When it is present, pass its store into `createAppServices({ store })`. When it is absent, the layer uses `createMemoryStore()`.
+
+## Standalone HTML build
+
+`npm run build` runs the static Vite build and the single-file build. `npm run build:standalone` only emits the disk-openable file:
+
+- Config: `apps/web/vite.standalone.config.ts` (`vite-plugin-singlefile`)
+- Output: `apps/web/dist/standalone/index.html`
+- All JavaScript and CSS are inlined; there are no external `script src` or `link href` URLs
+- The file opens from disk (`file:`) with no network requests
+
+`npm run verify` runs the production build, all package tests, and the service-layer e2e suite, then writes `docs/RELEASE_EVIDENCE.md`. Merge order for workstreams A–E is in `docs/MERGE_ORDER.md`. The demonstration walkthrough is in `docs/DEMO_REHEARSAL.md`.
