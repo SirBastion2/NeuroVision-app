@@ -501,7 +501,6 @@ export function App() {
           <Home
             onStart={beginAssessment}
             onHistory={() => go("history")}
-            apiEnabled={apiEnabled}
             onDemo={() => go("demo")}
           />
         )}

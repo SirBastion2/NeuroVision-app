@@ -12,7 +12,6 @@ import { HOME_JOURNEY_STEPS } from "../lib/battery-labels";
 interface Props {
   onStart: () => void;
   onHistory: () => void;
-  apiEnabled?: boolean;
   onDemo?: () => void;
 }
 
@@ -48,7 +47,7 @@ function HeroBoard() {
   );
 }
 
-export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) {
+export function Home({ onStart, onHistory, onDemo }: Props) {
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
 
   return (
@@ -89,8 +88,6 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
-          <h2>Start an assessment</h2>
-
           {!supported && (
             <p className="notice warn" role="status">
               This window is smaller than 1024×768, so the session will be recorded with an “unsupported” screen class.
@@ -100,12 +97,6 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
             Begin assessment
             <span aria-hidden> →</span>
           </button>
-          <p className="fineprint">
-            Starry Night, hollow rings, then line bisection. A few minutes.{" "}
-            {apiEnabled
-              ? "Completed runs save to this participant ID when the server is reachable; this browser is the offline fallback."
-              : "Data stays in this browser."}
-          </p>
         </form>
 
         <div className="side-cards">
