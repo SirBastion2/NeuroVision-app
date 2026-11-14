@@ -12,7 +12,7 @@ describe("hosted Postgres connection strings", () => {
       "postgres://user:secret@example.test:5432/tsdb?uselibpqcompat=true&sslmode=require",
     );
     assert.equal(config.connectionString?.includes("uselibpqcompat"), false);
-    assert.equal(config.connectionString?.includes("sslmode=require"), true);
+    assert.equal(config.connectionString?.includes("sslmode"), false);
     assert.deepEqual(config.ssl, { rejectUnauthorized: false });
   });
 

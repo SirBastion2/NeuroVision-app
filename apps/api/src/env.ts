@@ -67,7 +67,11 @@ function stripUnknownParams(connectionString: string): { href: string; sslmode: 
     for (const [key, value] of url.searchParams) {
       const name = key.toLowerCase();
       if (name === "uselibpqcompat") continue;
-      if (name === "sslmode") sslmode = value.toLowerCase();
+      if (name === "sslmode") {
+        // Applied via config.ssl below; leaving it in the URL makes pg override that.
+        sslmode = value.toLowerCase();
+        continue;
+      }
       if (PG_QUERY_KEYS.has(name)) kept.set(key, value);
     }
     url.search = kept.toString();
