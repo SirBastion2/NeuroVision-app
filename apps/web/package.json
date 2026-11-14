@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
-    "preview": "vite preview"
+    "build": "tsc -p tsconfig.json && vite build && vite build --config vite.standalone.config.ts",
+    "build:standalone": "vite build --config vite.standalone.config.ts",
+    "preview": "vite preview",
+    "test": "tsx --test test/service.test.ts test/standalone.test.ts",
+    "test:e2e": "tsx --test test/e2e.test.ts"
   },
   "dependencies": {
     "@neurovision/domain": "*",
@@ -18,6 +21,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
-    "vite": "^6.3.4"
+    "vite": "^6.3.4",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }
