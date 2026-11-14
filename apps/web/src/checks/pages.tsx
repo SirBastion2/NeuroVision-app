@@ -17,6 +17,7 @@ import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
 import { TaskRunner } from "../components/TaskRunner";
+import { scoredBatteryName, scoredBatteryStep, SCORED_BATTERY, type ScoredBatteryTest } from "../lib/battery-labels";
 import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap, pct, points, seconds, signedPct } from "../lib/format";
 import { TIME_LIMIT_MS, createSession, newLineTrial, newTargetSelectionTrial, recordAssessmentTrial } from "../lib/session";
 import { LineIntro, TargetIntro } from "../screens/Intros";
@@ -39,14 +40,14 @@ const viewport = () => describeViewport(window.innerWidth, window.innerHeight, w
 /** Lets App switch on focus mode (no nav, theme locked) while a test is running. */
 export type RunningChange = (running: boolean) => void;
 
-export type BatteryTest = "starry" | "rings" | "lines";
+export type BatteryTest = ScoredBatteryTest;
 
 const TESTS: Record<BatteryTest, { name: string; hint: string }> = {
-  starry: { name: "Starry Night", hint: "Press Space or tap whenever a red dot appears." },
-  rings: { name: "Hollow rings", hint: "Select every hollow ring, leave the solid disks, then press Done." },
-  lines: { name: "Line bisection", hint: `Mark the middle of each line. ${LINE_BISECTION_TRIAL_COUNT} lines, one mark each.` },
+  starry: { name: scoredBatteryName("starry"), hint: "Press Space or tap whenever a red dot appears." },
+  rings: { name: scoredBatteryName("rings"), hint: "Select every hollow ring, leave the solid disks, then press Done." },
+  lines: { name: scoredBatteryName("lines"), hint: `Mark the middle of each line. ${LINE_BISECTION_TRIAL_COUNT} lines, one mark each.` },
 };
-const ORDER: BatteryTest[] = ["starry", "rings", "lines"];
+const ORDER: BatteryTest[] = SCORED_BATTERY.map((test) => test.id);
 
 type Step = { kind: "intro" } | { kind: "next"; test: BatteryTest } | { kind: "run"; test: BatteryTest } | { kind: "report" };
 
@@ -77,7 +78,7 @@ interface BatteryProps {
   onRunning: RunningChange;
   /** Called with the finished hollow-ring/line session (live runs only) so App can keep it in History. */
   onSave?: (session: SessionRecord) => void;
-  /** From the Home "Start assessment" form; defaults when opened from the nav. */
+  /** Signed-in participant ID; live runs store this as the session alias. */
   alias?: string;
   input?: InputModality;
   variant?: LayoutVariant;
@@ -98,7 +99,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
   useEffect(() => onRunning(running), [running, onRunning]);
   useEffect(() => () => onRunning(false), [onRunning]);
 
-  const position = (t: BatteryTest) => `${tests.indexOf(t) + 1} of ${tests.length}`;
+  const stepLabel = (t: BatteryTest) => (demo ? `Demo · ${scoredBatteryStep(t)}` : scoredBatteryStep(t));
 
   /** Moves past `done`: the next test's "up next" card, or the report after the last one. */
   const after = useCallback(
@@ -156,10 +157,10 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
   /* --- intro of the first test (full instructions, once) --- */
   if (step.kind === "intro") {
     const begin = () => setStep({ kind: "run", test: tests[0]! });
-    const label = `Test 1 of ${tests.length}`;
-    if (from === "starry") return <StarryIntro trials={starryTrials} step={demo ? `Demo · ${label}` : label} onBegin={begin} onCancel={onHome} />;
-    if (from === "rings") return <TargetIntro input={session.input} step={label} onBegin={begin} onCancel={onHome} />;
-    return <LineIntro input={session.input} onBegin={begin} />;
+    const first = tests[0]!;
+    if (from === "starry") return <StarryIntro trials={starryTrials} step={stepLabel("starry")} onBegin={begin} onCancel={onHome} />;
+    if (from === "rings") return <TargetIntro input={session.input} step={stepLabel("rings")} onBegin={begin} onCancel={onHome} />;
+    return <LineIntro input={session.input} step={stepLabel(first)} onBegin={begin} />;
   }
 
   if (step.kind === "next")
@@ -169,7 +170,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
     return (
       <StarryTask
         trials={starryTrials}
-        eyebrow={`${demo ? "Demo · " : ""}Test ${position("starry")} · Starry Night`}
+        eyebrow={stepLabel("starry")}
         autoStart={demo}
         onFinish={(run) => {
           setStarry(run);
@@ -187,8 +188,8 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
         sessionId={session.id}
         trial={boardTrial}
         timeLimitMs={TIME_LIMIT_MS[rings ? "target-selection" : "line-bisection"]}
-        eyebrow={`Test ${position(step.test)} · ${rings ? "hollow rings" : `line ${lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}`}
-        title={rings ? "Select every hollow ring" : "Mark the middle of the line"}
+        eyebrow={stepLabel(step.test)}
+        title={rings ? "Select every hollow ring" : `Mark the middle of line ${lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
         instruction={rings ? "Leave the solid disks. Press Done when finished." : "One mark. No accuracy feedback."}
         onFinish={onBoardTrial}
       />
@@ -233,7 +234,6 @@ function CombinedReport({
   const tsTrial = findTargetSelectionTrial(session);
   const lineTrials = session.trials.filter((t) => t.task === "line-bisection");
   const lb = result.lineBisection;
-  const n = (t: BatteryTest) => tests.indexOf(t) + 1;
 
   return (
     <div className="check-page demo-summary">
@@ -265,7 +265,7 @@ function CombinedReport({
       </section>
 
       {sky && starry && (
-        <StarryResult trials={starryTrials} responses={starry.responses} presses={starry.presses} eyebrow={`Test ${n("starry")} · Starry Night`} />
+        <StarryResult trials={starryTrials} responses={starry.responses} presses={starry.presses} eyebrow={scoredBatteryStep("starry")} />
       )}
 
       {tests.includes("rings") &&
@@ -273,7 +273,7 @@ function CombinedReport({
           <>
             <section className="verdict card">
               <div className="verdict-text">
-                <Eyebrow plain>Test {n("rings")} · Hollow rings</Eyebrow>
+                <Eyebrow plain>{scoredBatteryStep("rings")}</Eyebrow>
                 <h2>
                   {ts.hits} of {ts.available} rings found
                 </h2>
@@ -308,7 +308,7 @@ function CombinedReport({
       {tests.includes("lines") && (
         <section className="card">
           <div className="card-head">
-            <h3>Test {n("lines")} · Line bisection</h3>
+            <h3>{scoredBatteryStep("lines")}</h3>
             <span className="small">
               Median {signedPct(lb.signedMedian)} · absolute {signedPct(lb.absoluteMedian).replace("+", "")} · {lb.validCount} of {LINE_BISECTION_TRIAL_COUNT} valid
             </span>

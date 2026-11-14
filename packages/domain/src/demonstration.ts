@@ -1,15 +1,7 @@
 import { classifyResponse, type ResponseEvent } from "./events.js";
 import type { CalibrationQualityReport, GazeSample, GazeStream } from "./gaze.js";
-import {
-  createLineBisectionLayout,
-  createTargetSelectionLayout,
-  lineLength,
-  lineMidpoint,
-} from "./layouts.js";
-import { scoreSession } from "./scoring.js";
-import type { SessionRecord, TrialRecord, Viewport } from "./session.js";
-import { parseSessionRecord } from "./validate.js";
-import { PROTOCOL_ID, SCORER_ID } from "./version.js";
+import { createTargetSelectionLayout } from "./layouts.js";
+import type { TrialRecord, Viewport } from "./session.js";
 
 const VIEWPORT: Viewport = {
   width: 1280,
@@ -18,7 +10,6 @@ const VIEWPORT: Viewport = {
   class: "desktop-960",
 };
 
-const BISECTION_OFFSETS = [0, 0, 0, 0, 0] as const;
 const SAMPLE_MS = 100;
 const GAZE_DURATION_MS = 22_000;
 export const GAZE_LAB_TRACKING_GAPS = [
@@ -77,69 +68,6 @@ function targetTrial(sessionId: string, leftHits: number, rightHits: number): Tr
   return trial;
 }
 
-function lineTrial(sessionId: string, index: number, offsetRatio: number): TrialRecord {
-  const { layout, line } = createLineBisectionLayout(index);
-  const trial: TrialRecord = {
-    id: `${sessionId}-line-${index}`,
-    task: "line-bisection",
-    layout,
-    line,
-    events: [],
-    duration: 2000 + index * 200,
-    end: "done",
-    input: "mouse-trackpad",
-    viewport: VIEWPORT,
-  };
-  const x = lineMidpoint(line) + lineLength(line) * offsetRatio;
-  trial.events.push(
-    classifyResponse({
-      sessionId,
-      trialId: trial.id,
-      task: trial.task,
-      layout,
-      line,
-      existing: trial.events,
-      point: { x, y: line.y },
-      elapsed: 1000 + index * 200,
-    }),
-  );
-  return trial;
-}
-
-function demonstrationSession(id: string, alias: string, leftHits: number, rightHits: number, startedAt: string): SessionRecord {
-  const target = targetTrial(id, leftHits, rightHits);
-  const lines = BISECTION_OFFSETS.map((offset, index) => lineTrial(id, index, offset));
-  const session: SessionRecord = {
-    id,
-    profileId: "demonstration",
-    alias,
-    source: "demonstration",
-    protocol: PROTOCOL_ID,
-    scorer: SCORER_ID,
-    taskIds: ["target-selection", "line-bisection"],
-    status: "complete",
-    input: "mouse-trackpad",
-    viewport: VIEWPORT,
-    startedAt,
-    completedAt: new Date(Date.parse(startedAt) + 120_000).toISOString(),
-    trials: [target, ...lines],
-    practice: [],
-    decision: {
-      version: "practice-v1",
-      cue: "none",
-      density: "standard",
-      level: 0,
-      explanation: "",
-      metrics: null,
-      override: null,
-    },
-    pointerSampling: false,
-    calibration: EXAMPLE_CALIBRATION_REPORT,
-  };
-  session.decision = scoreSession(session).practice;
-  return parseSessionRecord(session);
-}
-
 function inGap(elapsed: number): boolean {
   return GAZE_LAB_TRACKING_GAPS.some((gap) => elapsed >= gap.start && elapsed < gap.end);
 }
@@ -176,38 +104,8 @@ export const EXAMPLE_CALIBRATION_REPORT: CalibrationQualityReport = {
   averageErrorPx: 16.5,
 };
 
-export const DEMONSTRATION_BALANCED = demonstrationSession(
-  "demo-balanced",
-  "Balanced pattern",
-  10,
-  10,
-  "2026-11-14T15:00:00.000Z",
-);
-
-export const DEMONSTRATION_LEFT_OMISSION = demonstrationSession(
-  "demo-left-omission",
-  "Left-omission pattern",
-  6,
-  12,
-  "2026-11-14T15:05:00.000Z",
-);
-
-export const DEMONSTRATION_RIGHT_OMISSION = demonstrationSession(
-  "demo-right-omission",
-  "Right-omission pattern",
-  12,
-  6,
-  "2026-11-14T15:10:00.000Z",
-);
-
-export const DEMONSTRATION_SESSIONS: readonly SessionRecord[] = [
-  DEMONSTRATION_BALANCED,
-  DEMONSTRATION_LEFT_OMISSION,
-  DEMONSTRATION_RIGHT_OMISSION,
-];
-
 export const GAZE_LAB_CLICK_SEQUENCE: readonly ResponseEvent[] = [
-  ...(DEMONSTRATION_BALANCED.trials[0]?.events ?? []),
+  ...targetTrial("demo-balanced", 10, 10).events,
 ];
 
 export const GAZE_LAB_STREAMS: readonly [GazeStream, GazeStream] = [

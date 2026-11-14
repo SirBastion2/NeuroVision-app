@@ -22,18 +22,13 @@ function assessmentTargets(session: SessionRecord, leftHits: number, rightHits: 
 }
 
 describe("service-layer end-to-end flow", () => {
-  it("loads demonstration data, then starts, scores, saves, reloads, compares, and reflects a live session", async () => {
+  it("starts, scores, saves, reloads, compares, and reflects a live session", async () => {
     const services = createAppServices({
       now: () => new Date("2026-11-14T17:00:00.000Z"),
     });
 
-    const demonstrations = services.loadDemonstrationSessions();
-    assert.equal(demonstrations.length, 3);
-    const demoKinds = demonstrations.map((session) => services.score(session).spatialPattern.kind);
-    assert.deepEqual(demoKinds, ["balanced", "left-omission", "right-omission"]);
     const gaze = services.loadGazeLabData();
     assert.equal(gaze.streams.length, 2);
-    await services.seedDemonstrationHistory();
 
     let live = services.startSession({
       id: "e2e-live",
@@ -99,10 +94,7 @@ describe("service-layer end-to-end flow", () => {
       history.trend.points.map((point) => point.sessionId),
       ["e2e-live", "e2e-live-2"],
     );
-    assert.equal(
-      history.trend.excluded.some((item) => item.sessionId === demonstrations[0]?.id && item.reason === "demonstration"),
-      true,
-    );
+    assert.equal(history.trend.excluded.length, 0);
 
     const { trial: practiceTrial, setup } = services.startPracticeTrial(reloaded, {
       cue: scored.practice.cue,

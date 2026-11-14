@@ -4,7 +4,6 @@ import {
   CONTRACTS_VERSION,
   createLineBisectionLayout,
   createTargetSelectionLayout,
-  DEMONSTRATION_SESSIONS,
   EXAMPLE_CALIBRATION_REPORT,
   GAZE_LAB_CLICK_SEQUENCE,
   GAZE_LAB_FIXTURE,
@@ -142,8 +141,6 @@ export interface AppServices {
   sessionActivity(): Promise<Array<{ bucket: string; count: number }>>;
   comparableHistory(sessions?: readonly SessionRecord[]): Promise<ComparableHistory>;
   sessionsComparable(a: SessionRecord, b: SessionRecord): boolean;
-  loadDemonstrationSessions(): readonly SessionRecord[];
-  seedDemonstrationHistory(): Promise<SessionRecord[]>;
   loadGazeLabData(): GazeLabData;
   configurePractice(choice: PracticeChoice, suggested?: PracticeSuggestion | null): PracticeRoundSetup;
   startPracticeTrial(session: SessionRecord, choice: PracticeChoice): { trial: TrialRecord; setup: PracticeRoundSetup };
@@ -433,17 +430,6 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     },
 
     sessionsComparable: areSessionsComparable,
-
-    loadDemonstrationSessions() {
-      return DEMONSTRATION_SESSIONS;
-    },
-
-    async seedDemonstrationHistory() {
-      for (const session of DEMONSTRATION_SESSIONS) {
-        await store.save(session);
-      }
-      return store.list();
-    },
 
     loadGazeLabData() {
       return {

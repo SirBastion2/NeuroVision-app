@@ -58,7 +58,7 @@ function drawDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
 export function StarryIntro({ trials, step, onBegin, onCancel }: { trials: StarryTrial[]; step: string; onBegin: () => void; onCancel: () => void }) {
   return (
     <section className="intro card narrow">
-      <Eyebrow>{step} · Starry Night</Eyebrow>
+      <Eyebrow>{step}</Eyebrow>
       <h1>Catch the red star</h1>
       <p className="lede">
         A night sky full of green dots that blink on and off. Every few seconds one <strong className="starry-red">red dot</strong> flashes

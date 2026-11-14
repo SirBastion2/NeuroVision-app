@@ -14,7 +14,7 @@ export function showApiControls(apiEnabled: boolean): boolean {
   return apiEnabled;
 }
 
-/** Gaze lab is a demonstration surface and is never persisted. */
+/** Live assessments persist; demonstration runs do not. */
 export function shouldPersistSession(session: SessionRecord | null): boolean {
   return Boolean(session && session.source === "live");
 }

@@ -1,6 +1,7 @@
 import { LINE_BISECTION_TRIAL_COUNT, type InputModality } from "@neurovision/domain";
 import { Disk, Ring } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
+import { scoredBatteryStep } from "../lib/battery-labels";
 import { TIME_LIMIT_MS } from "../lib/session";
 
 const HOW: Record<InputModality, string> = {
@@ -9,10 +10,20 @@ const HOW: Record<InputModality, string> = {
   keyboard: "Move the cursor with the arrow keys and press Enter on",
 };
 
-export function TargetIntro({ input, step = "Task 1 of 2", onBegin, onCancel }: { input: InputModality; step?: string; onBegin: () => void; onCancel: () => void }) {
+export function TargetIntro({
+  input,
+  step = scoredBatteryStep("rings"),
+  onBegin,
+  onCancel,
+}: {
+  input: InputModality;
+  step?: string;
+  onBegin: () => void;
+  onCancel: () => void;
+}) {
   return (
     <section className="intro card narrow">
-      <Eyebrow>{step} · Target selection</Eyebrow>
+      <Eyebrow>{step}</Eyebrow>
       <h1>Find every hollow ring</h1>
       <div className="legend">
         <figure>
@@ -50,10 +61,18 @@ export function TargetIntro({ input, step = "Task 1 of 2", onBegin, onCancel }: 
   );
 }
 
-export function LineIntro({ input, onBegin }: { input: InputModality; onBegin: () => void }) {
+export function LineIntro({
+  input,
+  step = scoredBatteryStep("lines"),
+  onBegin,
+}: {
+  input: InputModality;
+  step?: string;
+  onBegin: () => void;
+}) {
   return (
     <section className="intro card narrow">
-      <Eyebrow>Task 2 of 2 · Line bisection</Eyebrow>
+      <Eyebrow>{step}</Eyebrow>
       <h1>Mark the middle of each line</h1>
       <svg className="line-example" viewBox="0 0 300 60" aria-hidden>
         <line x1={30} x2={270} y1={30} y2={30} className="bisection-line" />

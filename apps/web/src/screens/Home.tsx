@@ -2,18 +2,15 @@ import { useMemo, useState } from "react";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  DEMONSTRATION_SESSIONS,
   INPUT_MODALITIES,
   createTargetSelectionLayout,
-  scoreSession,
   viewportClass,
   type InputModality,
   type LayoutVariant,
-  type SessionRecord,
 } from "@neurovision/domain";
 import { STIMULUS_RADIUS } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
-import { SessionThumb } from "../components/SessionThumb";
+import { HOME_JOURNEY_STEPS } from "../lib/battery-labels";
 
 const INPUT_LABELS: Record<InputModality, string> = {
   "mouse-trackpad": "Mouse or trackpad",
@@ -22,15 +19,10 @@ const INPUT_LABELS: Record<InputModality, string> = {
 };
 
 interface Props {
-  onStart: (alias: string, input: InputModality, variant: LayoutVariant) => void;
-  onOpen: (session: SessionRecord) => void;
+  onStart: (input: InputModality, variant: LayoutVariant) => void;
   onHistory: () => void;
   onProfile: () => void;
-  onGaze: () => void;
-  showBattery?: boolean;
   apiEnabled?: boolean;
-  onBattery?: () => void;
-  onStarry?: () => void;
   onDemo?: () => void;
 }
 
@@ -66,26 +58,7 @@ function HeroBoard() {
   );
 }
 
-const STEPS = [
-  ["01", "Target selection", "Find hollow rings among solid disks on a fixed board."],
-  ["02", "Line bisection", "Mark the centre of five lines. No feedback."],
-  ["03", "Review", "See what was found, what was missed, and where."],
-  ["04", "Practice", "An explained cue suggestion, then up to three rounds."],
-] as const;
-
-export function Home({
-  onStart,
-  onOpen,
-  onHistory,
-  onProfile,
-  onGaze,
-  showBattery = false,
-  apiEnabled = false,
-  onBattery,
-  onStarry,
-  onDemo,
-}: Props) {
-  const [alias, setAlias] = useState("");
+export function Home({ onStart, onHistory, onProfile, apiEnabled = false, onDemo }: Props) {
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
@@ -101,7 +74,7 @@ export function Home({
             <em>and where it doesn’t.</em>
           </h1>
           <p className="lede">
-            Two short board tasks record every response in space and time. The review shows what was found, what was
+            Three short tasks record every response in space and time. The review shows what was found, what was
             missed, and on which side, then suggests a practice setup you can read and overrule.
           </p>
           <p className="fineprint">Research tool. Describes one session’s responses; it is not a diagnosis.</p>
@@ -110,7 +83,7 @@ export function Home({
       </section>
 
       <ol className="journey">
-        {STEPS.map(([n, title, text]) => (
+        {HOME_JOURNEY_STEPS.map(({ n, title, text }) => (
           <li key={n}>
             <span className="journey-n">{n}</span>
             <strong>{title}</strong>
@@ -124,16 +97,11 @@ export function Home({
           className="card start-card"
           onSubmit={(e) => {
             e.preventDefault();
-            onStart(alias, input, variant);
+            onStart(input, variant);
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
           <h2>Start an assessment</h2>
-          <label className="field">
-            <span>Participant alias</span>
-            <input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="e.g. P-014" autoComplete="off" maxLength={40} />
-            <small>Use a pseudonym. Do not enter real names or clinical details.</small>
-          </label>
 
           <fieldset className="field">
             <legend>Input</legend>
@@ -193,34 +161,6 @@ export function Home({
               →
             </span>
           </button>
-          <button className="card link-card" onClick={onGaze}>
-            <Eyebrow plain>Gaze lab</Eyebrow>
-            <h3>Same clicks, different looking</h3>
-            <p>Replay two simulated gaze streams against one click sequence.</p>
-            <span className="link-arrow" aria-hidden>
-              →
-            </span>
-          </button>
-          {showBattery && onBattery && (
-            <button className="card link-card" onClick={onBattery}>
-              <Eyebrow plain>Spatial battery</Eyebrow>
-              <h3>Clock, greyscales, and lines</h3>
-              <p>A combined reading against the healthy range. Scene search is skipped until that screen is ready.</p>
-              <span className="link-arrow" aria-hidden>
-                →
-              </span>
-            </button>
-          )}
-          {onStarry && (
-            <button className="card link-card" onClick={onStarry}>
-              <Eyebrow plain>Starry Night</Eyebrow>
-              <h3>Detection among flashing dots</h3>
-              <p>Press whenever a red dot flashes among blinking green ones, then hollow rings and lines.</p>
-              <span className="link-arrow" aria-hidden>
-                →
-              </span>
-            </button>
-          )}
           {onDemo && (
             <button className="card link-card" onClick={onDemo}>
               <Eyebrow plain>Demo run</Eyebrow>
@@ -231,34 +171,6 @@ export function Home({
               </span>
             </button>
           )}
-        </div>
-      </section>
-
-      <section className="demos">
-        <div className="section-head">
-          <div>
-            <Eyebrow plain>Demonstration sessions</Eyebrow>
-            <h2>Three patterns, read at a glance</h2>
-          </div>
-          <p className="small">Built-in examples, always labelled as demonstration. They never enter the trend.</p>
-        </div>
-        <div className="demo-grid">
-          {DEMONSTRATION_SESSIONS.map((s) => {
-            const ts = scoreSession(s).targetSelection;
-            return (
-              <button key={s.id} className="card demo-card" onClick={() => onOpen(s)}>
-                <SessionThumb session={s} />
-                <div className="demo-meta">
-                  <strong>{s.alias}</strong>
-                  {ts && (
-                    <span>
-                      Left {ts.left.hits}/{ts.left.available} · Right {ts.right.hits}/{ts.right.available}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
         </div>
       </section>
     </div>

@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 import {
-  DEMONSTRATION_SESSIONS,
   scoreSession,
   sessionSourceLabel,
   summarizeAssessmentTrend,
-  type BatteryRecord,
   type SessionRecord,
   type TrendExclusionReason,
 } from "@neurovision/domain";
@@ -18,10 +16,8 @@ import type { UploadQueueState } from "../services/upload-queue";
 
 interface Props {
   stored: LoadResult;
-  batteries?: BatteryRecord[];
   activity?: Array<{ bucket: string; count: number }>;
   onOpen: (session: SessionRecord) => void;
-  onOpenBattery?: (record: BatteryRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
   onClinicianDashboard?: () => void;
@@ -42,10 +38,8 @@ const EXCLUDED: Record<TrendExclusionReason, string> = {
 
 export function History({
   stored,
-  batteries = [],
   activity = [],
   onOpen,
-  onOpenBattery,
   onDelete,
   onHome,
   onClinicianDashboard,
@@ -56,30 +50,33 @@ export function History({
   onExport,
   onDeleteParticipant,
 }: Props) {
-  const [showDemo, setShowDemo] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [confirmParticipant, setConfirmParticipant] = useState(false);
   const apiControls = showApiControls(apiEnabled);
 
+  const liveSessions = useMemo(
+    () => stored.sessions.filter((s) => s.source !== "demonstration"),
+    [stored.sessions],
+  );
   const profiles = useMemo(() => {
     const map = new Map<string, string>();
-    for (const s of stored.sessions) map.set(s.profileId, s.alias);
+    for (const s of liveSessions) map.set(s.profileId, s.alias);
     return [...map.entries()];
-  }, [stored.sessions]);
+  }, [liveSessions]);
   const [profile, setProfile] = useState<string | null>(null);
   const activeProfile = profile && profiles.some(([id]) => id === profile) ? profile : (profiles[0]?.[0] ?? null);
 
   // The domain decides which live sessions share a trend; the UI only picks the participant.
   const trend = useMemo(
-    () => summarizeAssessmentTrend(stored.sessions.filter((s) => s.profileId === activeProfile)),
-    [stored.sessions, activeProfile],
+    () => summarizeAssessmentTrend(liveSessions.filter((s) => s.profileId === activeProfile)),
+    [liveSessions, activeProfile],
   );
   const excluded = new Map(trend.excluded.map((e) => [e.sessionId, e.reason]));
   const included = new Set(trend.points.map((p) => p.sessionId));
 
   const rows = useMemo(
-    () => [...stored.sessions, ...(showDemo ? DEMONSTRATION_SESSIONS : [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
-    [stored.sessions, showDemo],
+    () => [...liveSessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+    [liveSessions],
   );
 
   const trendCell = (s: SessionRecord) => {
@@ -171,10 +168,6 @@ export function History({
       <section className="card pad-0">
         <div className="card-head">
           <h3>All sessions</h3>
-          <label className="check">
-            <input type="checkbox" checked={showDemo} onChange={(e) => setShowDemo(e.target.checked)} />
-            Show demonstrations
-          </label>
         </div>
         <div className="table-scroll">
           <table className="sessions">
@@ -281,45 +274,6 @@ export function History({
         )}
         <button onClick={onHome}>Home</button>
       </div>
-
-      {batteries.length > 0 && (
-        <section className="card pad-0">
-          <div className="card-head">
-            <h3>Battery runs</h3>
-            <span className="small">Full battery records from this browser and the server</span>
-          </div>
-          <div className="table-scroll">
-            <table className="sessions">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Mode</th>
-                  <th>Source</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {batteries.map((record) => (
-                  <tr key={record.id}>
-                    <td>{dateTime(record.completedAt)}</td>
-                    <td>{record.mode === "full" ? "Full battery" : "Demo"}</td>
-                    <td>
-                      <span className={`badge ${record.source}`}>{sessionSourceLabel(record.source)}</span>
-                    </td>
-                    <td className="row-actions">
-                      {onOpenBattery ? (
-                        <button type="button" onClick={() => onOpenBattery(record)}>
-                          Open
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
     </div>
   );
 }

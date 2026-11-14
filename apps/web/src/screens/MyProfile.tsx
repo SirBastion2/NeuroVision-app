@@ -21,10 +21,6 @@ export function MyProfile({ sessions, onHome, onHistory, onOpen, onClinicianDash
     () => sessions.filter((session) => session.source === "live").slice().reverse(),
     [sessions],
   );
-  const demos = useMemo(
-    () => sessions.filter((session) => session.source === "demonstration"),
-    [sessions],
-  );
   const latest = live[0] ?? null;
   const alias = latest?.alias ?? "No live assessments yet";
 
@@ -34,13 +30,10 @@ export function MyProfile({ sessions, onHome, onHistory, onOpen, onClinicianDash
         <div>
           <Eyebrow>My Profile</Eyebrow>
           <h1>{alias}</h1>
-          <p className="meta">
-            Patient view · sessions stay in this browser · demonstration records stay labeled separately
-          </p>
+          <p className="meta">Patient view · sessions stay in this browser</p>
         </div>
         <div className="badges">
           <span className="badge live">{live.length} live</span>
-          <span className="badge demonstration">{demos.length} demonstration</span>
         </div>
       </header>
 
@@ -116,34 +109,6 @@ export function MyProfile({ sessions, onHome, onHistory, onOpen, onClinicianDash
           </ul>
         )}
       </section>
-
-      {demos.length > 0 ? (
-        <section className="my-profile-list" aria-labelledby="my-demo-title">
-          <div className="section-head">
-            <div>
-              <Eyebrow plain>Demonstration</Eyebrow>
-              <h2 id="my-demo-title">Labeled demo records in this browser</h2>
-            </div>
-          </div>
-          <p className="small">
-            These are not patient-recorded assessments. They remain marked as demonstration in History and the
-            clinician dashboard.
-          </p>
-          <ul className="my-profile-sessions">
-            {demos.map((session) => (
-              <li key={session.id}>
-                <button type="button" className="card link-card my-session-card" onClick={() => onOpen(session)}>
-                  <div>
-                    <strong>{session.alias}</strong>
-                    <span className={`badge ${session.source}`}>{sessionSourceLabel(session.source)}</span>
-                  </div>
-                  <p>{dateTime(session.completedAt || session.startedAt)}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
     </div>
   );
 }

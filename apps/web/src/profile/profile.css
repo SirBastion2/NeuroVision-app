@@ -20,13 +20,10 @@
 
 .clinician-band,
 .patient-summary,
-.demo-patient-bar,
 .session-rail,
 .profile-main,
-.gaze-card,
 .practice-result,
 .spatial-board,
-.gaze-attention,
 .report-card,
 .empty-state {
   background: color-mix(in srgb, #fff 82%, var(--ivory));
@@ -115,27 +112,6 @@
   background: #fff;
   border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
   border-radius: 0.45rem;
-}
-
-.demo-patient-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: center;
-  padding: 0.75rem 0.9rem;
-}
-
-.demo-patient-label {
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--brass);
-  font-weight: 700;
-}
-
-.demo-patient-bar button {
-  min-width: 2.4rem;
-  font-weight: 700;
 }
 
 .patient-summary {
@@ -319,8 +295,7 @@
   text-decoration: underline;
 }
 
-.spatial-board,
-.gaze-attention {
+.spatial-board {
   padding: 0.75rem;
 }
 
@@ -328,8 +303,7 @@
   color: color-mix(in srgb, var(--graphite) 65%, transparent);
 }
 
-.spatial-board figcaption,
-.gaze-attention figcaption {
+.spatial-board figcaption {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -340,21 +314,13 @@
   align-items: center;
 }
 
-.gaze-attention figcaption > div {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .spatial-caption {
   font-weight: 400;
   color: color-mix(in srgb, var(--graphite) 65%, transparent);
   font-size: 0.85rem;
 }
 
-.spatial-board svg,
-.gaze-attention svg {
+.spatial-board svg {
   width: 100%;
   height: auto;
   background: #fbfaf6;
@@ -364,14 +330,6 @@
 .board-frame {
   fill: #fbfaf6;
   stroke: color-mix(in srgb, var(--forest) 25%, transparent);
-}
-
-.gaze-half.left {
-  fill: color-mix(in srgb, var(--forest) 6%, transparent);
-}
-
-.gaze-half.right {
-  fill: color-mix(in srgb, var(--brass) 10%, transparent);
 }
 
 .midline {
@@ -396,35 +354,6 @@
 
 .spatial-board .distractor {
   fill: color-mix(in srgb, var(--brass) 55%, #fff);
-}
-
-.gaze-dot {
-  opacity: 0.55;
-}
-
-.gaze-dot.left {
-  fill: var(--forest);
-}
-
-.gaze-dot.right {
-  fill: var(--brass);
-}
-
-.gaze-share {
-  display: flex;
-  height: 0.55rem;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 0.65rem;
-  background: var(--mist);
-}
-
-.gaze-share-left {
-  background: var(--forest);
-}
-
-.gaze-share-right {
-  background: var(--brass);
 }
 
 .spatial-legend {

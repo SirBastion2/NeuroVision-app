@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-  DEMONSTRATION_SESSIONS,
   classifyResponse,
   configurePracticeRound,
   isSessionRecord,
@@ -23,6 +22,7 @@ import {
   nextPracticeConfig,
   profileIdFor,
   recordAssessmentTrial,
+  sessionAliasForParticipant,
 } from "../src/lib/session.ts";
 
 const VP: Viewport = { width: 1280, height: 900, dpr: 1, class: "desktop-960" };
@@ -60,6 +60,11 @@ describe("session building", () => {
     assert.equal(isSessionRecord(fresh()), true);
     assert.equal(profileIdFor("  Demo A! "), "demo-a");
     assert.equal(profileIdFor(""), "anonymous");
+    assert.equal(sessionAliasForParticipant(null), "");
+    assert.equal(sessionAliasForParticipant("P-014"), "P-014");
+    const unnamed = createSession({ alias: "", input: "mouse-trackpad", viewport: VP });
+    assert.equal(unnamed.alias, "Anonymous");
+    assert.equal(unnamed.profileId, "anonymous");
   });
 
   test("a full run completes after five lines and carries the domain practice suggestion", () => {
@@ -117,49 +122,16 @@ describe("flow", () => {
     assert.equal(st.screen, "practice-reflection");
     assert.equal(st.session!.practice.length, 1);
   });
-
-  test("battery start walks intro config into the run, then results", () => {
-    let st = flowReducer(initialFlow, {
-      type: "battery-start",
-      config: { mode: "demo", hide: "left", seed: 11, readingDirection: null, consent: false },
-    });
-    assert.equal(st.screen, "battery-run");
-    assert.equal(st.batteryConfig?.mode, "demo");
-    st = flowReducer(st, {
-      type: "battery-finished",
-      record: {
-        contract: "battery-1.0.0",
-        id: "b-test",
-        mode: "demo",
-        hide: "left",
-        seed: 11,
-        readingDirection: null,
-        consent: false,
-        source: "demonstration",
-        startedAt: "2026-11-14T12:00:00.000Z",
-        completedAt: "2026-11-14T12:04:00.000Z",
-        scene: { taps: [] },
-        clock: { trials: [], responses: [] },
-        greyscales: null,
-        bisection: null,
-        normsUsed: {},
-      },
-    });
-    assert.equal(st.screen, "battery-results");
-    assert.equal(st.batteryRecord?.id, "b-test");
-    st = flowReducer(st, { type: "home" });
-    assert.equal(st.screen, "home");
-    assert.equal(st.batteryRecord, null);
-  });
 });
 
 describe("history", () => {
   test("live sessions form the trend; demonstrations never do", () => {
     const a = fullSession(6, 12, "a", "2026-11-01T10:00:00Z");
     const b = fullSession(10, 12, "b", "2026-11-08T10:00:00Z");
-    const trend = summarizeAssessmentTrend([b, a, ...DEMONSTRATION_SESSIONS]);
+    const demo = { ...fullSession(10, 10, "demo-1", "2026-11-04T10:00:00Z"), source: "demonstration" as const };
+    const trend = summarizeAssessmentTrend([b, a, demo]);
     assert.deepEqual(trend.points.map((p) => p.sessionId), ["a", "b"]);
-    assert.equal(trend.excluded.filter((e) => e.reason === "demonstration").length, DEMONSTRATION_SESSIONS.length);
+    assert.equal(trend.excluded.filter((e) => e.reason === "demonstration").length, 1);
   });
 });
 

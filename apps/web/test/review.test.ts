@@ -2,12 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  BOARD_WIDTH,
-  DEMONSTRATION_SESSIONS,
-  findTargetSelectionTrial,
-  scoreSession,
-} from "@neurovision/domain";
+import { BOARD_WIDTH, findTargetSelectionTrial, scoreSession } from "@neurovision/domain";
+import { makeSession } from "../../../packages/domain/test/session-factory.ts";
 import { ResponseOrderPlot } from "../src/components/ResponseOrderPlot.tsx";
 import { History } from "../src/screens/History.tsx";
 import { Review } from "../src/screens/Review.tsx";
@@ -22,7 +18,12 @@ import {
   wrongTapsHint,
 } from "../src/lib/format.ts";
 
-const session = DEMONSTRATION_SESSIONS[1]!;
+const session = makeSession({
+  id: "review-left",
+  alias: "Left-omission",
+  leftHits: 6,
+  rightHits: 12,
+});
 const trial = findTargetSelectionTrial(session)!;
 const score = scoreSession(session).targetSelection!;
 

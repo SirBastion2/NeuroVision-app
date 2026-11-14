@@ -102,7 +102,6 @@ describe("app service layer", () => {
     const services = createAppServices({
       now: () => new Date("2026-11-14T16:00:00.000Z"),
     });
-    await services.seedDemonstrationHistory();
     const first = fillHits(
       services,
       services.startSession({ id: "live-a", alias: "A", startedAt: "2026-11-14T16:00:00.000Z" }),
@@ -115,10 +114,17 @@ describe("app service layer", () => {
       6,
       12,
     );
+    const demo = {
+      ...first,
+      id: "demo-fixture",
+      source: "demonstration" as const,
+      alias: "Demo fixture",
+    };
     await services.save(first);
     await services.save(second);
+    await services.save(demo);
     const history = await services.comparableHistory();
-    assert.equal(history.sessions.length, 5);
+    assert.equal(history.sessions.length, 3);
     assert.equal(services.sessionsComparable(first, second), true);
     assert.deepEqual(
       history.trend.points.map((point) => point.sessionId),
@@ -126,18 +132,12 @@ describe("app service layer", () => {
     );
     assert.equal(
       history.trend.excluded.filter((item) => item.reason === "demonstration").length,
-      3,
+      1,
     );
   });
 
-  it("loads exported demonstration sessions and gaze-lab data", () => {
+  it("loads gaze-lab fixture data", () => {
     const services = createAppServices();
-    const demos = services.loadDemonstrationSessions();
-    assert.equal(demos.length, 3);
-    assert.deepEqual(
-      demos.map((session) => services.score(session).spatialPattern.kind),
-      ["balanced", "left-omission", "right-omission"],
-    );
     const gaze = services.loadGazeLabData();
     assert.equal(gaze.streams.length, 2);
     assert.ok(gaze.clicks.length >= 16);

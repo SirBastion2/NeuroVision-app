@@ -37,6 +37,11 @@ export function profileIdFor(alias: string): string {
   return slug || "anonymous";
 }
 
+/** Participant ID from sign-in; empty when nobody is signed in. */
+export function sessionAliasForParticipant(participantId: string | null | undefined): string {
+  return participantId?.trim() ?? "";
+}
+
 export interface NewSessionOptions {
   alias: string;
   input: InputModality;

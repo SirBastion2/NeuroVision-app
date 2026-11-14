@@ -1,12 +1,10 @@
 import type {
-  BatteryRecord,
   LayoutVariant,
   PracticeRoundSetup,
   PracticeSuggestion,
   SessionRecord,
   TrialRecord,
 } from "@neurovision/domain";
-import type { BatteryIntroConfig } from "../data/batterySession";
 import { addPracticeRound, recordAssessmentTrial } from "./session";
 
 export type Screen =
@@ -20,12 +18,8 @@ export type Screen =
   | "practice-task"
   | "practice-reflection"
   | "history"
-  | "gaze"
   | "my-profile"
   | "profile"
-  | "battery-intro"
-  | "battery-run"
-  | "battery-results"
   | "assessment"
   | "starry"
   | "scene"
@@ -46,8 +40,6 @@ export interface FlowState {
   nextSuggestion: PracticeSuggestion | null;
   /** True when line bisection was started on its own, without target selection first. */
   linesOnly: boolean;
-  batteryConfig: BatteryIntroConfig | null;
-  batteryRecord: BatteryRecord | null;
 }
 
 export type FlowAction =
@@ -59,9 +51,7 @@ export type FlowAction =
   | { type: "practice-configured"; setup: PracticeRoundSetup }
   | { type: "practice-finished"; trial: TrialRecord }
   | { type: "next-practice"; config: PracticeSuggestion }
-  | { type: "open"; session: SessionRecord }
-  | { type: "battery-start"; config: BatteryIntroConfig }
-  | { type: "battery-finished"; record: BatteryRecord };
+  | { type: "open"; session: SessionRecord };
 
 export const initialFlow: FlowState = {
   screen: "home",
@@ -72,8 +62,6 @@ export const initialFlow: FlowState = {
   practice: null,
   nextSuggestion: null,
   linesOnly: false,
-  batteryConfig: null,
-  batteryRecord: null,
 };
 
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
@@ -88,10 +76,6 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return { ...initialFlow, screen: "line-intro", session: action.session, linesOnly: true };
     case "open":
       return { ...initialFlow, screen: "review", session: action.session, ended: true };
-    case "battery-start":
-      return { ...initialFlow, screen: "battery-run", batteryConfig: action.config };
-    case "battery-finished":
-      return { ...state, screen: "battery-results", batteryRecord: action.record };
     case "trial-finished": {
       if (!state.session) return state;
       const { session, finished } = recordAssessmentTrial(state.session, action.trial);

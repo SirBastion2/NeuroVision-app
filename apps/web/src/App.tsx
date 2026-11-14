@@ -13,15 +13,18 @@ import { BatteryPage } from "./checks/pages";
 import { BrandMark, Wordmark } from "./components/Brand";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { TaskRunner } from "./components/TaskRunner";
-import { batteryEnabled, shouldPersistBattery } from "./data/batterySession";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
+import { scoredBatteryName, scoredBatteryStep } from "./lib/battery-labels";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
-import { TIME_LIMIT_MS, createSession, newLineTrial, newPracticeTrial, newTargetSelectionTrial } from "./lib/session";
+import {
+  TIME_LIMIT_MS,
+  createSession,
+  newLineTrial,
+  newPracticeTrial,
+  newTargetSelectionTrial,
+  sessionAliasForParticipant,
+} from "./lib/session";
 import { ProfileDashboard } from "./profile/ProfileDashboard";
-import { BatteryIntro } from "./screens/BatteryIntro";
-import { BatteryResults, serializeBatteryRecord } from "./screens/BatteryResults";
-import { BatteryRun } from "./screens/BatteryRun";
-import { GazeLab } from "./screens/GazeLab";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
@@ -46,7 +49,6 @@ import {
   type ProcessingSnapshot,
   type UploadQueueState,
 } from "./services";
-import type { BatteryRecord } from "@neurovision/domain";
 import "./styles.css";
 
 type Theme = "light" | "dark";
@@ -72,13 +74,13 @@ function avatarInitials(sessions: LoadResult["sessions"]): string {
 }
 
 const LINE_STEPS: { label: string; screens: Screen[] }[] = [
-  { label: "Line bisection", screens: ["line-intro", "line-task"] },
+  { label: scoredBatteryName("lines"), screens: ["line-intro", "line-task"] },
   { label: "Review", screens: ["review"] },
 ];
 
 const ASSESSMENT_STEPS: { label: string; screens: Screen[] }[] = [
-  { label: "Target selection", screens: ["target-intro", "target-task"] },
-  { label: "Line bisection", screens: ["line-intro", "line-task"] },
+  { label: scoredBatteryName("rings"), screens: ["target-intro", "target-task"] },
+  { label: scoredBatteryName("lines"), screens: ["line-intro", "line-task"] },
   { label: "Review", screens: ["review"] },
 ];
 
@@ -93,7 +95,6 @@ export function App() {
   const services = useMemo(() => createAppServices({ keyValueStore: scopedKv }), [scopedKv]);
   const apiEnabled = showApiControls(services.apiEnabled);
   const localIdentity = apiEnabled && services.identityMode === "local";
-  const showBattery = batteryEnabled(apiEnabled);
   const store = useMemo(
     () =>
       createLocalSessionStore({
@@ -120,7 +121,6 @@ export function App() {
   const [processing, setProcessing] = useState<Record<string, ProcessingSnapshot>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkRunning, setCheckRunning] = useState(false);
-  const [batteries, setBatteries] = useState<BatteryRecord[]>([]);
   const [activity, setActivity] = useState<Array<{ bucket: string; count: number }>>([]);
   const main = useRef<HTMLElement>(null);
   const enqueued = useRef(new Set<string>());
@@ -228,14 +228,13 @@ export function App() {
   useEffect(() => {
     if (screen === "history" || screen === "my-profile") {
       void store.load().then(setStored);
-      void services.listBatteries().then(setBatteries);
       void services.sessionActivity().then(setActivity);
     }
   }, [screen, store, services]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (screen.endsWith("-task") || screen === "battery-run") return;
+    if (screen.endsWith("-task")) return;
     const heading = main.current?.querySelector<HTMLElement>("h1, h2");
     if (heading) {
       heading.tabIndex = -1;
@@ -262,8 +261,13 @@ export function App() {
     return () => ac.abort();
   }, [apiEnabled, services, queue]);
 
-  const start = (alias: string, input: InputModality, variant: LayoutVariant) =>
-    dispatch({ type: "start", session: createSession({ alias, input, viewport: currentViewport() }), variant });
+  const participantLabel = sessionAliasForParticipant(signedIn?.subject ?? participantId);
+  const start = (input: InputModality, variant: LayoutVariant) =>
+    dispatch({
+      type: "start",
+      session: createSession({ alias: participantLabel, input, viewport: currentViewport() }),
+      variant,
+    });
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
   const onPractice = useCallback((trial: TrialRecord) => dispatch({ type: "practice-finished", trial }), []);
   const home = () => dispatch({ type: "home" });
@@ -301,13 +305,12 @@ export function App() {
   }, [screen, state.lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inAssessment = ["target-intro", "target-task", "line-intro", "line-task"].includes(screen);
-  const focusMode = inAssessment || checkRunning || screen === "practice-task" || screen === "battery-run";
+  const focusMode = inAssessment || checkRunning || screen === "practice-task";
   const steps = state.linesOnly ? LINE_STEPS : ASSESSMENT_STEPS;
   const stepIndex = steps.findIndex((s) => s.screens.includes(screen));
   const cue = state.practice?.config;
   const showPrimaryNav = !focusMode && !inAssessment;
-  const centerNavOn: Screen | null =
-    screen === "home" || screen === "history" || screen === "gaze" ? screen : null;
+  const centerNavOn: Screen | null = screen === "home" || screen === "history" ? screen : null;
   const exportId = participantIdForExport({
     signedInParticipantId: signedIn?.subject ?? null,
     activeProfileId: stored.sessions[0]?.profileId ?? null,
@@ -341,7 +344,6 @@ export function App() {
       setSignedIn(null);
       setParticipantId(null);
       setStored({ sessions: [], rejected: 0, error: null });
-      setBatteries([]);
       setActivity([]);
       dispatch({ type: "home" });
     });
@@ -513,57 +515,24 @@ export function App() {
         {screen === "home" && (
           <Home
             onStart={start}
-            onOpen={(s) => dispatch({ type: "open", session: s })}
             onHistory={() => go("history")}
             onProfile={() => go("my-profile")}
-            onGaze={() => go("gaze")}
-            showBattery={showBattery}
             apiEnabled={apiEnabled}
-            onBattery={showBattery ? () => go("battery-intro") : undefined}
-            onStarry={() => go("starry")}
             onDemo={() => go("demo")}
           />
         )}
-        {screen === "battery-intro" && showBattery && (
-          <BatteryIntro onStart={(config) => dispatch({ type: "battery-start", config })} onBack={home} />
-        )}
-        {screen === "battery-run" && state.batteryConfig && showBattery && (
-          <BatteryRun
-            config={state.batteryConfig}
-            onFinished={(record) => {
-              dispatch({ type: "battery-finished", record });
-              if (!shouldPersistBattery(record)) return;
-              void (async () => {
-                try {
-                  if (apiEnabled) await services.uploadBattery(record);
-                } catch (error) {
-                  setSaveError(error instanceof Error ? error.message : String(error));
-                }
-                setBatteries(await services.listBatteries());
-              })();
-            }}
-            onStop={home}
-            onRunning={setCheckRunning}
-          />
-        )}
-        {screen === "battery-results" && state.batteryRecord && (
-          <BatteryResults
-            record={state.batteryRecord}
-            onExport={() => {
-              const json = serializeBatteryRecord(state.batteryRecord!);
-              const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-              Object.assign(document.createElement("a"), { href: url, download: `${state.batteryRecord!.id}.json` }).click();
-              URL.revokeObjectURL(url);
-            }}
-            onBack={home}
-          />
-        )}
         {screen === "assessment" && (
-          <BatteryPage from="starry" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+          <BatteryPage from="starry" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
         )}
-        {screen === "starry" && <BatteryPage from="starry" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
-        {screen === "rings" && <BatteryPage from="rings" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
-        {screen === "lines" && <BatteryPage from="lines" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
+        {screen === "starry" && (
+          <BatteryPage from="starry" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+        )}
+        {screen === "rings" && (
+          <BatteryPage from="rings" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+        )}
+        {screen === "lines" && (
+          <BatteryPage from="lines" alias={participantLabel} onHome={home} onRunning={setCheckRunning} onSave={saveRun} />
+        )}
         {screen === "demo" && <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />}
         {screen === "scene" && <HiddenScenePage onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
@@ -573,7 +542,7 @@ export function App() {
             sessionId={session.id}
             trial={trial}
             timeLimitMs={TIME_LIMIT_MS["target-selection"]}
-            eyebrow="Assessment · target selection"
+            eyebrow={scoredBatteryStep("rings")}
             title="Select every hollow ring"
             instruction="Leave the solid disks. Press Done when finished."
             onFinish={onTrial}
@@ -586,8 +555,8 @@ export function App() {
             sessionId={session.id}
             trial={trial}
             timeLimitMs={TIME_LIMIT_MS["line-bisection"]}
-            eyebrow={`Assessment · line ${state.lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
-            title="Mark the middle of the line"
+            eyebrow={scoredBatteryStep("lines")}
+            title={`Mark the middle of line ${state.lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
             instruction="One mark. No accuracy feedback."
             onFinish={onTrial}
           />
@@ -637,10 +606,8 @@ export function App() {
         {screen === "history" && (
           <History
             stored={stored}
-            batteries={batteries}
             activity={activity}
             onOpen={(s) => dispatch({ type: "open", session: s })}
-            onOpenBattery={(record) => dispatch({ type: "battery-finished", record })}
             onDelete={async (id) => {
               const result = await store.remove(id);
               setSaveError(result.error);
@@ -656,7 +623,6 @@ export function App() {
             onDeleteParticipant={apiEnabled ? () => void onDeleteParticipant() : undefined}
           />
         )}
-        {screen === "gaze" && <GazeLab onHome={home} />}
         {screen === "my-profile" && (
           <MyProfile
             sessions={stored.sessions}

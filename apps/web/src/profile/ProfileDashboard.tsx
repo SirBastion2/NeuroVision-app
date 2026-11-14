@@ -6,13 +6,10 @@ import {
   type PracticeCue,
   type SessionRecord,
 } from "@neurovision/domain";
-import { SIMULATED_LAB_PROVENANCE } from "@neurovision/gaze";
 import { TrendChart } from "../components/TrendChart";
-import { createAppServices, type AppServices, type GazeLabData } from "../services";
+import { createAppServices, type AppServices } from "../services";
 import { canUseLocalHistoryStore, createLocalHistoryStore } from "../services/local-history-store";
 import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap } from "../lib/format";
-import { GazeAttentionMap } from "./GazeAttentionMap";
-import { DEMO_PATIENT_PROFILES, type DemoPatientId } from "./demo-patients";
 import {
   deleteClinicalNote,
   listClinicalNotes,
@@ -23,18 +20,15 @@ import { SpatialBoard } from "./SpatialBoard";
 import { buildClinicianReportPdf, downloadBlob } from "./report-pdf";
 import "./profile.css";
 
-type TabId = "overview" | "assessments" | "gaze" | "practice" | "progress" | "reports";
+type TabId = "overview" | "assessments" | "practice" | "progress" | "reports";
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "assessments", label: "Assessments" },
-  { id: "gaze", label: "Gaze & Attention" },
   { id: "practice", label: "Practice" },
   { id: "progress", label: "Progress" },
   { id: "reports", label: "Reports & Notes" },
 ];
-
-const GAZE_DURATION_MS = 22_000;
 
 function formatPct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
@@ -74,7 +68,7 @@ interface ProfileDashboardProps {
 
 /**
  * Clinician dashboard presentation overhaul (IA + visuals).
- * Scoring, practice configuration, gaze helpers, and PDF remain existing algorithms.
+ * Scoring, practice configuration, and PDF remain existing algorithms.
  */
 export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
   const services = useMemo(() => createServices(), []);
@@ -83,12 +77,9 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
   const [noteBody, setNoteBody] = useState("");
-  const [gaze, setGaze] = useState<GazeLabData | null>(null);
-  const [wideGaze, setWideGaze] = useState(false);
   const [cue, setCue] = useState<PracticeCue>("none");
   const [density, setDensity] = useState<BoardDensity>("standard");
   const [scanGuide, setScanGuide] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [trendState, setTrendState] = useState<Awaited<
     ReturnType<AppServices["comparableHistory"]>
@@ -104,10 +95,9 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
     : patients[0] ?? null;
 
   async function refresh(preferredId?: string | null) {
-    const list = await services.listHistory();
+    const list = (await services.listHistory()).filter((session) => session.source !== "demonstration");
     setSessions(list);
     setNotes(listClinicalNotes());
-    setGaze(services.loadGazeLabData());
     const nextId = preferredId ?? selectedId ?? list[0]?.id ?? null;
     setSelectedId(nextId);
     setTrendState(await services.comparableHistory(list));
@@ -125,22 +115,6 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
     setDensity(practice.density);
     setScanGuide(Boolean(practice.scanGuide));
   }, [selected]);
-
-  async function loadDemoPatient(id: DemoPatientId) {
-    setBusy(true);
-    try {
-      const profile = DEMO_PATIENT_PROFILES.find((item) => item.id === id)!;
-      let latest: SessionRecord | null = null;
-      for (const session of profile.sessions) {
-        latest = await services.save(session);
-      }
-      await refresh(latest?.id ?? null);
-      setTab("overview");
-      setMessage(`${profile.label} loaded (demonstration). ${profile.summary}`);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   function saveNote() {
     if (!noteBody.trim()) return;
@@ -161,12 +135,6 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
     downloadBlob(blob, `neurovision-report-${selected?.id ?? "profile"}.pdf`);
     setMessage("PDF downloaded.");
   }
-
-  const activeGazeStream = gaze
-    ? wideGaze
-      ? gaze.simulated.bothHalves
-      : gaze.simulated.leftBiased
-    : null;
 
   const metrics = [
     {
@@ -234,26 +202,8 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
       </header>
 
       <p className="storage-disclaimer" role="note">
-        Local-storage disclaimer: history and clinical notes stay on this device/browser. Demonstration and
-        simulated-lab records stay labeled separately from live assessments.
+        Local-storage disclaimer: history and clinical notes stay on this device/browser.
       </p>
-
-      {/* Demo patients */}
-      <div className="demo-patient-bar" role="group" aria-label="Load demonstration patients">
-        <span className="demo-patient-label">Load Demo Patient</span>
-        {DEMO_PATIENT_PROFILES.map((profile) => (
-          <button
-            key={profile.id}
-            type="button"
-            disabled={busy}
-            title={profile.summary}
-            onClick={() => void loadDemoPatient(profile.id)}
-          >
-            {profile.id}
-          </button>
-        ))}
-        <span className="muted small">A balanced · B left-omission · C right-omission (all demonstration)</span>
-      </div>
 
       {message ? (
         <p className="toast" role="status">
@@ -292,10 +242,7 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
         ) : (
           <div className="empty-state">
             <h3>No patient session selected</h3>
-            <p>
-              Run a live assessment from Home, or load Demo Patient A, B, or C to explore the clinician
-              workspace with labeled demonstration data.
-            </p>
+            <p>Run a live assessment from Home to explore the clinician workspace.</p>
           </div>
         )}
       </section>
@@ -305,7 +252,7 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
         <aside className="session-rail" aria-label="Patients and sessions">
           <h3>Patients</h3>
           {patients.length === 0 ? (
-            <p className="muted">Empty roster. Load a demo patient or complete a live assessment.</p>
+            <p className="muted">Empty roster. Complete a live assessment from Home.</p>
           ) : (
             <ul className="patient-roster">
               {patients.map((patient) => (
@@ -429,36 +376,6 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
             </div>
           )}
 
-          {tab === "gaze" && (
-            <div className="tab-panel">
-              <h3>Gaze &amp; Attention</h3>
-              <p className="panel-lede">
-                Visual attention from simulated-lab streams. Webcam observation stays separately labeled if
-                available later; tracking gaps never count as dwell.
-              </p>
-              {gaze && activeGazeStream ? (
-                <>
-                  <div className="profile-actions">
-                    <button type="button" onClick={() => setWideGaze((value) => !value)}>
-                      Show {wideGaze ? "left-biased" : "both-halves"} attention map
-                    </button>
-                  </div>
-                  <GazeAttentionMap
-                    label={activeGazeStream.label}
-                    samples={activeGazeStream.samples}
-                    gaps={activeGazeStream.gaps}
-                    durationMs={GAZE_DURATION_MS}
-                    badge={SIMULATED_LAB_PROVENANCE.badge}
-                  />
-                </>
-              ) : (
-                <div className="empty-state compact">
-                  <p>Gaze lab streams are unavailable in this runtime.</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {tab === "practice" && (
             <div className="tab-panel">
               <h3>Practice</h3>
@@ -520,10 +437,7 @@ export function ProfileDashboard({ onBackToPatient }: ProfileDashboardProps) {
               </p>
               {!trendState || trendState.trend.points.length === 0 ? (
                 <div className="empty-state compact">
-                  <p>
-                    No comparable live points yet. Demo patients appear under Assessments as demonstration and
-                    do not enter this trend.
-                  </p>
+                  <p>No comparable live points yet. Complete two live assessments to start a trend.</p>
                 </div>
               ) : (
                 <div className="progress-charts">

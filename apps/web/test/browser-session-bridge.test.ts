@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEMONSTRATION_SESSIONS } from "@neurovision/domain";
+import { makeSession } from "../../../packages/domain/test/session-factory.ts";
 import { createLocalSessionStore } from "../src/data/sessionStore.js";
 import {
   CLINICIAN_HISTORY_KEY,
@@ -43,10 +43,12 @@ describe("patient → clinician session bridge", () => {
       storage.removeItem(PATIENT_SESSION_KEY);
 
       const patient = createLocalSessionStore({ storage });
-      const live = structuredClone(DEMONSTRATION_SESSIONS[0]);
-      live.id = "live-bridge-1";
-      live.source = "live";
-      live.alias = "Judge-01";
+      const live = makeSession({
+        id: "live-bridge-1",
+        alias: "Judge-01",
+        leftHits: 10,
+        rightHits: 10,
+      });
 
       const saved = await patient.save(live);
       assert.equal(saved.ok, true);
