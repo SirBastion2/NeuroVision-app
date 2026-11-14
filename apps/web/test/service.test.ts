@@ -68,6 +68,7 @@ describe("app service layer", () => {
     assert.equal(session.scorer, SCORER_ID);
     assert.equal(session.alias, "Pilot");
     assert.equal(session.trials.length, 6);
+    assert.equal(session.input, "mouse-trackpad");
     assert.equal(targetTrial(session).layout.id, "fixed-a");
     assert.equal(
       session.trials.filter((trial) => trial.task === "line-bisection").length,

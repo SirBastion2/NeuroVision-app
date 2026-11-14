@@ -48,7 +48,11 @@ describe("Home hero", () => {
     assert.match(html, /Sessions over time/);
     assert.match(html, /Demo run/);
     assert.match(html, /Begin assessment/);
-    assert.match(html, />Input</);
+    assert.match(html, /New session/);
+    assert.match(html, /Start an assessment/);
+    assert.doesNotMatch(html, />Input</);
+    assert.doesNotMatch(html, /Mouse or trackpad/);
+    assert.doesNotMatch(html, /Keyboard cursor/);
     assert.doesNotMatch(html, /Board layout/);
     assert.doesNotMatch(html, /Layout A/);
     assert.doesNotMatch(html, /Layout B/);

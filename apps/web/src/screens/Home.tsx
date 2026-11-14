@@ -1,24 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  INPUT_MODALITIES,
   createTargetSelectionLayout,
   viewportClass,
-  type InputModality,
 } from "@neurovision/domain";
 import { STIMULUS_RADIUS } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
 import { HOME_JOURNEY_STEPS } from "../lib/battery-labels";
 
-const INPUT_LABELS: Record<InputModality, string> = {
-  "mouse-trackpad": "Mouse or trackpad",
-  keyboard: "Keyboard cursor",
-  touch: "Touch",
-};
-
 interface Props {
-  onStart: (input: InputModality) => void;
+  onStart: () => void;
   onHistory: () => void;
   apiEnabled?: boolean;
   onDemo?: () => void;
@@ -57,7 +49,6 @@ function HeroBoard() {
 }
 
 export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) {
-  const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
 
   return (
@@ -94,23 +85,11 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           className="card start-card"
           onSubmit={(e) => {
             e.preventDefault();
-            onStart(input);
+            onStart();
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
           <h2>Start an assessment</h2>
-
-          <fieldset className="field">
-            <legend>Input</legend>
-            <div className="segmented">
-              {INPUT_MODALITIES.map((m) => (
-                <label key={m} className={input === m ? "on" : ""}>
-                  <input type="radio" name="input" value={m} checked={input === m} onChange={() => setInput(m)} />
-                  {INPUT_LABELS[m]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
 
           {!supported && (
             <p className="notice warn" role="status">

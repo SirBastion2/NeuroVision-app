@@ -37,7 +37,7 @@ export function sessionAliasForParticipant(participantId: string | null | undefi
 
 export interface NewSessionOptions {
   alias: string;
-  input: InputModality;
+  input?: InputModality;
   viewport: Viewport;
   source?: SessionSource;
   now?: Date;
@@ -56,7 +56,7 @@ export function createSession(options: NewSessionOptions): SessionRecord {
     scorer: SCORER_ID,
     taskIds: ["target-selection", "line-bisection"],
     status: "incomplete",
-    input: options.input,
+    input: options.input ?? "mouse-trackpad",
     viewport: options.viewport,
     startedAt: now.toISOString(),
     // The contract requires a timestamp; it is replaced when the session ends.

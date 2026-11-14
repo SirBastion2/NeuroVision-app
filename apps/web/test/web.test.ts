@@ -59,9 +59,10 @@ describe("session building", () => {
     assert.equal(profileIdFor(""), "anonymous");
     assert.equal(sessionAliasForParticipant(null), "");
     assert.equal(sessionAliasForParticipant("P-014"), "P-014");
-    const unnamed = createSession({ alias: "", input: "mouse-trackpad", viewport: VP });
+    const unnamed = createSession({ alias: "", viewport: VP });
     assert.equal(unnamed.alias, "Anonymous");
     assert.equal(unnamed.profileId, "anonymous");
+    assert.equal(unnamed.input, "mouse-trackpad");
   });
 
   test("a full run completes after five lines and carries the domain practice suggestion", () => {
