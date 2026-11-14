@@ -8,6 +8,7 @@ import {
   type SessionRecord,
   type TrialRecord,
 } from "@neurovision/domain";
+import { HiddenScenePage } from "./checks/HiddenScene";
 import { BatteryPage } from "./checks/pages";
 import { BrandMark, Wordmark } from "./components/Brand";
 import { ProfileMenu } from "./components/ProfileMenu";
@@ -297,6 +298,9 @@ export function App() {
             <button type="button" className={centerNavOn === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
               Gaze Lab
             </button>
+            <button type="button" className={screen === "scene" ? "on" : ""} onClick={() => go("scene")}>
+              Hidden scene
+            </button>
           </nav>
         ) : (
           <div className="topbar-center-spacer" aria-hidden />
@@ -394,6 +398,7 @@ export function App() {
         {screen === "rings" && <BatteryPage from="rings" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
         {screen === "lines" && <BatteryPage from="lines" onHome={home} onRunning={setCheckRunning} onSave={saveRun} />}
         {screen === "demo" && <BatteryPage from="starry" demo onHome={home} onRunning={setCheckRunning} />}
+        {screen === "scene" && <HiddenScenePage onHome={home} onRunning={setCheckRunning} />}
         {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
         {screen === "target-task" && session && trial && (
           <TaskRunner

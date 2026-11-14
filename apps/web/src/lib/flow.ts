@@ -28,6 +28,7 @@ export type Screen =
   | "battery-results"
   | "assessment"
   | "starry"
+  | "scene"
   | "rings"
   | "lines"
   | "demo";
