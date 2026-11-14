@@ -3,7 +3,6 @@ import {
   LINE_BISECTION_TRIAL_COUNT,
   findTargetSelectionTrial,
   scoreSession,
-  scoreTargetSelection,
   sessionSourceLabel,
   type SessionRecord,
   type SpatialPatternKind,
@@ -26,12 +25,10 @@ import {
   signedPct,
   wrongTapsHint,
 } from "../lib/format";
-import { MAX_PRACTICE_ROUNDS } from "../lib/session";
 
 interface Props {
   session: SessionRecord;
   saveError: string | null;
-  onPractice: () => void;
   onHistory: () => void;
   onHome: () => void;
 }
@@ -53,7 +50,7 @@ const PATTERN_TITLE: Record<SpatialPatternKind, string> = {
   insufficient: "Not enough data",
 };
 
-export function Review({ session, saveError, onPractice, onHistory, onHome }: Props) {
+export function Review({ session, saveError, onHistory, onHome }: Props) {
   const result = useMemo(() => scoreSession(session), [session]);
   const ts = result.targetSelection;
   const tsTrial = findTargetSelectionTrial(session);
@@ -163,48 +160,9 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
         ) : null}
       </section>
 
-      <section className="card practice-summary">
-        <div>
-          <Eyebrow plain>Practice suggestion · {session.decision.version}</Eyebrow>
-          <h3>
-            {session.decision.cue === "none" ? "Unguided" : `Cue the ${session.decision.cue} side`} · {session.decision.density} density
-          </h3>
-          <p>{session.decision.explanation}</p>
-          {session.practice.length > 0 && (
-            <ol className="rounds">
-              {session.practice.map((round, i) => {
-                const s = scoreTargetSelection(round.trial);
-                return (
-                  <li key={round.trial.id}>
-                    <span>Round {i + 1}</span>
-                    <strong>
-                      {s.hits}/{s.available}
-                    </strong>
-                    <span>{missShareGap(s.omissionAsymmetry)}</span>
-                    <span>
-                      cue {round.config.cue}
-                      {round.config.cue !== "none" && ` · level ${round.config.level}`}
-                    </span>
-                    {round.config.override && <span className="badge">override</span>}
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <p className="small">Practice rounds are stored separately and never join the assessment trend.</p>
-        </div>
-        <button className="primary large" onClick={onPractice} disabled={session.practice.length >= MAX_PRACTICE_ROUNDS}>
-          {session.practice.length === 0
-            ? "Set up practice"
-            : session.practice.length >= MAX_PRACTICE_ROUNDS
-              ? "Practice limit reached"
-              : "Another practice round"}
-        </button>
-      </section>
-
       <details className="card events">
         <summary>Underlying events</summary>
-        {[...session.trials, ...session.practice.map((p) => p.trial)].map((trial) => (
+        {session.trials.map((trial) => (
           <div key={trial.id} className="event-block">
             <h4>
               {trial.id} · {trial.task} · {END_LABEL[trial.end]} · {seconds(trial.duration)}

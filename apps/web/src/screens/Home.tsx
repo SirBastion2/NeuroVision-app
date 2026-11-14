@@ -74,7 +74,7 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           </h1>
           <p className="lede">
             Three short tasks record every response in space and time. The review shows what was found, what was
-            missed, and on which side, then suggests a practice setup you can read and overrule.
+            missed, and on which side.
           </p>
           <p className="fineprint">Research tool. Describes one session’s responses; it is not a diagnosis.</p>
         </div>
@@ -147,7 +147,7 @@ export function Home({ onStart, onHistory, apiEnabled = false, onDemo }: Props) 
           <button className="card link-card" onClick={onHistory}>
             <Eyebrow plain>History</Eyebrow>
             <h3>Sessions over time</h3>
-            <p>Your saved assessments, the trend across comparable runs, and practice rounds.</p>
+            <p>Your saved assessments and the trend across comparable runs.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>

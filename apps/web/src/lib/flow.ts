@@ -1,11 +1,5 @@
-import type {
-  LayoutVariant,
-  PracticeRoundSetup,
-  PracticeSuggestion,
-  SessionRecord,
-  TrialRecord,
-} from "@neurovision/domain";
-import { addPracticeRound, recordAssessmentTrial } from "./session";
+import type { LayoutVariant, SessionRecord, TrialRecord } from "@neurovision/domain";
+import { recordAssessmentTrial } from "./session";
 
 export type Screen =
   | "home"
@@ -34,10 +28,6 @@ export interface FlowState {
   lineIndex: number;
   /** True once the assessment part has ended; the session is then saved on every change. */
   ended: boolean;
-  /** Setup of the round being run or just finished. */
-  practice: PracticeRoundSetup | null;
-  /** Starting point for the next setup screen (the faded config after a round). */
-  nextSuggestion: PracticeSuggestion | null;
   /** True when line bisection was started on its own, without hollow rings first. */
   linesOnly: boolean;
 }
@@ -48,9 +38,6 @@ export type FlowAction =
   | { type: "start"; session: SessionRecord; variant: LayoutVariant }
   | { type: "start-lines"; session: SessionRecord }
   | { type: "trial-finished"; trial: TrialRecord }
-  | { type: "practice-configured"; setup: PracticeRoundSetup }
-  | { type: "practice-finished"; trial: TrialRecord }
-  | { type: "next-practice"; config: PracticeSuggestion }
   | { type: "open"; session: SessionRecord };
 
 export const initialFlow: FlowState = {
@@ -59,14 +46,15 @@ export const initialFlow: FlowState = {
   variant: "fixed-a",
   lineIndex: 0,
   ended: false,
-  practice: null,
-  nextSuggestion: null,
   linesOnly: false,
 };
 
-/** My Profile was folded into History after demonstration sessions went away. */
-export function resolveScreen(screen: Screen): Screen {
+/** Retired screens keep their names so old `go` calls still resolve. */
+export function resolveScreen(screen: Screen, hasSession = false): Screen {
   if (screen === "my-profile" || screen === "profile") return "history";
+  if (screen === "practice-setup" || screen === "practice-task" || screen === "practice-reflection") {
+    return hasSession ? "review" : "home";
+  }
   return screen;
 }
 
@@ -75,7 +63,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "home":
       return initialFlow;
     case "go":
-      return { ...state, screen: resolveScreen(action.screen) };
+      return { ...state, screen: resolveScreen(action.screen, Boolean(state.session)) };
     case "start":
       return { ...initialFlow, screen: "target-intro", session: action.session, variant: action.variant };
     case "start-lines":
@@ -89,17 +77,5 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       if (action.trial.task === "target-selection") return { ...state, session, screen: "line-intro", lineIndex: 0 };
       return { ...state, session, screen: "line-task", lineIndex: state.lineIndex + 1 };
     }
-    case "practice-configured":
-      return { ...state, practice: action.setup, screen: "practice-task" };
-    case "practice-finished": {
-      if (!state.session || !state.practice) return state;
-      return {
-        ...state,
-        session: addPracticeRound(state.session, action.trial, state.practice.config),
-        screen: "practice-reflection",
-      };
-    }
-    case "next-practice":
-      return { ...state, nextSuggestion: action.config, screen: "practice-setup" };
   }
 }

@@ -27,10 +27,10 @@ describe("scored battery labels", () => {
     assert.equal(scoredBatteryStep("rings").startsWith("Test 2 of 3"), true);
   });
 
-  it("builds the Home journey from the same list, then Review and Practice", () => {
+  it("builds the Home journey from the same list, then Review", () => {
     assert.deepEqual(
       HOME_JOURNEY_STEPS.map((step) => `${step.n} ${step.title}`),
-      ["01 Starry Night", "02 Hollow rings", "03 Line bisection", "04 Review", "05 Practice"],
+      ["01 Starry Night", "02 Hollow rings", "03 Line bisection", "04 Review"],
     );
     assert.equal(HOME_JOURNEY_STEPS[0]?.text, SCORED_BATTERY[0]?.blurb);
     assert.equal(HOME_JOURNEY_STEPS[1]?.text, SCORED_BATTERY[1]?.blurb);

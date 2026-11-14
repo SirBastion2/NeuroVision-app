@@ -19,7 +19,6 @@ import { flowReducer, initialFlow, type Screen } from "./lib/flow";
 import {
   TIME_LIMIT_MS,
   newLineTrial,
-  newPracticeTrial,
   newTargetSelectionTrial,
   sessionAliasForParticipant,
 } from "./lib/session";
@@ -27,7 +26,6 @@ import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { LineIntro, TargetIntro } from "./screens/Intros";
 import { ParticipantStart } from "./screens/ParticipantStart";
-import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
 import {
   DEMO_LOCAL_IDENTITY,
@@ -267,7 +265,6 @@ export function App() {
     dispatch({ type: "go", screen: "assessment" });
   };
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
-  const onPractice = useCallback((trial: TrialRecord) => dispatch({ type: "practice-finished", trial }), []);
   const home = () => dispatch({ type: "home" });
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
   const saveRun = useCallback(
@@ -298,15 +295,13 @@ export function App() {
     if (!session) return null;
     if (screen === "target-task") return newTargetSelectionTrial(session, state.variant, currentViewport());
     if (screen === "line-task") return newLineTrial(session, state.lineIndex, currentViewport());
-    if (screen === "practice-task" && state.practice) return newPracticeTrial(session, state.practice.layout, currentViewport());
     return null;
   }, [screen, state.lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inAssessment = ["target-intro", "target-task", "line-intro", "line-task"].includes(screen);
-  const focusMode = inAssessment || checkRunning || screen === "practice-task";
+  const focusMode = inAssessment || checkRunning;
   const steps = state.linesOnly ? LINE_STEPS : ASSESSMENT_STEPS;
   const stepIndex = steps.findIndex((s) => s.screens.includes(screen));
-  const cue = state.practice?.config;
   const showPrimaryNav = !focusMode && !inAssessment;
   const centerNavOn: Screen | null = screen === "home" || screen === "history" ? screen : null;
   const exportId = participantIdForExport({
@@ -594,42 +589,8 @@ export function App() {
           <Review
             session={session}
             saveError={session.source === "live" ? saveError : null}
-            onPractice={() => go("practice-setup")}
             onHistory={() => go("history")}
             onHome={home}
-          />
-        )}
-        {screen === "practice-setup" && session && (
-          <PracticeSetup
-            session={session}
-            suggested={state.nextSuggestion ?? session.decision}
-            onStart={(setup) => dispatch({ type: "practice-configured", setup })}
-            onBack={() => go("review")}
-          />
-        )}
-        {screen === "practice-task" && session && trial && cue && (
-          <TaskRunner
-            key={trial.id}
-            sessionId={session.id}
-            trial={trial}
-            timeLimitMs={TIME_LIMIT_MS.practice}
-            eyebrow={`Practice · round ${session.practice.length + 1}${session.source === "demonstration" ? " · demonstration, not saved" : ""}`}
-            title="Select every hollow ring"
-            instruction={
-              cue.cue === "none" || cue.level === 0
-                ? "Leave the solid disks. Press Done when finished."
-                : `Begin at the ${cue.cue} side${cue.level === 2 ? ` and scan ${cue.cue === "left" ? "left to right" : "right to left"}` : ""}.`
-            }
-            practice={cue}
-            onFinish={onPractice}
-          />
-        )}
-        {screen === "practice-reflection" && session && cue && (
-          <PracticeReflection
-            session={session}
-            config={cue}
-            onAnother={(config) => dispatch({ type: "next-practice", config })}
-            onReview={() => go("review")}
           />
         )}
         {screen === "history" && (

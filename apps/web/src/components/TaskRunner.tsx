@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import {
   BOARD_HEIGHT,
-  BOARD_ROWS,
   BOARD_WIDTH,
-  cellPosition,
   classifyResponse,
   toBoardCoordinates,
-  type PracticeSuggestion,
   type ResponseEvent,
   type TrialEndReason,
   type TrialRecord,
 } from "@neurovision/domain";
-import { Board, ResponseMarks, RowGuide, SideCue } from "./Board";
+import { Board, ResponseMarks } from "./Board";
 import { Eyebrow } from "./Brand";
 
 interface Props {
@@ -21,8 +18,6 @@ interface Props {
   eyebrow: string;
   title: string;
   instruction: string;
-  /** Practice only. Assessment trials never receive a cue. */
-  practice?: PracticeSuggestion;
   onFinish: (trial: TrialRecord) => void;
 }
 
@@ -34,7 +29,7 @@ const KEY_FINE_STEP = 2;
  * first painted frame; nothing here waits on storage or the network.
  * Interruptions (Stop, resize, hidden tab) end the trial with that reason.
  */
-export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, instruction, practice, onFinish }: Props) {
+export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, instruction, onFinish }: Props) {
   const board = useRef<SVGSVGElement>(null);
   const onset = useRef<number | null>(null);
   const closed = useRef(false);
@@ -43,12 +38,10 @@ export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, inst
   const [ready, setReady] = useState(false);
   const [remaining, setRemaining] = useState(timeLimitMs);
   const [cursor, setCursor] = useState({ x: BOARD_WIDTH / 2, y: trial.line?.y ?? BOARD_HEIGHT / 2 });
-  const [row, setRow] = useState(0);
 
   const isLine = trial.task === "line-bisection";
   const answered = isLine && events.some((e) => e.type === "bisection");
   const keyboard = trial.input === "keyboard";
-  const rowGuide = !!practice?.scanGuide && practice.cue !== "none" && practice.level === 2;
 
   const finish = useCallback(
     (end: TrialEndReason) => {
@@ -165,12 +158,6 @@ export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, inst
           <span>{secondsLeft}</span>
         </div>
       </div>
-      {rowGuide && (
-        <p className="row-status" role="status">
-          Row {row + 1} of {BOARD_ROWS}: start at the {practice!.cue} edge and scan across.
-        </p>
-      )}
-
       <div className="board-frame">
         <Board
           ref={board}
@@ -183,8 +170,6 @@ export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, inst
           onKeyDown={onKeyDown}
           aria-describedby="task-live"
         >
-          {practice && <SideCue cue={practice.cue} level={practice.level} />}
-          {rowGuide && <RowGuide y={cellPosition(0, row).y} />}
           <ResponseMarks events={events} />
           {keyboard && ready && (
             <g className="cursor" aria-hidden>
@@ -203,11 +188,6 @@ export function TaskRunner({ sessionId, trial, timeLimitMs, eyebrow, title, inst
         <button className="ghost" onClick={() => finish("stop")}>
           Stop
         </button>
-        {rowGuide && (
-          <button onClick={() => setRow((r) => Math.min(BOARD_ROWS - 1, r + 1))} disabled={row >= BOARD_ROWS - 1}>
-            Next scan row
-          </button>
-        )}
         {isLine ? (
           <>
             <button className="ghost" onClick={() => finish("skip")} disabled={answered}>

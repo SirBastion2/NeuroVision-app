@@ -4,7 +4,6 @@ import {
   BOARD_MIDLINE_X,
   BOARD_WIDTH,
   type LineSegment,
-  type PracticeCue,
   type Point,
   type ResponseEvent,
   type Stimulus,
@@ -22,24 +21,6 @@ export function Disk({ x, y, className = "" }: Point & { className?: string }) {
 
 export function StimulusMark({ stimulus, className }: { stimulus: Stimulus; className?: string }) {
   return stimulus.kind === "target" ? <Ring {...stimulus} className={className} /> : <Disk {...stimulus} className={className} />;
-}
-
-/** Side cue inside the board. Level 1: edge anchor. Level 2: anchor plus scan arrow. */
-export function SideCue({ cue, level }: { cue: PracticeCue; level: number }) {
-  if (cue === "none" || level <= 0) return null;
-  const left = cue === "left";
-  return (
-    <g className="side-cue" aria-hidden>
-      <rect x={left ? 0 : BOARD_WIDTH - 10} y={0} width={10} height={BOARD_HEIGHT} />
-      {level >= 2 && (
-        <path d={left ? "M22 254 L58 270 L22 286 Z" : `M${BOARD_WIDTH - 22} 254 L${BOARD_WIDTH - 58} 270 L${BOARD_WIDTH - 22} 286 Z`} />
-      )}
-    </g>
-  );
-}
-
-export function RowGuide({ y }: { y: number }) {
-  return <rect className="row-guide" x={0} y={y - 34} width={BOARD_WIDTH} height={68} aria-hidden />;
 }
 
 /** Neutral response marks: show where a selection landed without revealing correctness. */

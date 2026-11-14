@@ -165,8 +165,7 @@ export function History({
           <div>
             <h3>The trend starts at two sessions</h3>
             <p className="small">
-              Charts join a participant’s comparable live assessments. {trend.points.length === 1 ? "One is recorded so far." : "None are recorded yet."}{" "}
-              Practice records never enter the trend.
+              Charts join a participant’s comparable live assessments. {trend.points.length === 1 ? "One is recorded so far." : "None are recorded yet."}
             </p>
           </div>
         </section>
@@ -186,7 +185,6 @@ export function History({
                 <th>Rings found</th>
                 <th>Left vs right</th>
                 <th>Pattern</th>
-                <th>Practice</th>
                 <th>Trend</th>
                 {apiControls && <th>Server</th>}
                 <th />
@@ -195,7 +193,7 @@ export function History({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={apiControls ? 10 : 9} className="empty">
+                  <td colSpan={apiControls ? 9 : 8} className="empty">
                     No sessions yet. Run an assessment from Home to build this history.
                   </td>
                 </tr>
@@ -218,11 +216,6 @@ export function History({
                     <td>{ts ? `${ts.hits}/${ts.available}` : "n/a"}</td>
                     <td>{missShareGap(ts?.omissionAsymmetry ?? null)}</td>
                     <td>{result.spatialPattern.kind.replace("-", " ")}</td>
-                    <td className="small">
-                      {session.practice.length
-                        ? `${session.practice.length} round${session.practice.length === 1 ? "" : "s"}`
-                        : "—"}
-                    </td>
                     <td className="small">{trendCell(session)}</td>
                     {apiControls && (
                       <td className="small">

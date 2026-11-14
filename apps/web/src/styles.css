@@ -264,7 +264,7 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge.live { color: var(--accent); border-color: currentColor; }
 .badge.demonstration { color: var(--brass); border-color: currentColor; border-style: dashed; }
-.badge.complete, .badge.suggested { color: var(--found); border-color: currentColor; }
+.badge.complete { color: var(--found); border-color: currentColor; }
 .badge.incomplete { color: var(--missed); border-color: currentColor; }
 
 /* Home */
@@ -277,7 +277,7 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .hero-star path { fill: var(--star); stroke: var(--brass); stroke-width: 1.5; }
 .hero-star { offset-path: ellipse(502px 150px at 480px 270px); offset-rotate: 0deg; animation: orbit 26s linear infinite; }
 @keyframes orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
-.journey { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+.journey { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
 .journey li { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px 20px; border-left: 1px solid var(--line); font-size: 0.9rem; color: var(--ink-2); }
 .journey li:first-child { border-left: 0; padding-left: 0; }
 .journey strong { color: var(--ink); font-size: 1rem; }
@@ -291,13 +291,12 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .link-card h3 { font-family: var(--serif); font-weight: 500; font-size: 1.4rem; margin-bottom: 8px; }
 .link-card p { color: var(--ink-2); margin: 0; max-width: 34ch; }
 .link-arrow { position: absolute; right: 22px; top: 20px; color: var(--brass); font-size: 1.2rem; transition: transform 0.2s; }
-.link-card:hover:not(:disabled), .cue-card:hover:not(:disabled) { border-color: var(--line-2); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+.link-card:hover:not(:disabled) { border-color: var(--line-2); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
 .link-card:hover .link-arrow { transform: translateX(4px); }
 @media (max-width: 880px) {
   .hero, .home-grid { grid-template-columns: 1fr; }
   .journey { grid-template-columns: 1fr 1fr; }
-  .journey li:nth-child(3),
-  .journey li:nth-child(5) { border-left: 0; padding-left: 0; }
+  .journey li:nth-child(3) { border-left: 0; padding-left: 0; }
 }
 
 /* Intros */
@@ -325,8 +324,6 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .midline { stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 3 8; stroke-linecap: round; }
 .response-marks .slash { stroke: var(--brass); stroke-width: 3.5; stroke-linecap: round; }
 .response-marks .tick, .line-example .tick { stroke: var(--brass); stroke-width: 4; stroke-linecap: round; }
-.side-cue rect, .side-cue path { fill: var(--brass); }
-.row-guide { fill: var(--brass); opacity: 0.14; }
 .cursor line { stroke: var(--missed); stroke-width: 2.5; }
 .board-wait { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--serif); font-size: 1.4rem; color: var(--muted); background: color-mix(in srgb, var(--board) 88%, transparent); border-radius: 12px; }
 
@@ -343,7 +340,6 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .timer-arc { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 0.12s linear; }
 .timer.low { color: var(--missed); }
 .timer.low .timer-arc { stroke: var(--missed); }
-.row-status { font-weight: 600; margin: 0; }
 .task-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; max-width: 960px; width: 100%; margin: 0 auto; }
 .task-actions .ghost:first-child { margin-right: auto; }
 
@@ -419,32 +415,12 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .deviation-val { display: flex; flex-direction: column; text-align: right; font-variant-numeric: tabular-nums; }
 .deviation-val strong { font-size: 1.02rem; }
 .dev-key { margin: 14px 0 0; }
-.practice-summary { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; align-items: center; border-left: 4px solid var(--brass); }
-.practice-summary > div { flex: 1 1 380px; }
-.practice-summary h3 { font-family: var(--serif); font-weight: 500; font-size: 1.5rem; margin-bottom: 8px; }
-.practice-summary p { color: var(--ink-2); }
-.rounds { list-style: none; padding: 0; margin: 12px 0; }
-.rounds li { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.92rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.rounds strong { color: var(--ink); }
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; padding: 11px 14px; border-top: 1px solid var(--line); }
 th { font-size: 0.72rem; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-top: 0; }
 td { font-variant-numeric: tabular-nums; }
 .events summary { cursor: pointer; font-weight: 650; }
 .event-block { margin-top: 18px; overflow-x: auto; }
-
-/* Practice */
-.suggestion { border-left: 4px solid var(--brass); }
-.suggestion-text { font-family: var(--serif); font-size: 1.3rem; line-height: 1.35; margin: 0; }
-.cue-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.cue-card { padding: 10px; display: flex; flex-direction: column; gap: 10px; font-weight: 400; }
-.cue-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), var(--shadow-lift); }
-.cue-card .board-surface { fill: var(--surface-2); stroke: none; }
-.cue-card-foot { display: flex; justify-content: space-between; align-items: center; padding: 2px 8px 6px; }
-.controls { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; }
-.controls .field { margin: 0; }
-.controls .notice { flex-basis: 100%; }
-@media (max-width: 760px) { .cue-grid { grid-template-columns: 1fr; } }
 
 /* History */
 .trends { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }

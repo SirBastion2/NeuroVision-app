@@ -95,35 +95,6 @@ describe("service-layer end-to-end flow", () => {
       ["e2e-live", "e2e-live-2"],
     );
     assert.equal(history.trend.excluded.length, 0);
-
-    const { trial: practiceTrial, setup } = services.startPracticeTrial(reloaded, {
-      cue: scored.practice.cue,
-      density: scored.practice.density,
-    });
-    assert.equal(setup.config.cue, "left");
-    let practice = practiceTrial;
-    let practiceElapsed = 500;
-    const practiceTargets = practice.layout.stimuli.filter((stimulus) => stimulus.kind === "target");
-    for (const stimulus of practiceTargets) {
-      practice = services.recordTrialClick(practice, reloaded.id, { x: stimulus.x, y: stimulus.y }, practiceElapsed);
-      practiceElapsed += 400;
-    }
-    practice = services.finishStandaloneTrial(practice, "done", 12_000);
-    const reflection = services.reflectPractice(practice, scored.targetSelection);
-    assert.ok(reflection.versusAssessment);
-    assert.equal(reflection.versusAssessment.assessmentPattern, "left-omission");
-    assert.equal(reflection.orderedHits.length, practiceTargets.length);
-    const withPractice = services.appendPracticeRound(reloaded, practice, setup.config);
-    const savedPractice = await services.save(withPractice);
-    const reloadedPractice = await services.load("e2e-live");
-    assert.ok(reloadedPractice);
-    assert.equal(reloadedPractice.practice.length, 1);
-    assert.equal(savedPractice.practice[0]?.config.cue, "left");
-    const trendAfterPractice = await services.comparableHistory();
-    assert.equal(
-      trendAfterPractice.trend.points.some((point) => point.sessionId === "e2e-live"),
-      true,
-    );
   });
 
   it("signs in through API routes, queues an upload, polls processing, exports, deletes, and stays offline when standalone", async () => {

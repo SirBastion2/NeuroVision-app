@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   classifyResponse,
-  configurePracticeRound,
   isSessionRecord,
   lineMidpoint,
   scoreSession,
@@ -17,9 +16,7 @@ import { flowReducer, initialFlow } from "../src/lib/flow.ts";
 import {
   createSession,
   newLineTrial,
-  newPracticeTrial,
   newTargetSelectionTrial,
-  nextPracticeConfig,
   profileIdFor,
   recordAssessmentTrial,
   sessionAliasForParticipant,
@@ -84,27 +81,10 @@ describe("session building", () => {
     assert.equal(isSessionRecord(r.session), true);
     assert.equal(summarizeAssessmentTrend([r.session]).points.length, 0);
   });
-
-  test("practice rounds use the domain setup, stay out of trials, and fade per the domain rule", () => {
-    let s = fullSession(4, 12);
-    const setup = configurePracticeRound({ cue: s.decision.cue, density: s.decision.density }, s.decision);
-    assert.equal(setup.config.override, null);
-    assert.equal(setup.config.level, 2);
-    for (let i = 0; i < 2; i++) {
-      const p = newPracticeTrial(s, setup.layout, VP);
-      const all = p.layout.stimuli.filter((x) => x.kind === "target").map((x) => x.id);
-      s = { ...s, practice: [...s.practice, { trial: clickAll(p, all, s), config: setup.config }] };
-    }
-    assert.equal(s.trials.length, 6);
-    assert.equal(s.practice[1]!.trial.id, "s1-practice-2");
-    assert.equal(nextPracticeConfig(s, setup.config).level, 1);
-    assert.equal(isSessionRecord(s), true);
-    assert.match(configurePracticeRound({ cue: "right", density: "low" }, s.decision).config.override ?? "", /differs/);
-  });
 });
 
 describe("flow", () => {
-  test("walks intro → target → lines → review → practice", () => {
+  test("walks intro → target → lines → review", () => {
     let st = flowReducer(initialFlow, { type: "start", session: fresh(), variant: "fixed-b" });
     assert.equal(st.screen, "target-intro");
     st = flowReducer(st, { type: "trial-finished", trial: { ...newTargetSelectionTrial(st.session!, "fixed-b", VP), end: "done" } });
@@ -115,17 +95,25 @@ describe("flow", () => {
     }
     assert.equal(st.screen, "review");
     assert.equal(st.session!.status, "complete");
-    const setup = configurePracticeRound({ cue: "left", density: "standard" }, st.session!.decision);
-    st = flowReducer(st, { type: "practice-configured", setup });
-    assert.equal(st.screen, "practice-task");
-    st = flowReducer(st, { type: "practice-finished", trial: { ...newPracticeTrial(st.session!, setup.layout, VP), end: "done" } });
-    assert.equal(st.screen, "practice-reflection");
-    assert.equal(st.session!.practice.length, 1);
   });
 
   test("my-profile and profile screens redirect to history", () => {
     assert.equal(flowReducer(initialFlow, { type: "go", screen: "my-profile" }).screen, "history");
     assert.equal(flowReducer(initialFlow, { type: "go", screen: "profile" }).screen, "history");
+  });
+
+  test("old practice screens redirect to review when a session is open, otherwise home", () => {
+    assert.equal(flowReducer(initialFlow, { type: "go", screen: "practice-setup" }).screen, "home");
+    assert.equal(flowReducer(initialFlow, { type: "go", screen: "practice-task" }).screen, "home");
+    assert.equal(flowReducer(initialFlow, { type: "go", screen: "practice-reflection" }).screen, "home");
+    let st = flowReducer(initialFlow, { type: "open", session: fresh() });
+    assert.equal(st.screen, "review");
+    st = flowReducer(st, { type: "go", screen: "practice-setup" });
+    assert.equal(st.screen, "review");
+    st = flowReducer(st, { type: "go", screen: "practice-task" });
+    assert.equal(st.screen, "review");
+    st = flowReducer(st, { type: "go", screen: "practice-reflection" });
+    assert.equal(st.screen, "review");
   });
 });
 

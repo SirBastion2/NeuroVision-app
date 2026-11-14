@@ -1,6 +1,5 @@
 import {
   classifyResponse,
-  configurePracticeRound,
   CONTRACTS_VERSION,
   createLineBisectionLayout,
   createTargetSelectionLayout,
@@ -11,7 +10,6 @@ import {
   LINE_BISECTION_LINES,
   PRACTICE_RULES_VERSION,
   PROTOCOL_ID,
-  reflectPracticeRound,
   SCORER_ID,
   scoreSession,
   summarizeAssessmentTrend,
@@ -24,13 +22,9 @@ import {
   type InputModality,
   type LayoutVariant,
   type Point,
-  type PracticeChoice,
-  type PracticeReflection,
-  type PracticeRoundSetup,
   type PracticeSuggestion,
   type ScoringResult,
   type SessionRecord,
-  type TargetSelectionScore,
   type TrialEndReason,
   type TrialRecord,
   type Viewport,
@@ -142,10 +136,6 @@ export interface AppServices {
   comparableHistory(sessions?: readonly SessionRecord[]): Promise<ComparableHistory>;
   sessionsComparable(a: SessionRecord, b: SessionRecord): boolean;
   loadGazeLabData(): GazeLabData;
-  configurePractice(choice: PracticeChoice, suggested?: PracticeSuggestion | null): PracticeRoundSetup;
-  startPracticeTrial(session: SessionRecord, choice: PracticeChoice): { trial: TrialRecord; setup: PracticeRoundSetup };
-  appendPracticeRound(session: SessionRecord, trial: TrialRecord, config: PracticeSuggestion): SessionRecord;
-  reflectPractice(trial: TrialRecord, assessment?: TargetSelectionScore | null): PracticeReflection;
   health(): Promise<HealthResult>;
   uploadSession(input: PutSessionInput): Promise<SessionResource>;
   uploadTrace(sessionId: string, request: TraceUploadRequest, bytes: Uint8Array): Promise<TraceUploadResult>;
@@ -452,29 +442,6 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
         },
       };
     },
-
-    configurePractice: configurePracticeRound,
-
-    startPracticeTrial(session, choice) {
-      const setup = configurePracticeRound(choice, scoreSession(session).practice);
-      const trial = emptyTrial({
-        id: `${session.id}-practice-${session.practice.length + 1}`,
-        task: "target-selection",
-        layout: setup.layout,
-        modality: session.input,
-        viewport: session.viewport,
-      });
-      return { trial, setup };
-    },
-
-    appendPracticeRound(session, trial, config) {
-      return {
-        ...session,
-        practice: [...session.practice, { trial, config }],
-      };
-    },
-
-    reflectPractice: reflectPracticeRound,
 
     health() {
       return api.health();

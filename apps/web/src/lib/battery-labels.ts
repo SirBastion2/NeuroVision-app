@@ -38,7 +38,7 @@ export function scoredBatteryStepIndex(test: ScoredBatteryTest): number {
   return SCORED_BATTERY.findIndex((item) => item.id === test) + 1;
 }
 
-/** Home journey: scored tests in nav order, then review and practice. */
+/** Home journey: scored tests in nav order, then review. */
 export const HOME_JOURNEY_STEPS = [
   ...SCORED_BATTERY.map((test, index) => ({
     n: String(index + 1).padStart(2, "0"),
@@ -49,10 +49,5 @@ export const HOME_JOURNEY_STEPS = [
     n: String(SCORED_BATTERY_COUNT + 1).padStart(2, "0"),
     title: "Review",
     text: "See what was found, what was missed, and where.",
-  },
-  {
-    n: String(SCORED_BATTERY_COUNT + 2).padStart(2, "0"),
-    title: "Practice",
-    text: "An explained cue suggestion, then up to three rounds.",
   },
 ] as const;

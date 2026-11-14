@@ -4,16 +4,12 @@ import {
   SCORER_ID,
   createLineBisectionLayout,
   createTargetSelectionLayout,
-  fadePracticeCue,
   scoreSession,
-  scoreTargetSelection,
   suggestPractice,
   type InputModality,
   type LayoutVariant,
-  type PracticeSuggestion,
   type SessionRecord,
   type SessionSource,
-  type TaskLayout,
   type TrialEndReason,
   type TrialRecord,
   type Viewport,
@@ -23,10 +19,7 @@ import {
 export const TIME_LIMIT_MS = {
   "target-selection": 60_000,
   "line-bisection": 15_000,
-  practice: 30_000,
 } as const;
-
-export const MAX_PRACTICE_ROUNDS = 3;
 
 export function profileIdFor(alias: string): string {
   const slug = alias
@@ -93,15 +86,6 @@ export function newLineTrial(session: SessionRecord, index: number, viewport: Vi
   return { ...blankTrial(session, `${session.id}-lb-${index}`, viewport), task: "line-bisection", layout, line };
 }
 
-/** Practice uses the target-selection task kind but is stored in `session.practice`, never in `trials`. */
-export function newPracticeTrial(session: SessionRecord, layout: TaskLayout, viewport: Viewport): TrialRecord {
-  return {
-    ...blankTrial(session, `${session.id}-practice-${session.practice.length + 1}`, viewport),
-    task: "target-selection",
-    layout,
-  };
-}
-
 export function isInterruption(end: TrialEndReason): boolean {
   return end === "stop" || end === "resize" || end === "hidden";
 }
@@ -128,14 +112,4 @@ export function recordAssessmentTrial(session: SessionRecord, trial: TrialRecord
     completedAt: now.toISOString(),
   };
   return { session: { ...ended, decision: scoreSession(ended).practice }, finished };
-}
-
-export function addPracticeRound(session: SessionRecord, trial: TrialRecord, config: PracticeSuggestion): SessionRecord {
-  return { ...session, practice: [...session.practice, { trial, config }] };
-}
-
-/** Applies the domain fading rule to completed practice rounds. */
-export function nextPracticeConfig(session: SessionRecord, current: PracticeSuggestion): PracticeSuggestion {
-  const rounds = session.practice.map((round) => ({ score: scoreTargetSelection(round.trial), config: round.config }));
-  return fadePracticeCue(rounds, current);
 }

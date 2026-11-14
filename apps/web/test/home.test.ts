@@ -22,7 +22,7 @@ function renderHome() {
 }
 
 describe("Home hero", () => {
-  it("lists the scored battery, Review, and Practice, and names three short tasks", () => {
+  it("lists the scored battery and Review, and names three short tasks", () => {
     const html = renderHome();
     assert.match(html, /Three short tasks record every response/);
     assert.match(html, /it is not a diagnosis/);
@@ -41,6 +41,9 @@ describe("Home hero", () => {
     assert.doesNotMatch(html, /My Profile/);
     assert.doesNotMatch(html, /Clinician/);
     assert.doesNotMatch(html, /from this browser/);
+    assert.doesNotMatch(html, /Practice/);
+    assert.doesNotMatch(html, /practice setup/);
+    assert.doesNotMatch(html, /practice rounds/);
     assert.match(html, /History/);
     assert.match(html, /Sessions over time/);
     assert.match(html, /Demo run/);

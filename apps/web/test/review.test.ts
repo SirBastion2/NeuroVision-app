@@ -32,7 +32,6 @@ const review = () =>
     createElement(Review, {
       session,
       saveError: null,
-      onPractice() {},
       onHistory() {},
       onHome() {},
     }),
@@ -56,6 +55,10 @@ describe("session review board", () => {
     assert.match(html, />Home</);
     assert.doesNotMatch(html, /Open Clinician Dashboard/);
     assert.doesNotMatch(html, /Clinician Dashboard/);
+    assert.doesNotMatch(html, /Set up practice/);
+    assert.doesNotMatch(html, /Practice suggestion/);
+    assert.doesNotMatch(html, /Another practice round/);
+    assert.doesNotMatch(html, /Cue the /);
   });
 
   it("shows found vs missed on a clean board, with search order off by default", () => {
@@ -144,7 +147,7 @@ describe("session review board", () => {
     assert.match(html, /Sessions over time/);
     assert.match(html, />Participant</);
     assert.match(html, />Rings found</);
-    assert.match(html, />Practice</);
+    assert.doesNotMatch(html, />Practice</);
     assert.match(html, /Left vs right/);
     assert.doesNotMatch(html, />Alias</);
     assert.doesNotMatch(html, /My Profile/);
