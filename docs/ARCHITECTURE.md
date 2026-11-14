@@ -160,55 +160,68 @@ Screens talk to domain, gaze, storage, and the HTTP API through `apps/web/src/se
 | `startSession` | Create a live assessment `SessionRecord` with the fixed target-selection layout and five line-bisection trials |
 | `recordClick` / `finishTrial` | Append a classified `ResponseEvent` and close a trial |
 | `completeSession` / `score` | Mark the record complete and run `scoreSession` |
-| `save` / `load` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write) |
+| `save` / `load` / `remove` / `listHistory` | Persist through a `HistoryStore` (`parseSessionRecord` runs before every write) |
 | `comparableHistory` | `summarizeAssessmentTrend` / `areSessionsComparable` over saved records |
 | `loadDemonstrationSessions` / `seedDemonstrationHistory` | Exported demonstration sessions |
 | `loadGazeLabData` | Demonstration click sequence, two gaze streams, calibration report, plus simulated lab traces from `@neurovision/gaze` |
 | `configurePractice` / `startPracticeTrial` / `appendPracticeRound` / `reflectPractice` | Practice setup and `reflectPracticeRound` |
 | `health` / `uploadSession` / `uploadTrace` | Typed calls to the API health, session, and trace-upload routes |
+| `enqueueUpload` / `queueState` / `drainQueue` | Offline upload queue: persist session/trace jobs, retry with backoff when online, idempotent by session and batch id |
 | `pollProcessingState` | Dashboard polling of processing state with exponential backoff; stops on `ready` or `failed` |
 | `exportParticipant` / `deleteParticipant` | Participant export bundle and confirmed delete |
-| `beginOidcRedirect` / `completeOidcCallback` / `getAccessToken` | Browser OIDC authorization-code + PKCE; access token stays in memory |
+| `beginSignIn` / `completeSignIn` / `signInLocal` / `getMe` / `signOut` | Browser sign-in through the API's `/api/v1/auth/login` and `/api/v1/auth/callback` (cookie + CSRF). `signInLocal` posts to `/api/v1/auth/local`. |
+
+Screens use `apps/web/src/data/sessionStore.ts` as a thin adapter over this HistoryStore. Sign-in, export, delete, and upload-queue chrome are shown only when the API client is enabled.
 
 ### History store
 
-The default store is `createPackageHistoryStore` from `@neurovision/storage` (the envelope HistoryStore, `kind: "package"`) when that package is in the workspace and a key-value backend such as `localStorage` is available. Pass a store into `createAppServices({ store })` to override. The standalone HTML build always uses `createMemoryStore()` (`kind: "memory"`). When `packages/storage` is not in the workspace, the Vite alias and tsconfig path resolve `@neurovision/storage` to `apps/web/src/services/storage-unavailable.ts`, and the default is in-memory.
+The default store is `createPackageHistoryStore` from `@neurovision/storage` (the envelope HistoryStore, `kind: "package"`, key `spatial-patterns:envelope:v1`) when that package is in the workspace and a key-value backend such as `localStorage` is available. `load` maps envelope `sessions` and, on `EnvelopeError`, returns `{ sessions: [], rejected: 0, error }` without replacing the stored value. `save` calls `saveSession`. `remove` filters by id and writes the envelope back. A one-time import copies malformed records from the screens' `neurovision.web.sessions` envelope aside before valid records are written into the package envelope.
+
+Pass a store into `createAppServices({ store })` to override. The standalone HTML build always uses `createMemoryStore()` (`kind: "memory"`). When `packages/storage` is not in the workspace, the Vite alias and tsconfig path resolve `@neurovision/storage` to `apps/web/src/services/storage-unavailable.ts`, and the default is in-memory.
 
 ### HTTP API client
 
-`createApiClient` / `createAppServices` read `VITE_API_BASE_URL`. When that value is empty, or when the standalone build is active (`VITE_STANDALONE=true` or a `file:` page), the client is disabled and service methods throw `ApiOfflineError` without calling `fetch`.
+`createApiClient` / `createAppServices` read `VITE_API_BASE_URL`. When that value is empty, or when the standalone build is active (`VITE_STANDALONE=true` or a `file:` page), the client is disabled and service methods throw `ApiOfflineError` without calling `fetch`. Set `VITE_API_BASE_URL=/` to use same-origin routes (the Vite dev server proxies `/api` and `/health` to `http://127.0.0.1:3001`).
 
-The client matches the routes `apps/api` is expected to expose. **Today `apps/api/src` only registers `GET /health`.** The other paths below are typed in the web client so the dashboard can call them once the API adds them; they are missing from the current API process.
+The client matches the routes `apps/api` registers. Requests use `credentials: "include"` and send `x-csrf-token` from the `nv_csrf` cookie (or `/api/v1/me`) on POST, PUT, and DELETE.
 
-| Client method | Method and path | On `apps/api` today |
-| --- | --- | --- |
-| `health` | `GET /health` | Present |
-| `putSession` | `PUT /api/v1/sessions/:sessionId` | Missing |
-| `createTraceUpload` | `POST /api/v1/sessions/:sessionId/trace-uploads` | Missing |
-| `putTraceContent` | `PUT /api/v1/sessions/:sessionId/trace-uploads/:traceId/content` | Missing |
-| `getSession` / `getProcessingState` / `pollProcessingState` | `GET /api/v1/sessions/:sessionId` (processing field + `processingDetail`) | Missing (no dedicated processing-state route either) |
-| `exportParticipant` | `POST /api/v1/participants/:participantId/exports` | Missing |
-| `deleteParticipant` | `DELETE /api/v1/participants/:participantId` (`{ confirm: true }`) | Missing |
+| Client method | Method and path |
+| --- | --- |
+| `health` | `GET /health` |
+| `getMe` | `GET /api/v1/me` |
+| `completeAuthCallback` | `GET /api/v1/auth/callback` |
+| `signInLocal` | `POST /api/v1/auth/local` |
+| `logout` | `POST /api/v1/auth/logout` |
+| `putSession` | `PUT /api/v1/sessions/:sessionId` |
+| `putBatch` | `PUT /api/v1/sessions/:sessionId/batches/:batchId` |
+| `finalizeSession` | `POST /api/v1/sessions/:sessionId/finalize` |
+| `createTraceUpload` | `POST /api/v1/sessions/:sessionId/trace-uploads` |
+| `putTraceContent` | `PUT /api/v1/sessions/:sessionId/trace-uploads/:traceId/content` |
+| `getSession` / `getProcessingState` / `pollProcessingState` | `GET /api/v1/sessions/:sessionId` (processing field + `processingDetail`) |
+| `exportParticipant` | `POST /api/v1/participants/:participantId/exports` |
+| `deleteParticipant` | `DELETE /api/v1/participants/:participantId` (`{ confirm: true }`) |
 
 `pollProcessingState` fetches immediately, then waits `initialDelayMs` (default 250ms) doubling each time up to `maxDelayMs` (default 4s) until `processing` is `ready` or `failed`.
 
-When an in-memory OIDC access token is present, requests send `Authorization: Bearer <token>`.
+### Offline upload queue
 
-### Browser OIDC (authorization code + PKCE)
+`createUploadQueue` persists pending session and optional trace uploads on the same key-value backend (`spatial-patterns:upload-queue:v1`). Jobs are keyed by session id (batch id `"{sessionId}-batch-1"`). A 409 conflict is treated as already stored. While offline, jobs stay queued; an `online` event and `drainQueue()` retry with exponential backoff. Reloading reads the persisted envelope and resets in-flight `uploading` jobs back to `queued`. `queueState()` / `subscribeQueue` expose pending, uploading, acknowledged, and blocked counts.
 
-`apps/api` currently exposes no auth or OIDC routes. The helper is therefore configured entirely from Vite env:
+After a live assessment ends, screens call `enqueueUpload`. The queued work is `PUT` session, `PUT` batch, optional trace bytes, then `POST` finalize.
 
-| Variable | Role |
+### Browser sign-in (API routes)
+
+The web app does not run OIDC PKCE in the browser. Sign-in navigates to the API:
+
+| Route | Role |
 | --- | --- |
-| `VITE_OIDC_AUTHORIZE_URL` | Authorization endpoint (`response_type=code`, S256 PKCE) |
-| `VITE_OIDC_TOKEN_URL` | Token endpoint (`grant_type=authorization_code` + `code_verifier`) |
-| `VITE_OIDC_CLIENT_ID` | Public client id |
-| `VITE_OIDC_REDIRECT_URI` | Browser callback URL |
-| `VITE_OIDC_SCOPE` | Optional; default `openid` |
+| `GET /api/v1/auth/login` | API starts the provider redirect (PKCE lives on the server) |
+| `GET /api/v1/auth/callback` | API exchanges the code, sets `nv_session` / `nv_csrf`, redirects to `/` |
+| `POST /api/v1/auth/local` | Local identity for `IDENTITY_MODE=local` |
+| `GET /api/v1/me` | Current subject, org, role, and CSRF token |
+| `POST /api/v1/auth/logout` | Clears the API session cookies |
 
-The in-flight PKCE verifier and `state` are stored in `sessionStorage` (or an injected transaction store) so the redirect can complete. The access token is not written to storage. If those env values are unset, `beginOidcRedirect` / `buildAuthorizationUrl` throw `OidcConfigError`.
-
-If `apps/api` later adds cookie-based login (`/api/v1/auth/login` and `/api/v1/auth/callback`), keep this browser PKCE helper behind the Vite config above; do not mix the two token models in the service layer without an explicit choice.
+`beginSignIn` returns `{ url }` for `/api/v1/auth/login`. `completeSignIn` forwards `code` and `state` to `/api/v1/auth/callback`. These controls are hidden when the API client is disabled (standalone or empty `VITE_API_BASE_URL`).
 
 ## Standalone HTML build
 

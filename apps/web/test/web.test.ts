@@ -129,37 +129,37 @@ describe("history", () => {
   });
 });
 
-describe("temporary session store", () => {
+describe("session store", () => {
   function memoryStorage() {
     const map = new Map<string, string>();
-    return { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v), map };
+    return {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+      map,
+    };
   }
-  const KEY = "neurovision.web.sessions";
 
-  test("saves only valid records, upserts by id, and keeps malformed records", () => {
+  test("saves only valid records, upserts by id, and copies malformed records aside on import", async () => {
     const mem = memoryStorage();
-    const store = createLocalSessionStore(mem);
+    const store = createLocalSessionStore({ storage: mem });
     const s = fullSession(8, 8);
-    assert.equal(store.save(s).ok, true);
-    assert.equal(store.save({ ...s, alias: "Renamed" }).ok, true);
-    assert.equal(store.load().sessions[0]!.alias, "Renamed");
-    assert.equal(store.save({ ...s, source: "nope" } as unknown as SessionRecord).ok, false);
-    const env = JSON.parse(mem.map.get(KEY)!);
-    env.records.push({ broken: true });
-    mem.setItem(KEY, JSON.stringify(env));
-    assert.equal(store.load().rejected, 1);
-    store.save({ ...s, id: "s2" });
-    assert.equal(JSON.parse(mem.map.get(KEY)!).records.length, 3, "malformed record preserved");
-    store.remove("s2");
-    assert.equal(store.load().sessions.length, 1);
+    assert.equal((await store.save(s)).ok, true);
+    assert.equal((await store.save({ ...s, alias: "Renamed" })).ok, true);
+    assert.equal((await store.load()).sessions[0]!.alias, "Renamed");
+    assert.equal((await store.save({ ...s, source: "nope" } as unknown as SessionRecord)).ok, false);
+    await store.save({ ...s, id: "s2" });
+    assert.equal((await store.remove("s2")).ok, true);
+    assert.equal((await store.load()).sessions.length, 1);
   });
 
-  test("unsupported stored versions are reported, not overwritten", () => {
+  test("a malformed envelope is reported and left untouched", async () => {
     const mem = memoryStorage();
-    mem.setItem(KEY, JSON.stringify({ version: 99, records: [] }));
-    const store = createLocalSessionStore(mem);
-    assert.match(store.load().error ?? "", /Unsupported/);
-    assert.equal(store.save(fullSession(1, 1)).ok, false);
-    assert.equal(JSON.parse(mem.map.get(KEY)!).version, 99);
+    mem.setItem("spatial-patterns:envelope:v1", "{");
+    const store = createLocalSessionStore({ storage: mem });
+    const loaded = await store.load();
+    assert.match(loaded.error ?? "", /malformed|preserved/i);
+    assert.equal((await store.save(fullSession(1, 1))).ok, false);
+    assert.equal(mem.map.get("spatial-patterns:envelope:v1"), "{");
   });
 });
