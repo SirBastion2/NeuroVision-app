@@ -379,13 +379,21 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .stats .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .stat-label { font-size: 0.74rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
 .stat-value { font-family: var(--serif); font-size: 1.85rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.stat-sub { font-size: 0.8rem; color: var(--muted); }
-.review-grid { display: grid !important; grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr); gap: 22px; align-items: start; }
+.stat-sub { font-size: 0.8rem; color: var(--muted); line-height: 1.35; }
+.review-grid { display: grid !important; grid-template-columns: minmax(0, 1.9fr) minmax(200px, 0.85fr); gap: 18px; align-items: start; }
 .plot { margin: 0; padding: 0 14px 14px; }
 .plot .board-surface { stroke: none; fill: var(--surface-2); }
 .plot .ring.found { stroke: var(--found); stroke-width: 3.6; }
 .plot .ring.missed { stroke: var(--missed); stroke-dasharray: 5 4; }
-.plot .muted { opacity: 0.16; }
+.plot .muted { opacity: 0.07; }
+.plot .midline { stroke: var(--ink); stroke-width: 1.4; opacity: 0.28; stroke-dasharray: none; }
+.half-fill { pointer-events: none; }
+.half-fill.left { fill: color-mix(in srgb, var(--accent) 8%, transparent); }
+.half-fill.right { fill: color-mix(in srgb, var(--brass) 10%, transparent); }
+.region-tint { fill: var(--missed); opacity: calc(var(--miss) * 0.16); pointer-events: none; }
+.plot-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 16px; }
+.plot-tools .check { font-size: 0.8rem; color: var(--muted); font-weight: 600; gap: 6px; }
+.plot-tools .check input { width: 15px; height: 15px; }
 .search-path { fill: none; stroke: var(--found); stroke-width: 2; opacity: 0.4; stroke-linejoin: round; }
 .distractor-hit line { stroke: var(--missed); stroke-width: 3.5; stroke-linecap: round; }
 .order-badge circle { fill: var(--surface); stroke: var(--found); stroke-width: 1.5; }
@@ -400,14 +408,14 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .key.centre, .key.mark { border: 0; border-radius: 1px; width: 3px; height: 14px; vertical-align: -3px; margin-left: 10px; }
 .key.centre { background: var(--line-2); margin-left: 0; }
 .key.mark { background: var(--brass); }
-.regions { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, auto); grid-auto-flow: column; gap: 3px; margin-top: 14px; border-radius: 12px; overflow: hidden; }
-.region { padding: 12px 14px; display: flex; flex-direction: column; background: color-mix(in srgb, var(--missed) calc(var(--miss) * 82%), var(--surface-2)); color: var(--ink); }
-.region.deep { color: #fffdf8; }
-:root[data-theme="dark"] .region.deep { color: #0b1310; }
-.region-name { font-size: 0.72rem; text-transform: capitalize; opacity: 0.75; font-weight: 600; }
-.region strong { font-family: var(--serif); font-size: 1.5rem; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.region strong small { font-size: 0.9rem; color: inherit; opacity: 0.7; }
-.region-sub { font-size: 0.75rem; opacity: 0.7; }
+.regions-card { padding: 16px 16px 14px; }
+.regions-card h3 { font-size: 1rem; }
+.regions { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, auto); grid-auto-flow: column; gap: 2px; margin-top: 10px; border-radius: 10px; overflow: hidden; }
+.region { padding: 8px 10px; display: flex; flex-direction: column; background: color-mix(in srgb, var(--missed) calc(var(--miss) * 36%), var(--surface-2)); color: var(--ink); }
+.region-name { font-size: 0.68rem; text-transform: capitalize; opacity: 0.7; font-weight: 600; }
+.region strong { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.region strong small { font-size: 0.78rem; color: inherit; opacity: 0.7; }
+.region-sub { font-size: 0.7rem; opacity: 0.65; }
 .deviations { list-style: none; margin: 0; padding: 0; }
 .deviation { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px; gap: 14px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .deviation-n { font-family: var(--serif); font-size: 1.2rem; color: var(--brass); }

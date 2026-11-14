@@ -11,7 +11,7 @@ import {
 import { Eyebrow } from "../components/Brand";
 import { TrendChart } from "../components/TrendChart";
 import type { LoadResult } from "../data/sessionStore";
-import { date, dateTime, pct, points } from "../lib/format";
+import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, date, dateTime, missShareGap, pct } from "../lib/format";
 import { jobForSession, processingLabel, showApiControls } from "../services/screen-wiring";
 import type { ProcessingSnapshot } from "../services/api-client";
 import type { UploadQueueState } from "../services/upload-queue";
@@ -24,6 +24,7 @@ interface Props {
   onOpenBattery?: (record: BatteryRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
+  onClinicianDashboard?: () => void;
   apiEnabled?: boolean;
   processing?: Record<string, ProcessingSnapshot>;
   queue?: UploadQueueState;
@@ -47,6 +48,7 @@ export function History({
   onOpenBattery,
   onDelete,
   onHome,
+  onClinicianDashboard,
   apiEnabled = false,
   processing = {},
   queue,
@@ -140,8 +142,8 @@ export function History({
             points={trend.points.map((p) => ({ id: p.sessionId, label: date(p.completedAt), value: p.hitRate }))}
           />
           <TrendChart
-            title="Omission gap, left − right"
-            subtitle="percentage points · 0 = balanced"
+            title={LEFT_RIGHT_MISSES_LABEL}
+            subtitle={LEFT_RIGHT_MISSES_HINT}
             min={-100}
             max={100}
             zeroLine
@@ -182,7 +184,7 @@ export function History({
                 <th>Alias</th>
                 <th>Source</th>
                 <th>Found</th>
-                <th>Gap</th>
+                <th>Left vs right</th>
                 <th>Pattern</th>
                 <th>Trend</th>
                 {apiControls && <th>Server</th>}
@@ -210,7 +212,7 @@ export function History({
                       <span className={`badge ${session.source}`}>{sessionSourceLabel(session.source)}</span>
                     </td>
                     <td>{ts ? `${ts.hits}/${ts.available}` : "n/a"}</td>
-                    <td>{points(ts?.omissionAsymmetry ?? null, 0)}</td>
+                    <td>{missShareGap(ts?.omissionAsymmetry ?? null)}</td>
                     <td>{result.spatialPattern.kind.replace("-", " ")}</td>
                     <td className="small">{trendCell(session)}</td>
                     {apiControls && (
@@ -272,6 +274,11 @@ export function History({
               Delete participant
             </button>
           ))}
+        {onClinicianDashboard && (
+          <button className="ghost" type="button" onClick={onClinicianDashboard}>
+            Clinician Dashboard
+          </button>
+        )}
         <button onClick={onHome}>Home</button>
       </div>
 

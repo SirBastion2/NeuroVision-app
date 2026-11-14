@@ -17,7 +17,7 @@ import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
 import { TaskRunner } from "../components/TaskRunner";
-import { pct, points, seconds, signedPct } from "../lib/format";
+import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap, pct, points, seconds, signedPct } from "../lib/format";
 import { TIME_LIMIT_MS, createSession, newLineTrial, newTargetSelectionTrial, recordAssessmentTrial } from "../lib/session";
 import { LineIntro, TargetIntro } from "../screens/Intros";
 import { StarryIntro, StarryTask, type StarryRun } from "./StarryTask";
@@ -253,7 +253,14 @@ function CombinedReport({
 
       <section className="stat-row card">
         {sky && <Stat label="Starry Night · gap, left − right" value={points(sky.observation.value * 100)} sub={`${sky.left.hits}/${sky.left.n} left · ${sky.right.hits}/${sky.right.n} right`} />}
-        {ts && <Stat label="Hollow rings · omission gap" value={points(ts.omissionAsymmetry)} sub={`${ts.hits} of ${ts.available} found`} />}
+        {ts && (
+          <Stat
+            label={`Hollow rings · ${LEFT_RIGHT_MISSES_LABEL}`}
+            value={missShareGap(ts.omissionAsymmetry)}
+            sub={LEFT_RIGHT_MISSES_HINT}
+            title={LEFT_RIGHT_MISSES_HINT}
+          />
+        )}
         {tests.includes("lines") && <Stat label="Line bisection · median" value={signedPct(lb.signedMedian)} sub="positive = right of centre" />}
       </section>
 
@@ -276,17 +283,20 @@ function CombinedReport({
             </section>
             <section className="review-grid">
               <div className="card pad-0">
-                <div className="card-head">
-                  <h3>Response order</h3>
-                  <span className="small">
-                    Found {pct(ts.hitRate)} · first ring after {seconds(ts.firstLatencyMs)}
-                  </span>
-                </div>
-                <ResponseOrderPlot layout={tsTrial.layout} orderedHits={ts.orderedHits} events={tsTrial.events} />
+                <ResponseOrderPlot
+                  layout={tsTrial.layout}
+                  orderedHits={ts.orderedHits}
+                  events={tsTrial.events}
+                  headingMeta={
+                    <span className="small">
+                      Found {pct(ts.hitRate)} · first ring after {seconds(ts.firstLatencyMs)}
+                    </span>
+                  }
+                />
               </div>
-              <div className="card">
+              <div className="card regions-card">
                 <h3>Omissions by region</h3>
-                <p className="small">Laid out as on the board. Darker means more missed.</p>
+                <p className="small">Darker = more missed.</p>
                 <RegionGrid regions={ts.regions} />
               </div>
             </section>

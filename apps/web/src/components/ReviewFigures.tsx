@@ -44,7 +44,7 @@ export function RegionGrid({ regions }: { regions: Record<BoardRegion, Selection
         return (
           <div
             key={region}
-            className={`region ${rate > 0.72 ? "deep" : ""}`}
+            className="region"
             role="cell"
             style={{ ["--miss" as string]: String(rate) }}
             title={`${region.replace("-", " ")}: ${r.omissions} of ${r.available} missed`}
@@ -118,9 +118,21 @@ export function LineDeviations({ trials, total }: { trials: readonly TrialRecord
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "warn" }) {
+export function Stat({
+  label,
+  value,
+  sub,
+  tone,
+  title,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "good" | "warn";
+  title?: string;
+}) {
   return (
-    <div className={`stat ${tone ?? ""}`}>
+    <div className={`stat ${tone ?? ""}`} title={title}>
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
       {sub && <span className="stat-sub">{sub}</span>}

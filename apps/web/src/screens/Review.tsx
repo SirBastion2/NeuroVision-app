@@ -12,7 +12,20 @@ import {
 import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
-import { dateTime, pct, points, seconds, signedPct } from "../lib/format";
+import {
+  LEFT_RIGHT_MISSES_HINT,
+  LEFT_RIGHT_MISSES_LABEL,
+  SEARCH_DISTANCE_HINT,
+  SEARCH_DISTANCE_LABEL,
+  WRONG_TAPS_LABEL,
+  boardWidths,
+  dateTime,
+  missShareGap,
+  pct,
+  seconds,
+  signedPct,
+  wrongTapsHint,
+} from "../lib/format";
 import { MAX_PRACTICE_ROUNDS } from "../lib/session";
 
 interface Props {
@@ -20,7 +33,6 @@ interface Props {
   saveError: string | null;
   onPractice: () => void;
   onHistory: () => void;
-  onProfile: () => void;
   onHome: () => void;
 }
 
@@ -41,7 +53,7 @@ const PATTERN_TITLE: Record<SpatialPatternKind, string> = {
   insufficient: "Not enough data",
 };
 
-export function Review({ session, saveError, onPractice, onHistory, onProfile, onHome }: Props) {
+export function Review({ session, saveError, onPractice, onHistory, onHome }: Props) {
   const result = useMemo(() => scoreSession(session), [session]);
   const ts = result.targetSelection;
   const tsTrial = findTargetSelectionTrial(session);
@@ -92,23 +104,39 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
         <>
           <section className="stat-row">
             <Stat label="Targets found" value={`${ts.hits} / ${ts.available}`} sub={pct(ts.hitRate)} />
-            <Stat label="Omission gap, left − right" value={points(ts.omissionAsymmetry)} sub="percentage points" />
+            <Stat
+              label={LEFT_RIGHT_MISSES_LABEL}
+              value={missShareGap(ts.omissionAsymmetry)}
+              sub={LEFT_RIGHT_MISSES_HINT}
+              title={LEFT_RIGHT_MISSES_HINT}
+            />
             <Stat label="First target" value={seconds(ts.firstLatencyMs)} />
-            <Stat label="Disks selected" value={String(ts.distractors)} sub={`${ts.repeats} repeat${ts.repeats === 1 ? "" : "s"}`} />
-            <Stat label="Search path" value={String(Math.round(ts.pathDistance))} sub="board units" />
+            <Stat
+              label={WRONG_TAPS_LABEL}
+              value={String(ts.distractors)}
+              sub={wrongTapsHint(ts.repeats)}
+              title={wrongTapsHint(ts.repeats)}
+            />
+            <Stat
+              label={SEARCH_DISTANCE_LABEL}
+              value={boardWidths(ts.pathDistance)}
+              sub={SEARCH_DISTANCE_HINT}
+              title={SEARCH_DISTANCE_HINT}
+            />
           </section>
 
           <section className="review-grid">
             <div className="card pad-0">
-              <div className="card-head">
-                <h3>Response order</h3>
-                <span className="small">Ended: {END_LABEL[tsTrial.end]}</span>
-              </div>
-              <ResponseOrderPlot layout={tsTrial.layout} orderedHits={ts.orderedHits} events={tsTrial.events} />
+              <ResponseOrderPlot
+                layout={tsTrial.layout}
+                orderedHits={ts.orderedHits}
+                events={tsTrial.events}
+                headingMeta={<span className="small">Ended: {END_LABEL[tsTrial.end]}</span>}
+              />
             </div>
-            <div className="card">
+            <div className="card regions-card">
               <h3>Omissions by region</h3>
-              <p className="small">Laid out as on the board. Darker means more missed.</p>
+              <p className="small">Darker = more missed.</p>
               <RegionGrid regions={ts.regions} />
             </div>
           </section>
@@ -152,7 +180,7 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
                     <strong>
                       {s.hits}/{s.available}
                     </strong>
-                    <span>gap {points(s.omissionAsymmetry)}</span>
+                    <span>{missShareGap(s.omissionAsymmetry)}</span>
                     <span>
                       cue {round.config.cue}
                       {round.config.cue !== "none" && ` · level ${round.config.level}`}
@@ -220,11 +248,6 @@ export function Review({ session, saveError, onPractice, onHistory, onProfile, o
         <button className="ghost" onClick={onHistory}>
           History
         </button>
-        {session.source === "live" && (
-          <button className="primary" onClick={onProfile}>
-            Open Clinician Dashboard
-          </button>
-        )}
         <button onClick={onHome}>Home</button>
       </div>
     </div>

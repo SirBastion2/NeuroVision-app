@@ -15,7 +15,7 @@ import { Board, SideCue } from "../components/Board";
 import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { Stat } from "../components/ReviewFigures";
-import { points } from "../lib/format";
+import { LEFT_RIGHT_MISSES_HINT, LEFT_RIGHT_MISSES_LABEL, missShareGap } from "../lib/format";
 import { MAX_PRACTICE_ROUNDS, nextPracticeConfig } from "../lib/session";
 
 interface SetupProps {
@@ -143,15 +143,22 @@ export function PracticeReflection({ session, config, onAnother, onReview }: Ref
 
       <section className="review-grid">
         <div className="card pad-0">
-          <div className="card-head">
-            <h3>This round</h3>
-          </div>
-          <ResponseOrderPlot layout={last.trial.layout} orderedHits={r.orderedHits} events={last.trial.events} />
+          <ResponseOrderPlot
+            layout={last.trial.layout}
+            orderedHits={r.orderedHits}
+            events={last.trial.events}
+            heading="This round"
+          />
         </div>
         <div className="stats">
           <Stat label="Left half found" value={`${r.hits.left} / ${score.left.available}`} sub={vs ? `${delta(vs.omissions.left)} omissions vs assessment` : undefined} />
           <Stat label="Right half found" value={`${r.hits.right} / ${score.right.available}`} sub={vs ? `${delta(vs.omissions.right)} omissions vs assessment` : undefined} />
-          <Stat label="Omission gap" value={points(r.omissionAsymmetry)} />
+          <Stat
+            label={LEFT_RIGHT_MISSES_LABEL}
+            value={missShareGap(r.omissionAsymmetry)}
+            sub={LEFT_RIGHT_MISSES_HINT}
+            title={LEFT_RIGHT_MISSES_HINT}
+          />
           {vs && <Stat label="Hit rate vs assessment" value={delta(Math.round(vs.hitRateDelta * 100), " pts")} sub="different board, so indicative only" />}
         </div>
       </section>
