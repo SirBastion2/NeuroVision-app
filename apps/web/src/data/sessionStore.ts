@@ -1,5 +1,6 @@
 import { isSessionRecord, parseSessionRecord, type SessionRecord } from "@neurovision/domain";
 import { ENVELOPE_KEY, EnvelopeError, loadEnvelope, saveSession } from "@neurovision/storage";
+import { removeFromClinicianHistory, upsertClinicianHistory } from "../services/browser-session-bridge";
 import type { HistoryStore } from "../services/history-store";
 import { isEnvelopeError } from "../services/history-store";
 import type { KeyValueStore } from "../services/package-store";
@@ -7,7 +8,8 @@ import type { KeyValueStore } from "../services/package-store";
 /**
  * Screen-facing session store. Persistence goes through the service layer's
  * storage-backed HistoryStore (the `@neurovision/storage` envelope). The
- * in-memory path is only for the standalone build.
+ * in-memory path is only for the standalone build. Successful browser saves
+ * also mirror into clinician history so Profile lists the same live sessions.
  */
 export interface LoadResult {
   sessions: SessionRecord[];
@@ -56,6 +58,10 @@ function rejectedCount(storage: KeyValueStore | null): number {
   } catch {
     return 1;
   }
+}
+
+function shouldMirrorClinician(standalone: boolean): boolean {
+  return !standalone;
 }
 
 /**
@@ -151,13 +157,12 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
         const valid = parseSessionRecord(session);
         if (history) {
           await history.save(valid);
-          return { ok: true, error: null };
-        }
-        if (standalone || !storage) {
+        } else if (standalone || !storage) {
           memory.set(valid.id, structuredClone(valid));
-          return { ok: true, error: null };
+        } else {
+          saveSession(storage, valid);
         }
-        saveSession(storage, valid);
+        if (shouldMirrorClinician(standalone)) upsertClinicianHistory(valid);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -167,15 +172,14 @@ export function createLocalSessionStore(options: CreateLocalSessionStoreOptions 
       try {
         if (history) {
           await history.remove(id);
-          return { ok: true, error: null };
-        }
-        if (standalone || !storage) {
+        } else if (standalone || !storage) {
           memory.delete(id);
-          return { ok: true, error: null };
+        } else {
+          const envelope = loadEnvelope(storage);
+          const sessions = envelope.sessions.filter((item) => item.id !== id);
+          storage.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
         }
-        const envelope = loadEnvelope(storage);
-        const sessions = envelope.sessions.filter((item) => item.id !== id);
-        storage.setItem(ENVELOPE_KEY, JSON.stringify({ ...envelope, sessions }));
+        if (shouldMirrorClinician(standalone)) removeFromClinicianHistory(id);
         return { ok: true, error: null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };

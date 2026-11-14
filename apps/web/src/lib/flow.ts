@@ -12,7 +12,9 @@ export type Screen =
   | "practice-task"
   | "practice-reflection"
   | "history"
-  | "gaze";
+  | "gaze"
+  | "my-profile"
+  | "profile";
 
 export interface FlowState {
   screen: Screen;

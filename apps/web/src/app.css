@@ -1,11 +1,15 @@
 :root {
-  --nv-ink: #10282a;
-  --nv-mist: #e8f1f0;
-  --nv-sea: #153e40;
-  --nv-foam: #f7fbfa;
+  --nv-ink: #1c2024;
+  --nv-mist: #e7ece7;
+  --nv-sea: #22382a;
+  --nv-foam: #f4f1ea;
+  --nv-brass: #b08d57;
   color: var(--nv-ink);
-  background: radial-gradient(1200px 600px at 50% -10%, #d7ebe8 0%, var(--nv-foam) 55%, #eef4f3 100%);
-  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  background:
+    radial-gradient(1100px 520px at 12% -8%, color-mix(in srgb, var(--nv-brass) 18%, #fff) 0%, transparent 55%),
+    radial-gradient(900px 480px at 88% 0%, color-mix(in srgb, var(--nv-sea) 14%, #fff) 0%, transparent 50%),
+    linear-gradient(180deg, #f7f5ef 0%, var(--nv-foam) 45%, #eef1ec 100%);
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
 * {
@@ -18,7 +22,7 @@ body {
 }
 
 .app-shell {
-  max-width: 960px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 1.25rem 1.5rem 3rem;
 }
@@ -32,6 +36,27 @@ body {
   margin-bottom: 1rem;
   border-bottom: 1px solid color-mix(in srgb, var(--nv-sea) 14%, transparent);
   background: transparent;
+}
+
+.app-nav {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.app-nav button {
+  border: 1px solid color-mix(in srgb, var(--nv-sea) 28%, transparent);
+  background: #fff;
+  color: var(--nv-sea);
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.app-nav button.active {
+  background: var(--nv-sea);
+  color: var(--nv-foam);
 }
 
 .brand-logo {

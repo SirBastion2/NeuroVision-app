@@ -25,6 +25,7 @@ interface Props {
   onStart: (alias: string, input: InputModality, variant: LayoutVariant) => void;
   onOpen: (session: SessionRecord) => void;
   onHistory: () => void;
+  onProfile: () => void;
   onGaze: () => void;
 }
 
@@ -67,7 +68,7 @@ const STEPS = [
   ["04", "Practice", "An explained cue suggestion, then up to three rounds."],
 ] as const;
 
-export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
+export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
   const [alias, setAlias] = useState("");
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
@@ -87,7 +88,7 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
             Two short board tasks record every response in space and time. The review shows what was found, what was
             missed, and on which side, then suggests a practice setup you can read and overrule.
           </p>
-          <p className="fineprint">Research prototype. Describes one session’s responses; it is not a diagnosis.</p>
+          <p className="fineprint">Research tool. Describes one session’s responses; it is not a diagnosis.</p>
         </div>
         <HeroBoard />
       </section>
@@ -159,6 +160,14 @@ export function Home({ onStart, onOpen, onHistory, onGaze }: Props) {
             <Eyebrow plain>History</Eyebrow>
             <h3>Sessions over time</h3>
             <p>Saved sessions and the trend across comparable assessments.</p>
+            <span className="link-arrow" aria-hidden>
+              →
+            </span>
+          </button>
+          <button className="card link-card" onClick={onProfile}>
+            <Eyebrow plain>My Profile</Eyebrow>
+            <h3>Your saved assessments</h3>
+            <p>See live sessions from this browser. Clinician tools stay under the account menu.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>
