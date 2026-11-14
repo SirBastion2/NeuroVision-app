@@ -215,3 +215,17 @@ export type {
 } from "./scoring.js";
 
 export { isSessionRecord, parseSessionRecord } from "./validate.js";
+
+export { combineEvidence, standardize, verdictFor, seProportionDiff, fitNorms, DEFAULT_NORMS } from "./evidence.js";
+export type { TestId, Hypothesis, TestNorm, TestObservation, EvidenceOptions, TestEvidence, EvidenceResult, Verdict } from "./evidence.js";
+export { generateScene, scoreScene, hitTest, centerOfCancellation, SCENE_DEFAULTS } from "./scene.js";
+export type { HideSide, SceneConfig, Scene, Lantern, Building, SceneWindow, SceneTap, SceneTapResult, SceneScore } from "./scene.js";
+export { generateClockTrials, scoreClock, numeralAngle, CLOCK_DEFAULTS } from "./clock.js";
+export type { ClockSide, ClockErrorType, StackPosition, ClockNumeral, ClockFace, ClockTrial, ClockResponse, ClockScore } from "./clock.js";
+export { generateGreyscalesTrials, scoreGreyscales, chosenDarkSide, greyscalesNormFor, GREYSCALES_DEFAULTS } from "./greyscales.js";
+export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, GreyscalesResponse, GreyscalesScore } from "./greyscales.js";
+export { generateBisectionLines, signedErrorPct, bisectionObservation } from "./bisection.js";
+export type { BisectionLine, BisectionResponse } from "./bisection.js";
+
+export { BATTERY_CONTRACT_VERSION, BATTERY_MODES, isBatteryRecord, parseBatteryRecord, scoreBatteryRecord } from "./battery.js";
+export type { BatteryMode, BatteryRecord, BatteryScore } from "./battery.js";
