@@ -12,17 +12,6 @@ The task runner draws every trial on a fixed 960×540 board. Pointers are conver
 
 Domain scoring is the only interpreter of recorded events. It walks events in elapsed-time order (sequence number as a tie-break), counts first target hits, omissions by side and vertical region, distractors, repeats, click-path length, and line midpoint error (percent of line length; right of center is positive). From the target-selection result it also emits a spatial-pattern summary and a practice suggestion (cue left / right / none, board density standard / low).
 
-## Battery scoring modules
-
-`@neurovision/domain` also exports these battery scorers (pure functions; they do not replace `scoreSession`):
-
-- evidence: `combineEvidence`, `standardize`, `verdictFor`, `seProportionDiff`, `fitNorms`, `DEFAULT_NORMS` (`TestId`, `Hypothesis`, `TestNorm`, `TestObservation`, `EvidenceOptions`, `TestEvidence`, `EvidenceResult`, `Verdict`)
-- scene: `generateScene`, `scoreScene`, `hitTest`, `centerOfCancellation`, `SCENE_DEFAULTS` (`HideSide`, `SceneConfig`, `Scene`, `Lantern`, `Building`, `SceneWindow`, `SceneTap`, `SceneTapResult`, `SceneScore`)
-- clock: `generateClockTrials`, `scoreClock`, `numeralAngle`, `CLOCK_DEFAULTS` (`ClockSide`, `ClockErrorType`, `StackPosition`, `ClockNumeral`, `ClockFace`, `ClockTrial`, `ClockResponse`, `ClockScore`)
-- greyscales: `generateGreyscalesTrials`, `scoreGreyscales`, `chosenDarkSide`, `greyscalesNormFor`, `GREYSCALES_DEFAULTS` (`DarkSide`, `BarPosition`, `ReadingDirection`, `GreyscalesTrial`, `GreyscalesResponse`, `GreyscalesScore`)
-- bisection: `generateBisectionLines`, `signedErrorPct`, `bisectionObservation` (`BisectionLine`, `BisectionResponse`)
-- battery: `BATTERY_CONTRACT_VERSION`, `parseBatteryRecord`, `scoreBatteryRecord` (`BatteryRecord`, `BatteryScore`). Stored records hold raw taps, trials, and responses only; scores are always recomputed.
-
 ## Product surfaces
 
 The UI work must match the supplied UI reference design (look, screens, and board layout). Do not copy that file into the repo.
@@ -62,24 +51,13 @@ scripts/              `npm run verify` and the standalone-file check
 | D+E | Task runner and UI (must match the UI reference design) | `apps/web` screens, board, instructions, review, practice, history chrome |
 | F | Integration across tasks, scoring, storage, gaze, and delivery | `apps/web/src/services/`, static / standalone HTML packaging, `npm run verify` |
 
-Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session records must pass `parseSessionRecord` before they are written. Stored battery records must pass `parseBatteryRecord` before they are written. Scoring and practice rules are pure functions with no DOM access. `@neurovision/domain` is the contract: other packages must import these types and `parse*` validators from it. Local copies in other packages are not the contract.
+Agent A exports `CONTRACTS_VERSION` from `@neurovision/domain`. Stored session records must pass `parseSessionRecord` before they are written. Scoring and practice rules are pure functions with no DOM access. `@neurovision/domain` is the contract: other packages must import these types and `parse*` validators from it. Local copies in other packages are not the contract.
 
 ## Contracts
 
-`CONTRACTS_VERSION` is **1.2.0**. Increment it when a stored session field is added, removed, or changes meaning, or when the battery record is added. `PracticeRound.transfer` is a stored session field (optional boolean: `true` means transfer-cue isolation). Battery records carry `BATTERY_CONTRACT_VERSION` (`battery-1.0.0`) on `BatteryRecord.contract` and must pass `parseBatteryRecord` before they are written.
+`CONTRACTS_VERSION` is **1.1.0**. Increment it when a stored session field is added, removed, or changes meaning. `PracticeRound.transfer` is a stored session field (optional boolean: `true` means transfer-cue isolation).
 
 Runtime validators follow `parseSessionRecord`: each `parse*` function throws if the value is invalid and returns a typed, copied object.
-
-### Battery record
-
-Stored under its own envelope. Scores are not stored; `scoreBatteryRecord` regenerates the scene from `seed` and `hide`, scores each test from raw responses, and calls `combineEvidence`. Mode `"demo"` with source `"live"` is invalid.
-
-| Export | Kind | Meaning |
-| --- | --- | --- |
-| `BATTERY_CONTRACT_VERSION` | `"battery-1.0.0"` | Battery record contract id stored on `BatteryRecord.contract`. |
-| `BatteryRecord` | `{ contract, id, mode, hide, seed, readingDirection, consent, source, startedAt, completedAt, scene, clock, greyscales, bisection, normsUsed }` | One battery run. `mode` is `"demo" \| "full"`. `source` is `"live" \| "demonstration"`. `greyscales` and `bisection` may be `null`. `parseBatteryRecord`. |
-| `parseBatteryRecord` | helper | Throws if any field is invalid; returns a typed copy. |
-| `scoreBatteryRecord` | helper | Pure rescoring from raw data: scene, clock, greyscales, bisection, `combineEvidence`. |
 
 ### Organization and identity
 
@@ -164,7 +142,6 @@ Imported records keep their original string separately:
 - Practice setup starts from `suggestPractice`.
 - Gaze lab consumes `GazeStream` (samples + tracking-gap intervals) and `CalibrationQualityReport` shapes; Agent C implements behavior.
 - Storage persists `SessionRecord` with `source: "live" | "demonstration"`. Imported `simulated` records are stored as `demonstration` and keep `ImportedSourceProvenance.original`.
-- Battery storage persists `BatteryRecord` under `neurovision:battery:v1` (`createBatteryStore`). `parseBatteryRecord` runs before every write. The standalone HTML build uses an in-memory key-value backend (`memoryStore()`).
 - Organization APIs persist `Organization`, `Membership` (`Role`), and org-scoped `Participant`.
 - Assignment APIs persist immutable `TaskAssignment` revisions (`appendAssignmentRevision`); the runner records `ExposureStatus` when a form is first shown.
 - Upload uses `BatchPayload` and `TraceUploadRequest`. Ingestion tracks `CompletionState`, `SyncState`, and `ProcessingState` with the allowed transitions above.
@@ -198,7 +175,7 @@ Screens use `apps/web/src/data/sessionStore.ts` as a thin adapter over this Hist
 
 ### History store
 
-The default store is `createPackageHistoryStore` from `@neurovision/storage` (the envelope HistoryStore, `kind: "package"`, key `spatial-patterns:envelope:v1`) when that package is in the workspace and a key-value backend such as `localStorage` is available. Battery records use `createBatteryStore` on the same key-value backend under `neurovision:battery:v1`; the standalone HTML build passes `memoryStore()`. `load` maps envelope `sessions` and, on `EnvelopeError`, returns `{ sessions: [], rejected: 0, error }` without replacing the stored value. `save` calls `saveSession`. `remove` filters by id and writes the envelope back. A one-time import copies malformed records from the screens' `neurovision.web.sessions` envelope aside before valid records are written into the package envelope.
+The default store is `createPackageHistoryStore` from `@neurovision/storage` (the envelope HistoryStore, `kind: "package"`, key `spatial-patterns:envelope:v1`) when that package is in the workspace and a key-value backend such as `localStorage` is available. `load` maps envelope `sessions` and, on `EnvelopeError`, returns `{ sessions: [], rejected: 0, error }` without replacing the stored value. `save` calls `saveSession`. `remove` filters by id and writes the envelope back. A one-time import copies malformed records from the screens' `neurovision.web.sessions` envelope aside before valid records are written into the package envelope.
 
 Pass a store into `createAppServices({ store })` to override. The standalone HTML build always uses `createMemoryStore()` (`kind: "memory"`). When `packages/storage` is not in the workspace, the Vite alias and tsconfig path resolve `@neurovision/storage` to `apps/web/src/services/storage-unavailable.ts`, and the default is in-memory.
 

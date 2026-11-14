@@ -1,11 +1,8 @@
 import { jsPDF } from "jspdf";
 import {
-  DEFAULT_NORMS,
-  scoreBatteryRecord,
   scoreSession,
   sessionSourceLabel,
   type AssessmentTrend,
-  type BatteryRecord,
   type SessionRecord,
 } from "@neurovision/domain";
 import type { ClinicalNote } from "./notes-store";
@@ -17,7 +14,6 @@ export interface ReportInput {
   trend: AssessmentTrend;
   notes: ClinicalNote[];
   generatedAt?: string;
-  battery?: BatteryRecord | null;
 }
 
 /** Build a real downloadable clinician-facing PDF from scored session data. */
@@ -89,58 +85,6 @@ export function buildClinicianReportPdf(input: ReportInput): Blob {
     );
     if (scored.practice.override) {
       line(`Practice override note: ${scored.practice.override}`);
-    }
-  }
-
-  if (input.battery) {
-    y += 10;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(34, 56, 42);
-    doc.text("Battery", 56, y);
-    y += 18;
-
-    const battery = input.battery;
-    const scored = scoreBatteryRecord(battery);
-    const counted = scored.evidence.tests.filter((row) => row.included);
-    const lean = scored.evidence.lean;
-    line(`${battery.id} · ${battery.mode} · ${sessionSourceLabel(battery.source)}`);
-    line(`Verdict: ${scored.evidence.verdict.text}`);
-    line(
-      `Lean estimate ${lean.mean.toFixed(2)}, 90% range ${lean.lo.toFixed(2)} to ${lean.hi.toFixed(2)}, in units of normal person-to-person variation; negative means the left side is weaker.`,
-    );
-    line(
-      `Hypotheses: left weaker ${Math.round(scored.evidence.posterior.left * 100)}%, balanced ${Math.round(scored.evidence.posterior.none * 100)}%, right weaker ${Math.round(scored.evidence.posterior.right * 100)}%.`,
-    );
-    const indexByTest: Partial<Record<(typeof counted)[number]["test"], number>> = {
-      scene: scored.scene.observationVisible.value,
-      clock: scored.clock.observation.value,
-      greyscales: scored.greyscales?.observation.value,
-      bisection: scored.bisection?.observation.value,
-    };
-    for (const row of counted) {
-      const flag = row.discordant ? ", disagrees" : "";
-      const index = indexByTest[row.test];
-      const indexText = index == null ? "n/a" : index.toFixed(2);
-      line(
-        `${row.label}: lateral index ${indexText}, contribution ${row.favors} ${row.factor.toFixed(1)}x${flag}.`,
-        10,
-      );
-    }
-    line("Screening aid, not a diagnosis.", 10, [90, 96, 102]);
-    const usedDefaults = counted.some((row) => {
-      const stored = battery.normsUsed[row.test];
-      const fallback = DEFAULT_NORMS[row.test];
-      if (stored) {
-        return stored.mean === fallback.mean && stored.healthySd === fallback.healthySd && stored.source === fallback.source;
-      }
-      return row.test !== "greyscales" || !battery.readingDirection;
-    });
-    if (usedDefaults || scored.evidence.usesAssumedNorms) {
-      line("Placeholder norms were used for this reading.", 10, [90, 96, 102]);
-    }
-    if (battery.source === "demonstration") {
-      line("Demonstration record.", 10, [90, 96, 102]);
     }
   }
 

@@ -1,11 +1,4 @@
-import {
-  isBatteryRecord,
-  isSessionRecord,
-  parseBatteryRecord,
-  parseSessionRecord,
-  type BatteryRecord,
-  type SessionRecord,
-} from "@neurovision/domain";
+import { isSessionRecord, parseSessionRecord, type SessionRecord } from "@neurovision/domain";
 
 /** Browser envelope. Records must already be domain SessionRecords. */
 export const ENVELOPE_KEY = "spatial-patterns:envelope:v1";
@@ -157,73 +150,4 @@ function isProfile(value: unknown): value is LocalProfile {
   if (typeof value !== "object" || value === null) return false;
   const profile = value as Partial<LocalProfile>;
   return typeof profile.id === "string" && profile.id.length > 0 && typeof profile.alias === "string" && profile.alias.length > 0;
-}
-
-/** Browser envelope for battery records. Independent of the session envelope. */
-export const BATTERY_KEY = "neurovision:battery:v1";
-
-export interface BatteryEnvelope {
-  version: 1;
-  records: BatteryRecord[];
-}
-
-export interface BatteryStore {
-  save(record: BatteryRecord): Promise<BatteryRecord>;
-  load(id: string): Promise<BatteryRecord | null>;
-  list(): Promise<BatteryRecord[]>;
-}
-
-export function emptyBatteryEnvelope(): BatteryEnvelope {
-  return { version: 1, records: [] };
-}
-
-export function loadBatteryEnvelope(store: KeyValueStore): BatteryEnvelope {
-  const raw = store.getItem(BATTERY_KEY);
-  if (raw === null) return emptyBatteryEnvelope();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new EnvelopeError();
-  }
-  if (!isBatteryEnvelope(parsed)) throw new EnvelopeError();
-  return parsed;
-}
-
-export function saveBatteryRecord(store: KeyValueStore, value: unknown): BatteryEnvelope {
-  const record = parseBatteryRecord(value);
-  const current = loadBatteryEnvelope(store);
-  const records = current.records.filter((item) => item.id !== record.id);
-  records.push(record);
-  const next: BatteryEnvelope = { version: 1, records };
-  store.setItem(BATTERY_KEY, JSON.stringify(next));
-  return next;
-}
-
-/**
- * Same save/load/list shape as the session history store, under `neurovision:battery:v1`.
- * Pass `memoryStore()` for the standalone in-memory backend.
- */
-export function createBatteryStore(store: KeyValueStore): BatteryStore {
-  return {
-    async save(record) {
-      const saved = saveBatteryRecord(store, record);
-      const stored = saved.records.find((item) => item.id === record.id);
-      if (!stored) throw new EnvelopeError("Save did not retain the battery record.");
-      return structuredClone(stored);
-    },
-    async load(id) {
-      const match = loadBatteryEnvelope(store).records.find((item) => item.id === id);
-      return match ? structuredClone(match) : null;
-    },
-    async list() {
-      return loadBatteryEnvelope(store).records.map((item) => structuredClone(item));
-    },
-  };
-}
-
-function isBatteryEnvelope(value: unknown): value is BatteryEnvelope {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const envelope = value as Partial<BatteryEnvelope>;
-  return envelope.version === 1 && Array.isArray(envelope.records) && envelope.records.every((record) => isBatteryRecord(record));
 }
