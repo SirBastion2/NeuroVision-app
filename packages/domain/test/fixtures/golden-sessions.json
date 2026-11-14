@@ -1,5 +1,5 @@
 {
-  "contractsVersion": "1.1.0",
+  "contractsVersion": "1.2.0",
   "cases": [
     {
       "id": "balanced-high-selection",

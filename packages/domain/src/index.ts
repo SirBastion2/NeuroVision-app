@@ -226,3 +226,6 @@ export { generateGreyscalesTrials, scoreGreyscales, chosenDarkSide, greyscalesNo
 export type { DarkSide, BarPosition, ReadingDirection, GreyscalesTrial, GreyscalesResponse, GreyscalesScore } from "./greyscales.js";
 export { generateBisectionLines, signedErrorPct, bisectionObservation } from "./bisection.js";
 export type { BisectionLine, BisectionResponse } from "./bisection.js";
+
+export { BATTERY_CONTRACT_VERSION, BATTERY_MODES, isBatteryRecord, parseBatteryRecord, scoreBatteryRecord } from "./battery.js";
+export type { BatteryMode, BatteryRecord, BatteryScore } from "./battery.js";
