@@ -179,6 +179,7 @@ export interface ApiClient {
   completeAuthCallback(code: string, state: string): Promise<void>;
   logout(): Promise<{ signedOut: boolean }>;
   listParticipants(): Promise<{ participants: ParticipantListItem[] }>;
+  listSessions(): Promise<{ sessions: unknown[]; batteries: unknown[]; activity: Array<{ bucket: string; count: number }> }>;
   createAssignment(input: {
     id?: string;
     participantId: string;
@@ -186,6 +187,7 @@ export interface ApiClient {
     manifest: unknown;
   }): Promise<AssignmentResult>;
   putSession(input: PutSessionInput): Promise<SessionResource>;
+  putBattery(sessionId: string, record: unknown): Promise<{ sessionId: string; sealed: boolean; battery: boolean; idempotent?: boolean }>;
   putBatch(sessionId: string, batchId: string, payload: BatchPayloadInput): Promise<BatchResult>;
   finalizeSession(sessionId: string): Promise<FinalizeResult>;
   createTraceUpload(sessionId: string, request: TraceUploadRequest): Promise<TraceUploadAuthorization>;
@@ -370,6 +372,19 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return { participants: body.participants ?? [] };
     },
 
+    async listSessions() {
+      const body = await json<{
+        sessions?: unknown[];
+        batteries?: unknown[];
+        activity?: Array<{ bucket: string; count: number }>;
+      }>("/api/v1/sessions");
+      return {
+        sessions: body.sessions ?? [],
+        batteries: body.batteries ?? [],
+        activity: body.activity ?? [],
+      };
+    },
+
     async createAssignment(input) {
       return json<AssignmentResult>("/api/v1/assignments", {
         method: "POST",
@@ -383,6 +398,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         method: "PUT",
         body: JSON.stringify(body),
       });
+    },
+
+    async putBattery(sessionId, record) {
+      return json<{ sessionId: string; sealed: boolean; battery: boolean; idempotent?: boolean }>(
+        `/api/v1/sessions/${encodeURIComponent(sessionId)}/battery`,
+        { method: "PUT", body: JSON.stringify(record) },
+      );
     },
 
     async putBatch(sessionId, batchId, payload) {

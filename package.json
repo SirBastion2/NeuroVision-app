@@ -12,6 +12,7 @@
     "build": "npm run build -w @neurovision/domain && npm run build -w @neurovision/gaze && npm run build -w @neurovision/web && npm run build -w @neurovision/storage && npm run build -w @neurovision/api && npm run build -w @neurovision/worker",
     "build:standalone": "npm run build:standalone -w @neurovision/web",
     "verify": "node scripts/verify.mjs",
+    "dev": "node scripts/dev.mjs",
     "dev:backend": "node apps/api/scripts/dev-backend.mjs"
   },
   "devDependencies": {

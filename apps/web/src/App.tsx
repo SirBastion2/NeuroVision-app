@@ -10,10 +10,23 @@ import {
 import { BrandMark, Wordmark } from "./components/Brand";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { TaskRunner } from "./components/TaskRunner";
+import {
+  assembleBatteryRecord,
+  batteryEnabled,
+  batteryStepOrder,
+  saveBatterySession,
+  shouldPersistBattery,
+  type BatteryIntroConfig,
+  type BatteryStep,
+  type BatteryTaskOutputs,
+} from "./data/batterySession";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
 import { TIME_LIMIT_MS, createSession, newLineTrial, newPracticeTrial, newTargetSelectionTrial } from "./lib/session";
 import { ProfileDashboard } from "./profile/ProfileDashboard";
+import { BatteryIntro } from "./screens/BatteryIntro";
+import { BatteryResults } from "./screens/BatteryResults";
+import { BisectionStation, ClockStation, GreyscalesStation, SceneStation } from "./screens/BatteryStation";
 import { GazeLab } from "./screens/GazeLab";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
@@ -22,14 +35,17 @@ import { MyProfile } from "./screens/MyProfile";
 import { PracticeReflection, PracticeSetup } from "./screens/Practice";
 import { Review } from "./screens/Review";
 import {
+  DEMO_LOCAL_IDENTITY,
   createAppServices,
   participantIdForExport,
   shouldEnqueueUpload,
+  shouldPersistSession,
   showApiControls,
   type Me,
   type ProcessingSnapshot,
   type UploadQueueState,
 } from "./services";
+import type { BatteryRecord } from "@neurovision/domain";
 import "./styles.css";
 
 type Theme = "light" | "dark";
@@ -84,9 +100,16 @@ export function App() {
   const [queue, setQueue] = useState<UploadQueueState>(() => services.queueState());
   const [processing, setProcessing] = useState<Record<string, ProcessingSnapshot>>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [batteryScreen, setBatteryScreen] = useState<"intro" | BatteryStep | "results" | null>(null);
+  const [batteryConfig, setBatteryConfig] = useState<BatteryIntroConfig | null>(null);
+  const [batteryOutputs, setBatteryOutputs] = useState<Partial<BatteryTaskOutputs>>({});
+  const [batteryRecord, setBatteryRecord] = useState<BatteryRecord | null>(null);
+  const [batteries, setBatteries] = useState<BatteryRecord[]>([]);
+  const [activity, setActivity] = useState<Array<{ bucket: string; count: number }>>([]);
   const main = useRef<HTMLElement>(null);
   const enqueued = useRef(new Set<string>());
   const { session, screen } = state;
+  const showBattery = batteryEnabled(apiEnabled);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -120,11 +143,21 @@ export function App() {
         });
       return;
     }
-    void services.getMe().then(setSignedIn);
+    void services.getMe().then(async (me) => {
+      if (me) {
+        setSignedIn(me);
+        return;
+      }
+      try {
+        setSignedIn(await services.signInLocal(DEMO_LOCAL_IDENTITY));
+      } catch {
+        setSignedIn(null);
+      }
+    });
   }, [apiEnabled, services]);
 
   useEffect(() => {
-    if (!state.ended || !session || session.source !== "live") return;
+    if (!state.ended || !session || !shouldPersistSession(session)) return;
     let cancelled = false;
     void (async () => {
       const result = await store.save(session);
@@ -137,7 +170,11 @@ export function App() {
       ) {
         enqueued.current.add(session.id);
         try {
-          await services.enqueueUpload({ session });
+          await services.enqueueUpload({
+            session,
+            participantId: signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject,
+            assignmentId: `assign-${signedIn?.subject ?? DEMO_LOCAL_IDENTITY.subject}`,
+          });
         } catch (error) {
           if (cancelled) return;
           setSaveError(error instanceof Error ? error.message : String(error));
@@ -147,13 +184,15 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [state.ended, session, store, services, apiEnabled]);
+  }, [state.ended, session, store, services, apiEnabled, signedIn]);
 
   useEffect(() => {
     if (screen === "history" || screen === "my-profile") {
       void store.load().then(setStored);
+      void services.listBatteries().then(setBatteries);
+      void services.sessionActivity().then(setActivity);
     }
-  }, [screen, store]);
+  }, [screen, store, services]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -188,8 +227,42 @@ export function App() {
     dispatch({ type: "start", session: createSession({ alias, input, viewport: currentViewport() }), variant });
   const onTrial = useCallback((trial: TrialRecord) => dispatch({ type: "trial-finished", trial }), []);
   const onPractice = useCallback((trial: TrialRecord) => dispatch({ type: "practice-finished", trial }), []);
-  const home = () => dispatch({ type: "home" });
+  const home = () => {
+    setBatteryScreen(null);
+    setBatteryConfig(null);
+    setBatteryOutputs({});
+    setBatteryRecord(null);
+    dispatch({ type: "home" });
+  };
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
+
+  const finishBattery = async (config: BatteryIntroConfig, outputs: BatteryTaskOutputs) => {
+    const record = assembleBatteryRecord(config, outputs);
+    setBatteryRecord(record);
+    setBatteryScreen("results");
+    if (!shouldPersistBattery(record)) return;
+    const saved = await saveBatterySession(config, outputs);
+    try {
+      if (apiEnabled) await services.uploadBattery(saved);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+    }
+    setBatteries(await services.listBatteries());
+  };
+
+  const advanceBattery = (step: BatteryStep, patch: Partial<BatteryTaskOutputs>) => {
+    if (!batteryConfig) return;
+    const nextOutputs = { ...batteryOutputs, ...patch };
+    setBatteryOutputs(nextOutputs);
+    const order = batteryStepOrder(batteryConfig.mode);
+    const index = order.indexOf(step);
+    const following = order[index + 1];
+    if (following) {
+      setBatteryScreen(following);
+      return;
+    }
+    void finishBattery(batteryConfig, nextOutputs as BatteryTaskOutputs);
+  };
 
   const trial = useMemo(() => {
     if (!session) return null;
@@ -200,7 +273,8 @@ export function App() {
   }, [screen, state.lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inAssessment = ["target-intro", "target-task", "line-intro", "line-task"].includes(screen);
-  const focusMode = inAssessment || screen === "practice-task";
+  const inBattery = batteryScreen === "scene" || batteryScreen === "clock" || batteryScreen === "greyscales" || batteryScreen === "bisection";
+  const focusMode = inAssessment || inBattery || screen === "practice-task";
   const stepIndex = ASSESSMENT_STEPS.findIndex((s) => s.screens.includes(screen));
   const cue = state.practice?.config;
   const showPrimaryNav = !focusMode && !inAssessment;
@@ -212,9 +286,14 @@ export function App() {
   });
 
   const onSignIn = () => {
-    void services.beginSignIn().then((redirect) => {
-      window.location.assign(redirect.url);
-    });
+    void services
+      .signInLocal(DEMO_LOCAL_IDENTITY)
+      .then(setSignedIn)
+      .catch(() => {
+        void services.beginSignIn().then((redirect) => {
+          window.location.assign(redirect.url);
+        });
+      });
   };
 
   const onExport = async () => {
@@ -327,16 +406,53 @@ export function App() {
             Upload queue: {queue.pending} queued, {queue.uploading} uploading, {queue.blocked} blocked, {queue.acknowledged} sent.
           </p>
         )}
-        {screen === "home" && (
+        {batteryScreen === "intro" && (
+          <BatteryIntro
+            onStart={(config) => {
+              setBatteryConfig(config);
+              setBatteryOutputs({});
+              setBatteryScreen(batteryStepOrder(config.mode)[0] ?? "scene");
+            }}
+            onBack={home}
+          />
+        )}
+        {batteryScreen === "scene" && batteryConfig && (
+          <SceneStation config={batteryConfig} onDone={(taps) => advanceBattery("scene", { scene: { taps } })} />
+        )}
+        {batteryScreen === "clock" && batteryConfig && (
+          <ClockStation
+            config={batteryConfig}
+            onDone={(trials, responses) => advanceBattery("clock", { clock: { trials, responses } })}
+          />
+        )}
+        {batteryScreen === "greyscales" && batteryConfig && (
+          <GreyscalesStation
+            config={batteryConfig}
+            onDone={(trials, responses) => advanceBattery("greyscales", { greyscales: { trials, responses } })}
+          />
+        )}
+        {batteryScreen === "bisection" && batteryConfig && (
+          <BisectionStation
+            config={batteryConfig}
+            onDone={(lines, responses) => advanceBattery("bisection", { bisection: { lines, responses } })}
+          />
+        )}
+        {batteryScreen === "results" && batteryRecord && (
+          <BatteryResults record={batteryRecord} onExport={() => undefined} onBack={home} />
+        )}
+        {!batteryScreen && screen === "home" && (
           <Home
             onStart={start}
             onOpen={(s) => dispatch({ type: "open", session: s })}
             onHistory={() => go("history")}
             onProfile={() => go("my-profile")}
             onGaze={() => go("gaze")}
+            onBattery={showBattery ? () => setBatteryScreen("intro") : undefined}
+            batteryEnabled={showBattery}
+            apiEnabled={apiEnabled}
           />
         )}
-        {screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
+        {!batteryScreen && screen === "target-intro" && session && <TargetIntro input={session.input} onBegin={() => go("target-task")} onCancel={home} />}
         {screen === "target-task" && session && trial && (
           <TaskRunner
             key={trial.id}
@@ -405,10 +521,16 @@ export function App() {
             onReview={() => go("review")}
           />
         )}
-        {screen === "history" && (
+        {!batteryScreen && screen === "history" && (
           <History
             stored={stored}
+            batteries={batteries}
+            activity={activity}
             onOpen={(s) => dispatch({ type: "open", session: s })}
+            onOpenBattery={(record) => {
+              setBatteryRecord(record);
+              setBatteryScreen("results");
+            }}
             onDelete={async (id) => {
               const result = await store.remove(id);
               setSaveError(result.error);
@@ -440,8 +562,8 @@ export function App() {
         <footer className="footer">
           <span>NeuroVision · Spatial Attention Lab</span>
           <span>
-            Research tool · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this
-            browser
+            Research tool · not a diagnostic tool · contracts {CONTRACTS_VERSION}
+            {apiEnabled ? " · completed runs save to the server when reachable" : " · data stays in this browser"}
           </span>
         </footer>
       )}

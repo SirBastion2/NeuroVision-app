@@ -12,6 +12,8 @@ import {
   LINE_BISECTION_LINES,
   PRACTICE_RULES_VERSION,
   PROTOCOL_ID,
+  parseBatteryRecord,
+  parseSessionRecord,
   reflectPracticeRound,
   SCORER_ID,
   scoreSession,
@@ -19,6 +21,7 @@ import {
   areSessionsComparable,
   describeViewport,
   type AssessmentTrend,
+  type BatteryRecord,
   type InputModality,
   type LayoutVariant,
   type Point,
@@ -59,6 +62,7 @@ import {
   type KeyValueStore,
   type PackageStoreFactory,
 } from "./package-store";
+import { createWebBatteryStore } from "../data/batterySession";
 import { deleteParticipant, exportParticipant, pollProcessingState, type PollProcessingOptions } from "./processing";
 import { readRuntimeConfig, type WebRuntimeConfig } from "./runtime-config";
 import {
@@ -131,6 +135,9 @@ export interface AppServices {
   load(id: string): Promise<SessionRecord | null>;
   remove(id: string): Promise<void>;
   listHistory(): Promise<SessionRecord[]>;
+  listBatteries(): Promise<BatteryRecord[]>;
+  uploadBattery(record: BatteryRecord): Promise<BatteryRecord>;
+  sessionActivity(): Promise<Array<{ bucket: string; count: number }>>;
   comparableHistory(sessions?: readonly SessionRecord[]): Promise<ComparableHistory>;
   sessionsComparable(a: SessionRecord, b: SessionRecord): boolean;
   loadDemonstrationSessions(): readonly SessionRecord[];
@@ -352,8 +359,61 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       return store.remove(id);
     },
 
-    listHistory() {
-      return store.list();
+    async listHistory() {
+      const local = await store.list();
+      if (!api.enabled) return local;
+      try {
+        const remote = await api.listSessions();
+        const byId = new Map(local.map((session) => [session.id, session]));
+        for (const item of remote.sessions) {
+          try {
+            const parsed = parseSessionRecord(item);
+            byId.set(parsed.id, parsed);
+          } catch {
+            /* skip rows that are not session records */
+          }
+        }
+        return [...byId.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      } catch {
+        return local;
+      }
+    },
+
+    async listBatteries() {
+      const local = await createWebBatteryStore({ keyValueStore: kv, standalone }).list();
+      if (!api.enabled) return local;
+      try {
+        const remote = await api.listSessions();
+        const byId = new Map(local.map((record) => [record.id, record]));
+        for (const item of remote.batteries) {
+          try {
+            const parsed = parseBatteryRecord(item);
+            byId.set(parsed.id, parsed);
+          } catch {
+            /* skip invalid rows */
+          }
+        }
+        return [...byId.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      } catch {
+        return local;
+      }
+    },
+
+    async uploadBattery(record) {
+      const parsed = parseBatteryRecord(record);
+      if (!api.enabled) return parsed;
+      await api.putBattery(parsed.id, parsed);
+      return parsed;
+    },
+
+    async sessionActivity() {
+      if (!api.enabled) return [];
+      try {
+        const remote = await api.listSessions();
+        return remote.activity;
+      } catch {
+        return [];
+      }
     },
 
     async comparableHistory(sessions) {

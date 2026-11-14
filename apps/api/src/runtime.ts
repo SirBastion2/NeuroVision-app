@@ -1,6 +1,7 @@
 import { assertRuntimeSafe, loadConfig, type AppConfig } from "./config.js";
 import { seedDemo } from "./demo-seed.js";
 import { createMetrics, type Metrics } from "./metrics.js";
+import { loadRootEnv } from "./env.js";
 import { createObjectStoreFromEnv, type ObjectStore } from "./objects.js";
 import { createPgDatabase, migrate, type Database } from "./db.js";
 
@@ -17,13 +18,14 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): AppConf
 }
 
 export async function openRuntime(env: NodeJS.ProcessEnv = process.env): Promise<Runtime> {
+  loadRootEnv(env);
   const config = loadConfig(env);
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required.");
-  const objects = createObjectStoreFromEnv(env);
-  assertRuntimeSafe(config, objects.kind);
   const db = createPgDatabase(databaseUrl);
   await migrate(db);
+  const objects = createObjectStoreFromEnv(env, db);
+  assertRuntimeSafe(config, objects.kind);
   if (config.identityMode === "local" && env.DEMO_SEED !== "false") {
     await seedDemo(db);
   }

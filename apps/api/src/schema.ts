@@ -100,7 +100,32 @@ CREATE TABLE IF NOT EXISTS response_events (
   x DOUBLE PRECISION NOT NULL,
   y DOUBLE PRECISION NOT NULL,
   content_hash TEXT NOT NULL,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (session_id, trial_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS gaze_samples (
+  session_id TEXT NOT NULL,
+  trial_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  elapsed_ms DOUBLE PRECISION NOT NULL,
+  x DOUBLE PRECISION NOT NULL,
+  y DOUBLE PRECISION NOT NULL,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (session_id, trial_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS object_blobs (
+  object_key TEXT PRIMARY KEY,
+  body BYTEA NOT NULL,
+  content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS battery_records (
+  session_id TEXT PRIMARY KEY REFERENCES sessions (id),
+  record JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS trace_refs (
@@ -217,4 +242,6 @@ CREATE TABLE IF NOT EXISTS metric_events (
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE response_events ADD COLUMN IF NOT EXISTS recorded_at TIMESTAMPTZ NOT NULL DEFAULT now();
 `;

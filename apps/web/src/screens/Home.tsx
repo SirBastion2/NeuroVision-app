@@ -27,6 +27,9 @@ interface Props {
   onHistory: () => void;
   onProfile: () => void;
   onGaze: () => void;
+  onBattery?: () => void;
+  batteryEnabled?: boolean;
+  apiEnabled?: boolean;
 }
 
 /** The real assessment board with one half fading away, circled by the logo's orbit and star. */
@@ -68,7 +71,7 @@ const STEPS = [
   ["04", "Practice", "An explained cue suggestion, then up to three rounds."],
 ] as const;
 
-export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
+export function Home({ onStart, onOpen, onHistory, onProfile, onGaze, onBattery, batteryEnabled = true, apiEnabled = false }: Props) {
   const [alias, setAlias] = useState("");
   const [input, setInput] = useState<InputModality>("mouse-trackpad");
   const [variant, setVariant] = useState<LayoutVariant>("fixed-a");
@@ -152,10 +155,22 @@ export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
             Begin assessment
             <span aria-hidden> →</span>
           </button>
-          <p className="fineprint">About three minutes. Data stays in this browser.</p>
+          <p className="fineprint">
+            About three minutes. {apiEnabled ? "Completed runs save to the server when it is reachable; this browser is the offline fallback." : "Data stays in this browser."}
+          </p>
         </form>
 
         <div className="side-cards">
+          {batteryEnabled && onBattery ? (
+            <button className="card link-card" onClick={onBattery}>
+              <Eyebrow plain>Spatial battery</Eyebrow>
+              <h3>Starry Night, clock, greyscales</h3>
+              <p>A short demo or the full battery of scene search, clock, greyscales, and line bisection.</p>
+              <span className="link-arrow" aria-hidden>
+                →
+              </span>
+            </button>
+          ) : null}
           <button className="card link-card" onClick={onHistory}>
             <Eyebrow plain>History</Eyebrow>
             <h3>Sessions over time</h3>

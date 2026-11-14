@@ -1,6 +1,20 @@
 # Backend runbook
 
-Local API and worker for the HackPrinceton demo. This does not start the web app.
+Local API and worker for the HackPrinceton demo.
+
+## API and web together
+
+Copy `.env.example` to `.env` and set `DATABASE_URL` (hosted Postgres with `uselibpqcompat=true&sslmode=require`). Then from the repository root:
+
+```bash
+npm run dev
+```
+
+That starts the API on port 3001 and the web app on port 5173. The Vite dev server proxies `/api` and `/health`. Demo identity is `IDENTITY_MODE=local`; the web app signs in as `participant-demo` / `org-demo`. S3/MinIO and OIDC are not required. Traces fall back to Postgres when S3 env vars are absent.
+
+## Docker (optional)
+
+This does not start the web app.
 
 ## One command
 

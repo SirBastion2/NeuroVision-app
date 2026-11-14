@@ -2,9 +2,19 @@ import type { SessionRecord } from "@neurovision/domain";
 import type { ProcessingSnapshot } from "./api-client";
 import type { UploadJob, UploadQueueState } from "./upload-queue";
 
+export const DEMO_LOCAL_IDENTITY = {
+  subject: "participant-demo",
+  orgId: "org-demo",
+} as const;
+
 /** API-backed chrome is shown only when the service layer has an API base URL. */
 export function showApiControls(apiEnabled: boolean): boolean {
   return apiEnabled;
+}
+
+/** Gaze lab is a demonstration surface and is never persisted. */
+export function shouldPersistSession(session: SessionRecord | null): boolean {
+  return Boolean(session && session.source === "live");
 }
 
 /** Live assessments enqueue an upload after the board flow ends. */

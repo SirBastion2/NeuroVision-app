@@ -4,6 +4,7 @@ import {
   scoreSession,
   sessionSourceLabel,
   summarizeAssessmentTrend,
+  type BatteryRecord,
   type SessionRecord,
   type TrendExclusionReason,
 } from "@neurovision/domain";
@@ -17,7 +18,10 @@ import type { UploadQueueState } from "../services/upload-queue";
 
 interface Props {
   stored: LoadResult;
+  batteries?: BatteryRecord[];
+  activity?: Array<{ bucket: string; count: number }>;
   onOpen: (session: SessionRecord) => void;
+  onOpenBattery?: (record: BatteryRecord) => void;
   onDelete: (id: string) => void;
   onHome: () => void;
   apiEnabled?: boolean;
@@ -37,7 +41,10 @@ const EXCLUDED: Record<TrendExclusionReason, string> = {
 
 export function History({
   stored,
+  batteries = [],
+  activity = [],
   onOpen,
+  onOpenBattery,
   onDelete,
   onHome,
   apiEnabled = false,
@@ -114,6 +121,11 @@ export function History({
       {stored.rejected > 0 && (
         <p className="notice warn">
           {stored.rejected} stored record{stored.rejected === 1 ? "" : "s"} failed validation and {stored.rejected === 1 ? "is" : "are"} hidden. Nothing was deleted.
+        </p>
+      )}
+      {activity.length > 0 && (
+        <p className="small">
+          Server activity by day: {activity.map((row) => `${date(row.bucket)} (${row.count})`).join(" · ")}
         </p>
       )}
 
@@ -262,6 +274,45 @@ export function History({
           ))}
         <button onClick={onHome}>Home</button>
       </div>
+
+      {batteries.length > 0 && (
+        <section className="card pad-0">
+          <div className="card-head">
+            <h3>Battery runs</h3>
+            <span className="small">Full battery records from this browser and the server</span>
+          </div>
+          <div className="table-scroll">
+            <table className="sessions">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Mode</th>
+                  <th>Source</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {batteries.map((record) => (
+                  <tr key={record.id}>
+                    <td>{dateTime(record.completedAt)}</td>
+                    <td>{record.mode === "full" ? "Full battery" : "Demo"}</td>
+                    <td>
+                      <span className={`badge ${record.source}`}>{sessionSourceLabel(record.source)}</span>
+                    </td>
+                    <td className="row-actions">
+                      {onOpenBattery ? (
+                        <button type="button" onClick={() => onOpenBattery(record)}>
+                          Open
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { SessionRecord } from "@neurovision/domain";
+import type { BatteryRecord, SessionRecord } from "@neurovision/domain";
 
 /** Marker used when `packages/storage` is not in the workspace. */
 export const STORAGE_AVAILABLE = false;
@@ -54,5 +54,36 @@ export function saveSession(_store: KeyValueStore, _value: unknown): Envelope {
 
 export function createPackageHistoryStore(store: KeyValueStore): PackageHistoryStore {
   void store;
+  throw new Error("@neurovision/storage is not in this workspace");
+}
+
+export const BATTERY_KEY = "neurovision:battery:v1";
+
+export interface BatteryStore {
+  save(record: BatteryRecord): Promise<BatteryRecord>;
+  load(id: string): Promise<BatteryRecord | null>;
+  list(): Promise<BatteryRecord[]>;
+}
+
+export function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { snapshot(): Record<string, string> } {
+  const data = { ...initial };
+  return {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key]! : null;
+    },
+    setItem(key, value) {
+      data[key] = value;
+    },
+    removeItem(key) {
+      delete data[key];
+    },
+    snapshot() {
+      return { ...data };
+    },
+  };
+}
+
+export function createBatteryStore(_store: KeyValueStore): BatteryStore {
+  void _store;
   throw new Error("@neurovision/storage is not in this workspace");
 }

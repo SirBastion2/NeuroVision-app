@@ -37,5 +37,18 @@ export async function seedDemo(db: Database): Promise<void> {
     INSERT INTO reviewer_assignments (org_id, subject, participant_id) VALUES
       ('${DEMO_ORG_ID}', '${DEMO_SUBJECTS.reviewer}', '${DEMO_SUBJECTS.participant}')
     ON CONFLICT DO NOTHING;
+
+    INSERT INTO assignments (
+      id, revision, org_id, participant_id, manifest, manifest_hash, exposure_status, created_by
+    ) VALUES (
+      'assign-participant-demo',
+      1,
+      '${DEMO_ORG_ID}',
+      '${DEMO_SUBJECTS.participant}',
+      '{"protocol":"spatial-v1","scorer":"events-v1","taskIds":["target-selection","line-bisection"],"source":"live","input":"mouse-trackpad","accessibilityId":"default","configHash":"demo"}'::jsonb,
+      'demo-manifest',
+      'unseen',
+      '${DEMO_SUBJECTS.admin}'
+    ) ON CONFLICT DO NOTHING;
   `);
 }
