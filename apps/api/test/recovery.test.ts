@@ -137,4 +137,66 @@ describe("recovery", { concurrency: false }, () => {
     });
     assert.equal(hidden.statusCode, 404);
   });
+
+  it("keeps the sealed document when analysis fails and does not replace a successful summary", async () => {
+    await harness.db.query("UPDATE participants SET deleted_at = NULL WHERE id = $1", [world.participantId]);
+    const auth = await login(harness.app, world.participantSubject, world.orgA);
+    const failed = await uploadSession(harness.app, auth, "fail-session");
+    await harness.db.query("UPDATE jobs SET max_attempts = 1 WHERE id = $1", [failed.finalized.jobId]);
+    await harness.db.query("UPDATE session_documents SET record = '{\"broken\":true}'::jsonb WHERE session_id = 'fail-session'");
+    assert.equal((await runOnce(worker)).processed, true);
+    const failedJob = await one<{ status: string; last_error: string | null }>(
+      harness.db,
+      "SELECT status, last_error FROM jobs WHERE id = $1",
+      [failed.finalized.jobId],
+    );
+    assert.equal(failedJob?.status, "failed");
+    assert.match(failedJob?.last_error ?? "", /invalid session record/);
+    const failedSession = await one<{ processing_state: string }>(
+      harness.db,
+      "SELECT processing_state FROM sessions WHERE id = 'fail-session'",
+    );
+    assert.equal(failedSession?.processing_state, "failed");
+    const retained = await one<{ count: number }>(
+      harness.db,
+      "SELECT COUNT(*)::int AS count FROM session_documents WHERE session_id = 'fail-session'",
+    );
+    assert.equal(Number(retained?.count), 1);
+    const failedSummaries = await one<{ count: number }>(
+      harness.db,
+      "SELECT COUNT(*)::int AS count FROM derived_summaries WHERE session_id = 'fail-session'",
+    );
+    assert.equal(Number(failedSummaries?.count), 0);
+
+    const kept = await uploadSession(harness.app, auth, "keep-session");
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const job = await one<{ status: string }>(harness.db, "SELECT status FROM jobs WHERE id = $1", [kept.finalized.jobId]);
+      if (job?.status === "succeeded") break;
+      await runOnce(worker);
+    }
+    const before = await one<{ summary: unknown }>(
+      harness.db,
+      "SELECT summary FROM derived_summaries WHERE session_id = 'keep-session'",
+    );
+    await harness.db.query(
+      "UPDATE jobs SET status = 'queued', attempts = 0, lease_owner = NULL, lease_expires_at = NULL WHERE id = $1",
+      [kept.finalized.jobId],
+    );
+    assert.equal((await runOnce(worker)).processed, true);
+    const copies = await one<{ count: number }>(
+      harness.db,
+      "SELECT COUNT(*)::int AS count FROM derived_summaries WHERE session_id = 'keep-session'",
+    );
+    assert.equal(Number(copies?.count), 1);
+    const after = await one<{ summary: unknown }>(
+      harness.db,
+      "SELECT summary FROM derived_summaries WHERE session_id = 'keep-session'",
+    );
+    assert.equal(JSON.stringify(after?.summary), JSON.stringify(before?.summary));
+    const ready = await one<{ processing_state: string }>(
+      harness.db,
+      "SELECT processing_state FROM sessions WHERE id = 'keep-session'",
+    );
+    assert.equal(ready?.processing_state, "ready");
+  });
 });

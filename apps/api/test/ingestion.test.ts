@@ -250,6 +250,25 @@ describe("ingestion", { concurrency: false }, () => {
     assert.equal(trace.statusCode, 200, trace.body);
     assert.equal(trace.json().upload.adapter, "memory");
     assert.equal(trace.json().upload.localOnly, true);
+    const tooLarge = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/trace-session/trace-uploads",
+      headers: authed(auth),
+      payload: {
+        declaredByteCount: bytes.byteLength,
+        declaredExpandedBytes: 99_000_000,
+        declaredChecksum: sha256Hex(bytes),
+        contentType: "application/octet-stream",
+      },
+    });
+    assert.equal(tooLarge.statusCode, 413);
+    const missingObject = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/trace-session/finalize",
+      headers: authed(auth),
+    });
+    assert.equal(missingObject.statusCode, 422, missingObject.body);
+    assert.equal(await countJobs(harness.db, "trace-session"), 0);
     await harness.objects.put(trace.json().objectKey as string, new TextEncoder().encode("corrupt"));
     const blocked = await harness.app.inject({
       method: "POST",
@@ -282,6 +301,14 @@ describe("ingestion", { concurrency: false }, () => {
     assert.equal(again.json().jobId, finalized.json().jobId);
     assert.equal(again.json().idempotent, true);
     assert.equal(await countJobs(harness.db, "trace-session"), 1);
+    const sealed = await harness.app.inject({
+      method: "PUT",
+      url: "/api/v1/sessions/trace-session/batches/batch-after-seal",
+      headers: authed(auth),
+      payload: batchPayload(record, 2, "batch-1"),
+    });
+    assert.equal(sealed.statusCode, 409);
+    assert.equal(sealed.json().details.reason, "sealed");
 
     const worker: WorkerDeps = { ...harness.deps, workerId: "test-worker" };
     for (let attempt = 0; attempt < 5; attempt += 1) {

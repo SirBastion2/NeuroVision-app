@@ -9,6 +9,7 @@ import {
   type SessionRecord,
 } from "@neurovision/domain";
 import {
+  createPackageHistoryStore,
   ENVELOPE_KEY,
   EnvelopeError,
   loadEnvelope,
@@ -100,5 +101,37 @@ describe("browser envelope", () => {
     assert.throws(() => saveSession(memoryStore(), { ...live, source: "simulated" }), /invalid session record/);
     writeProfile(store, { id: "local", alias: "Local" });
     assert.deepEqual(readProfile(store), { id: "local", alias: "Local" });
+  });
+
+  it("refuses a write that exceeds the quota and keeps the previous envelope", () => {
+    const store = memoryStore();
+    const live = session("quota", "live");
+    saveSession(store, live);
+    const before = store.snapshot()[ENVELOPE_KEY];
+    assert.throws(() => saveSession(store, session("quota-2", "live"), { maxBytes: 32 }), EnvelopeError);
+    assert.equal(store.snapshot()[ENVELOPE_KEY], before);
+
+    const failing = {
+      ...store,
+      setItem() {
+        throw new Error("disk full");
+      },
+    };
+    assert.throws(() => saveSession(failing, session("quota-3", "demonstration")), /disk full/);
+    assert.equal(store.snapshot()[ENVELOPE_KEY], before);
+  });
+
+  it("round-trips records through the package history store", async () => {
+    const store = memoryStore();
+    const history = createPackageHistoryStore(store);
+    assert.equal(history.kind, "package");
+    const live = session("hist", "live");
+    const saved = await history.save(live);
+    assert.equal(saved.alias, "Local");
+    assert.equal((await history.load("missing")), null);
+    assert.equal((await history.load("hist"))?.source, "live");
+    await history.save(session("hist", "demonstration"));
+    assert.equal((await history.load("hist"))?.source, "live");
+    assert.equal((await history.list()).length, 2);
   });
 });

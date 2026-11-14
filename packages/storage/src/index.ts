@@ -50,15 +50,58 @@ export function loadEnvelope(store: KeyValueStore): Envelope {
   return parsed;
 }
 
-export function saveSession(store: KeyValueStore, value: unknown): Envelope {
+/** Byte budget for one envelope write. Oversized writes throw and leave the previous value. */
+export const DEFAULT_ENVELOPE_MAX_BYTES = 5_000_000;
+
+export interface SaveSessionOptions {
+  maxBytes?: number;
+}
+
+export function saveSession(store: KeyValueStore, value: unknown, options: SaveSessionOptions = {}): Envelope {
   const session = parseSessionRecord(value);
   const current = loadEnvelope(store);
   const key = sessionDedupeKey(session);
   const sessions = current.sessions.filter((item) => sessionDedupeKey(item) !== key);
   sessions.push(session);
   const next: Envelope = { ...current, sessions };
-  store.setItem(ENVELOPE_KEY, JSON.stringify(next));
+  const serialized = JSON.stringify(next);
+  const maxBytes = options.maxBytes ?? DEFAULT_ENVELOPE_MAX_BYTES;
+  if (serialized.length > maxBytes) {
+    throw new EnvelopeError("Saved data exceeds the storage quota. The previous envelope was preserved.");
+  }
+  store.setItem(ENVELOPE_KEY, serialized);
   return next;
+}
+
+/**
+ * Same save/load/list shape as the web HistoryStore (`kind: "package"`).
+ * Agent F can pass this to `createAppServices({ store })`. This package does not import apps/web.
+ */
+export interface PackageHistoryStore {
+  readonly kind: "package";
+  save(record: SessionRecord): Promise<SessionRecord>;
+  load(id: string): Promise<SessionRecord | null>;
+  list(): Promise<SessionRecord[]>;
+}
+
+export function createPackageHistoryStore(store: KeyValueStore, options: SaveSessionOptions = {}): PackageHistoryStore {
+  return {
+    kind: "package",
+    async save(record) {
+      const saved = saveSession(store, record, options);
+      const stored = saved.sessions.find((item) => sessionDedupeKey(item) === sessionDedupeKey(record));
+      if (!stored) throw new EnvelopeError("Save did not retain the session.");
+      return structuredClone(stored);
+    },
+    async load(id) {
+      const matches = loadEnvelope(store).sessions.filter((item) => item.id === id);
+      const chosen = matches.find((item) => item.source === "live") ?? matches[0];
+      return chosen ? structuredClone(chosen) : null;
+    },
+    async list() {
+      return loadEnvelope(store).sessions.map((item) => structuredClone(item));
+    },
+  };
 }
 
 export function readProfile(store: KeyValueStore): LocalProfile | null {
