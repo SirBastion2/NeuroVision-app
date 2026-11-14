@@ -5,7 +5,7 @@ import type { CompletionState } from "./contracts.provisional.js";
 import type { Deps } from "./deps.js";
 import { asJson, many, one } from "./db.js";
 
-export { ANALYSIS_VERSION, GAZE_STUB_REASON, GAZE_STUB_VERSION, buildDerivedSummary } from "./analysis.js";
+export { ANALYSIS_VERSION, buildDerivedSummary } from "./analysis.js";
 
 export interface WorkerDeps extends Deps {
   workerId: string;
@@ -151,11 +151,21 @@ async function runAnalysis(deps: WorkerDeps, job: JobRow): Promise<void> {
       );
       return;
     }
+    const traceRows = await many<{ object_key: string }>(
+      tx,
+      `SELECT object_key FROM trace_refs WHERE session_id = $1 AND status = 'verified' ORDER BY created_at`,
+      [job.session_id],
+    );
+    const traces: Uint8Array[] = [];
+    for (const trace of traceRows) {
+      traces.push((await deps.objects.get(trace.object_key)) ?? new Uint8Array());
+    }
     const summary = buildDerivedSummary({
       record,
       completion: session.completion,
       inputHash: job.input_hash,
       sessionRevision: job.session_revision,
+      traces,
     });
     if (summary.analysisVersion !== ANALYSIS_VERSION) {
       throw new Error("Analysis version drifted.");

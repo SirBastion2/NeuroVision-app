@@ -331,9 +331,10 @@ describe("ingestion", { concurrency: false }, () => {
     const body = view.json();
     assert.equal(body.processing.state, "ready");
     assert.equal(body.summaries.length, 1);
-    assert.equal(body.summaries[0].stub, true);
-    assert.equal(body.summaries[0].gazeAnalysis.metrics, null);
+    assert.equal(body.summaries[0].stub, false);
     assert.equal(body.summaries[0].eligibility.gaze, false);
+    assert.equal(body.summaries[0].gazeAnalysis.trials[0].metrics, null);
+    assert.equal(body.summaries[0].gazeAnalysis.trials[0].eligibility.reasons.includes("trace_unreadable"), true);
     assert.ok(body.summaries[0].scoring.targetSelection);
   });
 });
