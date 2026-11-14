@@ -165,9 +165,9 @@ export function Home({ onStart, onOpen, onHistory, onProfile, onGaze }: Props) {
             </span>
           </button>
           <button className="card link-card" onClick={onProfile}>
-            <Eyebrow plain>Profile</Eyebrow>
-            <h3>Clinician dashboard</h3>
-            <p>Gaze analysis, spatial board, practice, notes, and PDF report.</p>
+            <Eyebrow plain>Clinician</Eyebrow>
+            <h3>Open Profile dashboard</h3>
+            <p>After a live assessment, switch here to see the same session with gaze, notes, and PDF.</p>
             <span className="link-arrow" aria-hidden>
               →
             </span>

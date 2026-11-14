@@ -97,6 +97,7 @@ export function App() {
   const focusMode = inAssessment || screen === "practice-task";
   const stepIndex = ASSESSMENT_STEPS.findIndex((s) => s.screens.includes(screen));
   const cue = state.practice?.config;
+  const clinicianMode = screen === "profile";
 
   return (
     <div className={`app ${focusMode ? "focus-mode" : ""}`}>
@@ -116,20 +117,37 @@ export function App() {
           </ol>
         ) : (
           !focusMode && (
-            <nav aria-label="Main">
-              <button className={screen === "home" ? "on" : ""} onClick={home}>
-                Home
-              </button>
-              <button className={screen === "history" ? "on" : ""} onClick={() => go("history")}>
-                History
-              </button>
-              <button className={screen === "profile" ? "on" : ""} onClick={() => go("profile")}>
-                Profile
-              </button>
-              <button className={screen === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
-                Gaze lab
-              </button>
-            </nav>
+            <div className="topbar-navs">
+              <nav aria-label="Role">
+                <button
+                  type="button"
+                  className={!clinicianMode ? "on" : ""}
+                  onClick={home}
+                >
+                  Patient
+                </button>
+                <button
+                  type="button"
+                  className={clinicianMode ? "on" : ""}
+                  onClick={() => go("profile")}
+                >
+                  Clinician
+                </button>
+              </nav>
+              {!clinicianMode && (
+                <nav aria-label="Patient tools">
+                  <button type="button" className={screen === "home" ? "on" : ""} onClick={home}>
+                    Home
+                  </button>
+                  <button type="button" className={screen === "history" ? "on" : ""} onClick={() => go("history")}>
+                    History
+                  </button>
+                  <button type="button" className={screen === "gaze" ? "on" : ""} onClick={() => go("gaze")}>
+                    Gaze lab
+                  </button>
+                </nav>
+              )}
+            </div>
           )
         )}
         <button
@@ -165,7 +183,7 @@ export function App() {
             sessionId={session.id}
             trial={trial}
             timeLimitMs={TIME_LIMIT_MS["target-selection"]}
-            eyebrow="Assessment ┬╖ target selection"
+            eyebrow="Assessment · target selection"
             title="Select every hollow ring"
             instruction="Leave the solid disks. Press Done when finished."
             onFinish={onTrial}
@@ -178,7 +196,7 @@ export function App() {
             sessionId={session.id}
             trial={trial}
             timeLimitMs={TIME_LIMIT_MS["line-bisection"]}
-            eyebrow={`Assessment ┬╖ line ${state.lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
+            eyebrow={`Assessment · line ${state.lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
             title="Mark the middle of the line"
             instruction="One mark. No accuracy feedback."
             onFinish={onTrial}
@@ -190,6 +208,7 @@ export function App() {
             saveError={session.source === "live" ? saveError : null}
             onPractice={() => go("practice-setup")}
             onHistory={() => go("history")}
+            onProfile={() => go("profile")}
             onHome={home}
           />
         )}
@@ -207,7 +226,7 @@ export function App() {
             sessionId={session.id}
             trial={trial}
             timeLimitMs={TIME_LIMIT_MS.practice}
-            eyebrow={`Practice ┬╖ round ${session.practice.length + 1}${session.source === "demonstration" ? " ┬╖ demonstration, not saved" : ""}`}
+            eyebrow={`Practice · round ${session.practice.length + 1}${session.source === "demonstration" ? " · demonstration, not saved" : ""}`}
             title="Select every hollow ring"
             instruction={
               cue.cue === "none" || cue.level === 0
@@ -238,8 +257,8 @@ export function App() {
 
       {!focusMode && (
         <footer className="footer">
-          <span>NeuroVision ┬╖ Spatial Attention Lab</span>
-          <span>Research prototype ┬╖ not a diagnostic tool ┬╖ contracts {CONTRACTS_VERSION} ┬╖ data stays in this browser</span>
+          <span>NeuroVision · Spatial Attention Lab</span>
+          <span>Research prototype · not a diagnostic tool · contracts {CONTRACTS_VERSION} · data stays in this browser</span>
         </footer>
       )}
     </div>

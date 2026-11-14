@@ -165,7 +165,8 @@ export function ProfileDashboard() {
           <p className="eyebrow">Clinician profile</p>
           <h2 id="profile-title">Participant dashboard</h2>
           <p className="lede">
-            Research observations from validated local sessions. No diagnoses or treatment claims.
+            Research observations from validated local sessions. No diagnoses or treatment claims. Live
+            patient assessments from the Patient path appear here automatically.
           </p>
         </div>
         <div className="profile-actions">
@@ -180,7 +181,8 @@ export function ProfileDashboard() {
 
       <p className="storage-disclaimer" role="note">
         Local-storage disclaimer: history and clinical notes stay on this device/browser. They are not synced
-        to a server in this prototype. Demonstration records are labeled separately from live assessments.
+        to a server in this prototype. Demonstration and simulated-lab records stay labeled separately from
+        live (recorded) assessments.
       </p>
 
       {message ? (
@@ -193,7 +195,9 @@ export function ProfileDashboard() {
         <aside className="session-rail" aria-label="Sessions">
           <h3>Sessions</h3>
           {sessions.length === 0 ? (
-            <p className="muted">No stored sessions yet. Load demonstrations to explore the dashboard.</p>
+            <p className="muted">
+              No stored sessions yet. Run a live assessment under Patient, or load labeled demonstrations.
+            </p>
           ) : (
             <ul>
               {sessions.map((session) => (

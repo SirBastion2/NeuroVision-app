@@ -20,6 +20,7 @@ interface Props {
   saveError: string | null;
   onPractice: () => void;
   onHistory: () => void;
+  onProfile: () => void;
   onHome: () => void;
 }
 
@@ -40,7 +41,7 @@ const PATTERN_TITLE: Record<SpatialPatternKind, string> = {
   insufficient: "Not enough data",
 };
 
-export function Review({ session, saveError, onPractice, onHistory, onHome }: Props) {
+export function Review({ session, saveError, onPractice, onHistory, onProfile, onHome }: Props) {
   const result = useMemo(() => scoreSession(session), [session]);
   const ts = result.targetSelection;
   const tsTrial = findTargetSelectionTrial(session);
@@ -216,6 +217,11 @@ export function Review({ session, saveError, onPractice, onHistory, onHome }: Pr
         <button className="ghost" onClick={onHistory}>
           History
         </button>
+        {session.source === "live" && (
+          <button className="primary" onClick={onProfile}>
+            Open clinician Profile
+          </button>
+        )}
         <button onClick={onHome}>Home</button>
       </div>
     </div>

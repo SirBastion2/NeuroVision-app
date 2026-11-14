@@ -1,10 +1,17 @@
 import { isSessionRecord, parseSessionRecord, type SessionRecord } from "@neurovision/domain";
+import {
+  removeFromClinicianHistory,
+  upsertClinicianHistory,
+} from "../services/browser-session-bridge";
 
 /**
  * TEMPORARY browser storage for D+E screens. Agent B owns `packages/storage`;
  * when it lands, replace `createLocalSessionStore` with B's adapter behind this
  * same interface. Every write goes through `parseSessionRecord` (ARCHITECTURE.md),
  * and malformed stored records are kept and counted, never silently discarded.
+ *
+ * Successful saves also mirror into the clinician history key so Profile sees
+ * the same live sessions the patient assessment just wrote.
  */
 export interface LoadResult {
   sessions: SessionRecord[];
@@ -73,7 +80,9 @@ export function createLocalSessionStore(storage: Pick<Storage, "getItem" | "setI
         const valid = parseSessionRecord(session);
         const envelope = read();
         const others = envelope.records.filter((r) => idOf(r) !== valid.id);
-        return write({ version: VERSION, records: [...others, valid] });
+        const result = write({ version: VERSION, records: [...others, valid] });
+        if (result.ok && storage) upsertClinicianHistory(valid);
+        return result;
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }
@@ -81,7 +90,9 @@ export function createLocalSessionStore(storage: Pick<Storage, "getItem" | "setI
     remove(id) {
       try {
         const envelope = read();
-        return write({ version: VERSION, records: envelope.records.filter((r) => idOf(r) !== id) });
+        const result = write({ version: VERSION, records: envelope.records.filter((r) => idOf(r) !== id) });
+        if (result.ok && storage) removeFromClinicianHistory(id);
+        return result;
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }

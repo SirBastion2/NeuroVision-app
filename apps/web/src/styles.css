@@ -117,13 +117,14 @@ small, .small { color: var(--muted); font-size: 0.85rem; }
 .wordmark { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
 .wordmark-name { font-family: var(--serif); font-size: 1.32rem; letter-spacing: -0.01em; }
 .wordmark-sub { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--brass); margin-top: 4px; font-weight: 600; }
-nav { display: flex; gap: 2px; margin-left: auto; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; }
+.topbar-navs { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+nav { display: flex; gap: 2px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; }
 nav button { background: none; border: 0; min-height: 36px; padding: 6px 16px; border-radius: 999px; color: var(--ink-2); font-weight: 550; font-size: 0.92rem; }
 nav button:hover:not(:disabled) { color: var(--ink); border: 0; }
 nav button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px #0000001a; }
 .theme-toggle { width: 40px; min-height: 40px; padding: 0; border-radius: 999px; display: grid; place-items: center; background: transparent; }
 .theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.stepper + .theme-toggle, .brand + .theme-toggle { margin-left: auto; }
+.stepper + .theme-toggle, .brand + .theme-toggle, .topbar-navs + .theme-toggle { margin-left: auto; }
 .stepper { list-style: none; display: flex; gap: 6px; margin: 0 auto; padding: 0; font-size: 0.85rem; color: var(--muted); }
 .stepper li { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; }
 .stepper li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-2); font-size: 0.75rem; font-weight: 700; }
