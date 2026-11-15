@@ -13,6 +13,7 @@ interface Props {
   onStart: () => void;
   onHistory: () => void;
   onDemo?: () => void;
+  participantId?: string | null;
 }
 
 /** The real assessment board with one half fading away, circled by the logo's orbit and star. */
@@ -47,8 +48,9 @@ function HeroBoard() {
   );
 }
 
-export function Home({ onStart, onHistory, onDemo }: Props) {
+export function Home({ onStart, onHistory, onDemo, participantId }: Props) {
   const supported = viewportClass(window.innerWidth, window.innerHeight) === "desktop-960";
+  const welcomeId = participantId?.trim();
 
   return (
     <div className="home">
@@ -88,6 +90,7 @@ export function Home({ onStart, onHistory, onDemo }: Props) {
           }}
         >
           <Eyebrow plain>New session</Eyebrow>
+          {welcomeId ? <h3>Welcome, {welcomeId}</h3> : null}
           {!supported && (
             <p className="notice warn" role="status">
               This window is smaller than 1024×768, so the session will be recorded with an “unsupported” screen class.

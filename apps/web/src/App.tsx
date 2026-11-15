@@ -517,6 +517,7 @@ export function App() {
             onStart={beginAssessment}
             onHistory={() => go("history")}
             onDemo={() => go("demo")}
+            participantId={participantLabel}
           />
         )}
         {screen === "assessment" && (
