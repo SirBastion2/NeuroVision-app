@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { trendAxisTicks, trendPointX } from "../lib/trend-axis";
 
 export interface TrendPoint {
   id: string;
+  /** ISO timestamp. Points are placed in array order, not by calendar gap. */
+  at: string;
+  /** Hover and accessible label. */
   label: string;
   value: number | null;
 }
@@ -33,7 +37,7 @@ export function TrendChart({
   const H = 210;
   const pad = { l: 46, r: 28, t: 16, b: 30 };
   const innerW = W - pad.l - pad.r;
-  const x = (i: number) => pad.l + (points.length <= 1 ? innerW / 2 : (i * innerW) / (points.length - 1));
+  const x = (i: number) => trendPointX(i, points.length, innerW, pad.l);
   const y = (v: number) => pad.t + ((max - v) * (H - pad.t - pad.b)) / (max - min || 1);
 
   const segments: string[] = [];
@@ -45,8 +49,10 @@ export function TrendChart({
   });
   const ticks = [max, (max + min) / 2, min];
   const hit = active !== null ? points[active] : undefined;
-  const every = Math.max(1, Math.ceil(points.length / 5));
-  const last = points.length - 1;
+  const xTicks = trendAxisTicks(
+    points.map((p) => p.at),
+    x,
+  );
 
   return (
     <figure className="trend card">
@@ -78,13 +84,11 @@ export function TrendChart({
             <circle key={p.id} className={`dot ${active === i ? "on" : ""}`} cx={x(i)} cy={y(p.value)} r={active === i ? 6 : 4.5} />
           ),
         )}
-        {points.map((p, i) =>
-          i % every === 0 || i === last ? (
-            <text key={`l-${p.id}`} className="x-label" x={x(i)} y={H - 9} textAnchor={i === 0 ? "start" : i === last ? "end" : "middle"}>
-              {p.label}
-            </text>
-          ) : null,
-        )}
+        {xTicks.map((tick) => (
+          <text key={`l-${points[tick.index]?.id}`} className="x-label" x={tick.x} y={H - 9} textAnchor={tick.anchor}>
+            {tick.text}
+          </text>
+        ))}
         {/* Hit targets wider than the marks. */}
         {points.map((p, i) => (
           <rect
