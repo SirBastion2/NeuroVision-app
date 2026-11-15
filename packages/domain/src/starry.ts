@@ -34,7 +34,7 @@ export const STARRY_DEFAULTS = {
   /** Lead-in before the first target, so the eyes settle into the moving field. */
   leadInMs: 2000,
   fullTargets: 15,
-  demoTargets: 15,
+  demoTargets: 5,
   columns: 8,
   rows: 4,
   /** Field size in board units (16:10). */

@@ -64,10 +64,12 @@ export function TargetIntro({
 export function LineIntro({
   input,
   step = scoredBatteryStep("lines"),
+  lineCount = LINE_BISECTION_TRIAL_COUNT,
   onBegin,
 }: {
   input: InputModality;
   step?: string;
+  lineCount?: number;
   onBegin: () => void;
 }) {
   return (
@@ -80,7 +82,7 @@ export function LineIntro({
       </svg>
       <ul className="steps">
         <li>
-          {HOW[input]} the point you judge to be the centre. One mark per line, {LINE_BISECTION_TRIAL_COUNT} lines in total.
+          {HOW[input]} the point you judge to be the centre. One mark per line, {lineCount} lines in total.
         </li>
         <li>There is no feedback on accuracy. Press Next line to continue, or Skip line.</li>
         <li>Each line has up to {TIME_LIMIT_MS["line-bisection"] / 1000} seconds.</li>

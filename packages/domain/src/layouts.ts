@@ -41,6 +41,24 @@ export const LINE_BISECTION_LINES: readonly LineSegment[] = [
 
 export const LINE_BISECTION_TRIAL_COUNT = LINE_BISECTION_LINES.length;
 
+/** Short (400) and long (700) lines from the full set, with those lines' offsets kept. */
+export const DEMO_LINE_BISECTION_LINES: readonly LineSegment[] = [LINE_BISECTION_LINES[1]!, LINE_BISECTION_LINES[2]!];
+
+export const DEMO_LINE_BISECTION_TRIAL_COUNT = DEMO_LINE_BISECTION_LINES.length;
+
+export interface TargetSelectionLayoutOptions {
+  /** Same 48-item board; 20 of 24 hollow rings become solid disks (2 targets per side). */
+  demo?: boolean;
+}
+
+export function lineBisectionLines(demo = false): readonly LineSegment[] {
+  return demo ? DEMO_LINE_BISECTION_LINES : LINE_BISECTION_LINES;
+}
+
+export function lineBisectionTrialCount(demo = false): number {
+  return lineBisectionLines(demo).length;
+}
+
 interface SlotCounts {
   targetsPerSide: number;
   distractorsPerSide: number;
@@ -102,14 +120,28 @@ function fillSides(slots: Array<{ x: number; y: number }>, counts: SlotCounts): 
   return filled;
 }
 
+const DEMO_HOLLOW_RINGS_PER_SIDE = 2;
+
+/** Keep the full 48-item board; turn all but two hollow rings per side into solid disks. */
+function withDemoHollowRings(stimuli: Stimulus[]): Stimulus[] {
+  return stimuli.map((item) => {
+    if (item.kind !== "target") return item;
+    const ordinal = Number(/-t(\d+)$/.exec(item.id)?.[1] ?? 0);
+    if (ordinal > 0 && ordinal <= DEMO_HOLLOW_RINGS_PER_SIDE) return item;
+    return { ...item, kind: "distractor" as const };
+  });
+}
+
 export function createTargetSelectionLayout(
   variant: LayoutVariant = "fixed-a",
   density: BoardDensity = "standard",
+  options: TargetSelectionLayoutOptions = {},
 ): TaskLayout {
   const counts = slotCounts("assessment", density);
+  const stimuli = fillSides(shuffledSlots(layoutSeed(variant)), counts);
   return {
     id: variant,
-    stimuli: fillSides(shuffledSlots(layoutSeed(variant)), counts),
+    stimuli: options.demo ? withDemoHollowRings(stimuli) : stimuli,
   };
 }
 
@@ -129,8 +161,8 @@ export function createPracticeLayout(density: BoardDensity = "standard"): TaskLa
   };
 }
 
-export function createLineBisectionLayout(index: number): { layout: TaskLayout; line: LineSegment } {
-  const line = LINE_BISECTION_LINES[index];
+export function createLineBisectionLayout(index: number, demo = false): { layout: TaskLayout; line: LineSegment } {
+  const line = lineBisectionLines(demo)[index];
   if (!line) {
     throw new RangeError(`Line bisection index ${index} is out of range.`);
   }
