@@ -49,6 +49,7 @@ describe("Home hero", () => {
     assert.match(html, /Demo run/);
     assert.match(html, /Begin assessment/);
     assert.match(html, /New session/);
+    assert.doesNotMatch(html, /Welcome,/);
     assert.doesNotMatch(html, /Start an assessment/);
     assert.doesNotMatch(html, /A few minutes/);
     assert.doesNotMatch(html, /Data stays in this browser/);
@@ -58,6 +59,31 @@ describe("Home hero", () => {
     assert.doesNotMatch(html, /Board layout/);
     assert.doesNotMatch(html, /Layout A/);
     assert.doesNotMatch(html, /Layout B/);
+  });
+});
+
+describe("Home new session", () => {
+  it("greets the signed-in participant between New session and Begin assessment", () => {
+    const html = renderToStaticMarkup(
+      createElement(Home, {
+        onStart() {},
+        onHistory() {},
+        onDemo() {},
+        participantId: "p-42",
+      }),
+    );
+    assert.match(html, /New session[\s\S]*<h3>Welcome, p-42<\/h3>[\s\S]*Begin assessment/);
+  });
+
+  it("omits the welcome line when the participant id is blank", () => {
+    const html = renderToStaticMarkup(
+      createElement(Home, {
+        onStart() {},
+        onHistory() {},
+        participantId: "  ",
+      }),
+    );
+    assert.doesNotMatch(html, /Welcome,/);
   });
 });
 

@@ -284,6 +284,7 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .journey-n { font-family: var(--serif); font-size: 1.5rem; color: var(--brass); line-height: 1; margin-bottom: 4px; }
 .home-grid { display: grid !important; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 22px; }
 .start-card h2 { margin-bottom: 20px; }
+.start-card h3 { font-family: var(--serif); font-weight: 700; font-size: 1.4rem; margin-bottom: 20px; }
 .start-card .primary { width: 100%; margin: 6px 0 12px; }
 .start-card .fineprint { text-align: center; }
 .home-grid > .start-card { align-self: start; }
