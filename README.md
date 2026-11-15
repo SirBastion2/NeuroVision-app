@@ -3,6 +3,8 @@
 **Sebastian Villalba, Jonathan Zheng, Ekagra Jain, and Pronita Ghimire**
 HackPrinceton 2026
 
+**[Try it](https://neurovision-app-kappa.vercel.app/)** — the live app, in the browser, nothing to install.
+
 NeuroVision is a three-test battery for hemispatial neglect that runs in an ordinary web browser, with no installation and no extra hardware. Each test produces a signed left–right index and a standard error. A probabilistic evidence model standardizes those indices against healthy norms and combines them into a posterior over a leftward lean, a rightward lean, or balanced attention.
 
 It is a research prototype, not a diagnostic device. Its output describes one session. It does not diagnose a condition.
@@ -101,86 +103,18 @@ During the event the tests, the model, and the pilot plan were shown to Taryn Za
 - Screen size, viewing distance, lighting, and distraction are uncontrolled at home. Stimulus visual angle is not fixed.
 - The on-screen report does not yet show the combined posterior.
 
-## For developers
+## In the repository
 
-Node.js 22 or newer, npm workspaces, TypeScript. The web app is React 19 and Vite 6, including a single-file build. The API is Fastify 5 with cookie sessions and Postgres (`pg`); Timescale hypertables are created only when that extension is present. The worker leases analysis and cleanup jobs. Trace bytes go to S3 or MinIO when those variables are set, and stay in Postgres otherwise. Tests use `node:test` via `tsx`. One Vercel project can serve the static site and the API together (`vercel.json`). Deploy settings are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-| Path | Role |
-| --- | --- |
-| `apps/web` | The battery, report, history, and the service layer |
-| `apps/api` | Identity, sessions, battery records, trace upload, export, deletion |
-| `apps/worker` | Job loop for trace analysis and cleanup |
-| `packages/domain` | Contracts, validation, scoring, norms, and the evidence model (`CONTRACTS_VERSION` 1.2.0) |
-| `packages/gaze` | Gaze samples, calibration, quality, and trace summaries. Not used by the three tests |
-| `packages/storage` | Browser envelope for validated sessions and battery records |
-| `api/` | Vercel function entry |
-| `apps/api/fixtures/seed.sql` | Demo organization and identities |
-| `docs/` | Architecture, ownership, backend, norms, demo script, merge order |
-
-```bash
-npm ci
-```
-
-**Browser only.** No database and no `.env`. Sessions stay in this browser’s local storage.
-
-```bash
-npm run dev -w @neurovision/web
-```
-
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
-
-```bash
-npm run build:standalone
-```
-
-Open `apps/web/dist/standalone/index.html`. That file makes no network calls. Its history is in memory for the open page; closing it drops the session. It does not write the durable browser envelope the ordinary dev server uses.
-
-**API and web.** Copy `.env.example` to `.env` and set `DATABASE_URL`. The example host is a placeholder. `npm run dev` exits until `.env` exists, then serves the API on port 3001 and the web app on port 5173. Vite proxies `/api` and `/health`.
-
-The example uses local identity. The web app asks for a participant ID of 3–32 letters, digits, or dashes, in `org-demo`, and greets that ID on the home card. The same ID on another device loads that participant’s server history. No name is collected. `DEMO_SEED` (default on) seeds `admin-demo` (admin; cannot read measurements), `reviewer-demo` (reviewer; can read the demo participant), and `participant-demo`. Any other valid ID is created as a participant on first sign-in. The same rows are in `apps/api/fixtures/seed.sql`. Set `COOKIE_SECURE=false` for `http://localhost`. Leave `VITE_API_BASE_URL` unset for the browser-only path; the example sets it to `/`. `IDENTITY_MODE=oidc` needs the four `OIDC_*` variables and disables local sign-in.
-
-Migrations run on API startup and via `npm run migrate`. Without Docker: `npm run start -w @neurovision/api` and `npm run start -w @neurovision/worker`. Routes, cookies, and trace JSON are in [docs/BACKEND.md](docs/BACKEND.md).
-
-**Docker Compose.** `npm run dev:backend` copies `.env.example` when `.env` is missing and runs `docker compose up --build` (Postgres 16, MinIO, API, worker). It does not start the web app; run `npm run dev -w @neurovision/web` once the API is healthy. Compose will not start until `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_BUCKET` are set. Those lines are commented in `.env.example`. Do not commit `.env`.
-
-```bash
-npm test          # domain, gaze, web, storage, api, worker
-npm run test:e2e  # service-layer flow
-npm run build     # typecheck and both web builds
-npm run verify    # build, both test commands, standalone check; rewrites docs/RELEASE_EVIDENCE.md
-```
-
-CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` on Node 22. The committed [docs/RELEASE_EVIDENCE.md](docs/RELEASE_EVIDENCE.md) records 281 package tests and 2 end-to-end tests, all passing, at contracts `1.2.0`.
-
-```mermaid
-flowchart LR
-  web["apps/web"]
-  domain["packages/domain"]
-  storage["packages/storage"]
-  api["apps/api"]
-  worker["apps/worker"]
-  gaze["packages/gaze"]
-  pg[(Postgres)]
-
-  web --> domain
-  web --> storage
-  web -->|"/api when VITE_API_BASE_URL is set"| api
-  api --> domain
-  api --> pg
-  worker --> api
-  api --> gaze
-```
-
-Screens call `createAppServices`. Writes go through `parseSessionRecord` and `parseBatteryRecord`. Scores are recomputed from the raw log, so an old session can be re-scored when norms change. History puts two sessions on one trend only when they are comparable live assessments; demonstration runs stay off the trend. With the API configured, a finished live assessment is queued for upload and the worker moves processing to ready or failed.
+The live app is a React and Vite site with a Fastify API and Postgres. Scoring and the evidence model are in `packages/domain`; the battery UI is `apps/web`, with `apps/api`, `apps/worker`, `packages/gaze`, and `packages/storage` beside it.
 
 | Doc | Contents |
 | --- | --- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Contracts, scoring, API client, Vercel, standalone build |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Contracts, scoring, and how the app is delivered |
 | [docs/OWNERSHIP.md](docs/OWNERSHIP.md) | Which workstream may edit which tree |
-| [docs/BACKEND.md](docs/BACKEND.md) | API, worker, local sign-in, Compose |
+| [docs/BACKEND.md](docs/BACKEND.md) | API and worker |
 | [docs/NORMS.md](docs/NORMS.md) | Which tests enter the model, and the placeholder table |
 | [docs/MERGE_ORDER.md](docs/MERGE_ORDER.md) | Intended land order for workstreams A–F |
 | [docs/DEMO_REHEARSAL.md](docs/DEMO_REHEARSAL.md) | Demonstration-session script |
-| [docs/RELEASE_EVIDENCE.md](docs/RELEASE_EVIDENCE.md) | Last `npm run verify` output |
+| [docs/RELEASE_EVIDENCE.md](docs/RELEASE_EVIDENCE.md) | Latest recorded test and build evidence |
 
-The repository was built as parallel workstreams. Agent A owns `packages/domain` and `docs/`. Agent B owns `packages/storage`, `apps/api`, and `apps/worker`. Agent C owns `packages/gaze`. Agents D and E own the product UI in `apps/web`. Agent F owns `apps/web/src/services/`, the standalone build, and `npm run verify`. [docs/OWNERSHIP.md](docs/OWNERSHIP.md) is the rule for who edits which folder. `docs/ARCHITECTURE.md`, `docs/DEMO_REHEARSAL.md`, and `apps/web/README.md` still describe practice screens and a gaze lab in the product UI. Those pages are not mounted. Use this file and `apps/web/src/App.tsx` for what a visitor sees.
+The repository was built as parallel workstreams. Agent A owns `packages/domain` and `docs/`. Agent B owns storage, the API, and the worker. Agent C owns `packages/gaze`. Agents D and E own the product UI. Agent F owns the web service layer. [docs/OWNERSHIP.md](docs/OWNERSHIP.md) is the rule for who edits which folder. A few of those docs still describe practice screens and a gaze lab in the product UI; those pages are not mounted. This file and `apps/web/src/App.tsx` are what a visitor sees.
