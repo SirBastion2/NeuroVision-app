@@ -63,6 +63,7 @@ describe("screen wiring", () => {
           startedAt: "2026-11-14T16:00:00.000Z",
           completion: "complete",
           session: liveSession(),
+          battery: null,
           traces: [],
           attempts: 0,
           nextAttemptAt: 0,

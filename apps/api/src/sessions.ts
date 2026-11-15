@@ -19,6 +19,7 @@ import type { Actor, Deps } from "./deps.js";
 import { asJson, isUniqueViolation, one, sessionActivity } from "./db.js";
 import { HttpError } from "./errors.js";
 import { contentHash, sha256Hex } from "./hash.js";
+import { settleQueuedAnalysis } from "./worker-lib.js";
 
 interface AssignmentRow {
   id: string;
@@ -620,6 +621,14 @@ export async function readSession(deps: Deps, actor: Actor, sessionId: string) {
   if (!session || session.deleted_at) throw new HttpError(404, "not_found", "Not found.");
   const participant = await requireLiveParticipant(deps, actor.orgId, session.participant_id);
   await assertMeasurementRead(deps, actor, participant);
+  if (session.processing_state === "pending" || session.processing_state === "running") {
+    try {
+      const processing = await settleQueuedAnalysis(deps, sessionId);
+      if (processing) session.processing_state = processing;
+    } catch {
+      /* Leave the stored processing state; the next read retries. */
+    }
+  }
   const document = await one<{ record: unknown; provenance: unknown }>(
     deps.db,
     "SELECT record, provenance FROM session_documents WHERE session_id = $1",
@@ -627,7 +636,7 @@ export async function readSession(deps: Deps, actor: Actor, sessionId: string) {
   );
   const batteryRow = await one<{ record: unknown }>(deps.db, "SELECT record FROM battery_records WHERE session_id = $1", [sessionId]);
   let record: SessionRecord | null = null;
-  if (document && !batteryRow) {
+  if (document) {
     try {
       record = parseSessionRecord(asJson(document.record));
     } catch {
@@ -1147,15 +1156,25 @@ export async function putBattery(deps: Deps, actor: Actor, sessionId: string, ra
   });
   return deps.db.transaction(async (tx) => {
     const txDeps = { ...deps, db: tx };
-    const existing = await one<{ id: string; request_hash: string }>(tx, "SELECT id, request_hash FROM sessions WHERE id = $1 FOR UPDATE", [
+    const existing = await one<{ id: string; request_hash: string; sealed_at: Date | string | null }>(
+      tx,
+      "SELECT id, request_hash, sealed_at FROM sessions WHERE id = $1 FOR UPDATE",
+      [sessionId],
+    );
+    const requestHash = contentHash(record);
+    const storedBattery = await one<{ record: unknown }>(tx, "SELECT record FROM battery_records WHERE session_id = $1", [
       sessionId,
     ]);
-    const requestHash = contentHash(record);
-    if (existing) {
-      if (existing.request_hash === requestHash) {
-        return { sessionId, sealed: true, idempotent: true, battery: true };
+    if (storedBattery) {
+      if (contentHash(asJson(storedBattery.record)) === requestHash) {
+        return { sessionId, sealed: Boolean(existing?.sealed_at), idempotent: true, battery: true };
       }
-      throw new HttpError(409, "conflict", "Session identifier was reused with different content.", { reason: "session_content" });
+      throw new HttpError(409, "conflict", "Session identifier was reused with different content.", { reason: "battery_content" });
+    }
+    if (existing) {
+      await insertBatteryRows(tx, sessionId, record, { writeDocument: false, writeSummary: false });
+      await audit(txDeps, actor, "battery.store", "session", sessionId, { mode: record.mode, attached: true });
+      return { sessionId, sealed: Boolean(existing.sealed_at), idempotent: false, battery: true };
     }
     await tx.query(
       `INSERT INTO sessions (
@@ -1173,16 +1192,47 @@ export async function putBattery(deps: Deps, actor: Actor, sessionId: string, ra
         deps.now().toISOString(),
       ],
     );
-    for (const trial of batteryTrials(record)) {
-      const trialHash = contentHash(trial.payload);
+    await insertBatteryRows(tx, sessionId, record, { writeDocument: true, writeSummary: true, actorSubject: actor.subject });
+    await audit(txDeps, actor, "battery.store", "session", sessionId, { mode: record.mode });
+    return { sessionId, sealed: true, idempotent: false, battery: true };
+  });
+}
+
+async function insertBatteryRows(
+  tx: Deps["db"],
+  sessionId: string,
+  record: BatteryRecord,
+  options: { writeDocument: boolean; writeSummary: boolean; actorSubject?: string },
+) {
+  for (const trial of batteryTrials(record)) {
+    const trialHash = contentHash(trial.payload);
+    const stored = await one<{ content_hash: string }>(
+      tx,
+      "SELECT content_hash FROM trials WHERE session_id = $1 AND trial_id = $2",
+      [sessionId, trial.trialId],
+    );
+    if (stored && stored.content_hash !== trialHash) {
+      throw new HttpError(409, "conflict", "Trial was reused with different content.", { reason: "trial" });
+    }
+    if (!stored) {
       await tx.query("INSERT INTO trials (session_id, trial_id, payload, content_hash) VALUES ($1, $2, $3::jsonb, $4)", [
         sessionId,
         trial.trialId,
         JSON.stringify(trial.payload),
         trialHash,
       ]);
-      for (const event of trial.events) {
-        const eventHash = contentHash(event);
+    }
+    for (const event of trial.events) {
+      const eventHash = contentHash(event);
+      const storedEvent = await one<{ content_hash: string }>(
+        tx,
+        "SELECT content_hash FROM response_events WHERE session_id = $1 AND trial_id = $2 AND seq = $3",
+        [sessionId, trial.trialId, event.seq],
+      );
+      if (storedEvent && storedEvent.content_hash !== eventHash) {
+        throw new HttpError(409, "conflict", "Response sequence was reused with different content.", { reason: "event" });
+      }
+      if (!storedEvent) {
         await tx.query(
           `INSERT INTO response_events (session_id, trial_id, seq, elapsed_ms, object_id, kind, x, y, content_hash)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -1190,19 +1240,44 @@ export async function putBattery(deps: Deps, actor: Actor, sessionId: string, ra
         );
       }
     }
-    await tx.query("INSERT INTO battery_records (session_id, record) VALUES ($1, $2::jsonb)", [sessionId, JSON.stringify(record)]);
+  }
+  await tx.query("INSERT INTO battery_records (session_id, record) VALUES ($1, $2::jsonb)", [sessionId, JSON.stringify(record)]);
+  if (options.writeDocument) {
     await tx.query(
       `INSERT INTO session_documents (session_id, record, provenance)
-       VALUES ($1, $2::jsonb, $3::jsonb)`,
+       VALUES ($1, $2::jsonb, $3::jsonb)
+       ON CONFLICT (session_id) DO NOTHING`,
       [
         sessionId,
         JSON.stringify(record),
-        JSON.stringify({ kind: "battery", contractsVersion: record.contract, sealedBy: actor.subject }),
+        JSON.stringify({ kind: "battery", contractsVersion: record.contract, sealedBy: options.actorSubject ?? "" }),
       ],
     );
-    await audit(txDeps, actor, "battery.store", "session", sessionId, { mode: record.mode });
-    return { sessionId, sealed: true, idempotent: false, battery: true };
-  });
+  }
+  if (options.writeSummary) {
+    const scored = scoreBatteryRecord(record);
+    await tx.query(
+      `INSERT INTO derived_summaries (id, session_id, analysis_version, input_hash, session_revision, summary)
+       VALUES ($1, $2, $3, $4, 1, $5::jsonb)
+       ON CONFLICT (session_id, session_revision, analysis_version, input_hash) DO NOTHING`,
+      [
+        randomUUID(),
+        sessionId,
+        ANALYSIS_VERSION,
+        contentHash(record),
+        JSON.stringify({
+          stub: false,
+          analysisVersion: ANALYSIS_VERSION,
+          inputHash: contentHash(record),
+          sessionRevision: 1,
+          scoring: scored,
+          gazeAnalysis: { version: ANALYSIS_VERSION, trials: [] },
+          eligibility: { click: true, gaze: false, reasons: ["no_gaze_trace"], groupKey: record.contract },
+          provenance: { contractsVersion: record.contract, source: record.source },
+        }),
+      ],
+    );
+  }
 }
 
 export async function listSessions(deps: Deps, actor: Actor) {
@@ -1237,9 +1312,8 @@ export async function listSessions(deps: Deps, actor: Actor) {
     if (row.battery) {
       try {
         batteries.push(parseBatteryRecord(asJson(row.battery)));
-        continue;
       } catch {
-        /* fall through to session record */
+        /* skip rows that are not domain battery records */
       }
     }
     if (row.record) {

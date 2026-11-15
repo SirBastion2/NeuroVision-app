@@ -6,11 +6,13 @@ import {
   generateClockTrials,
   generateGreyscalesTrials,
   generateScene,
+  generateStarryTrials,
   parseBatteryRecord,
   scoreBatteryRecord,
 } from "@neurovision/domain";
 import { createBatteryStore, memoryStore } from "@neurovision/storage";
 import {
+  assembleAssessmentBatteryRecord,
   assembleBatteryRecord,
   batteryEnabled,
   batteryStepOrder,
@@ -20,6 +22,7 @@ import {
   type BatteryIntroConfig,
   type BatteryTaskOutputs,
 } from "../src/data/batterySession.ts";
+import { createAppServices } from "../src/services/index.ts";
 
 function outputs(seed: number, hide: BatteryIntroConfig["hide"]): BatteryTaskOutputs {
   const scene = generateScene({ seed, hide });
@@ -124,5 +127,72 @@ describe("batterySession", () => {
   it("keeps the battery visible when the API client is on", () => {
     assert.equal(batteryEnabled(true), true);
     assert.equal(batteryEnabled(false), true);
+  });
+
+  it("assembles Starry Night detection from a completed assessment session", async () => {
+    const services = createAppServices({
+      createId: () => "live-starry",
+      now: () => new Date("2026-11-14T16:00:00.000Z"),
+    });
+    const started = services.startSession({ alias: "Pilot", id: "live-starry", startedAt: "2026-11-14T16:00:00.000Z" });
+    const trial = started.trials.find((item) => item.task === "target-selection");
+    assert.ok(trial);
+    const left = trial.layout.stimuli.filter((stimulus) => stimulus.kind === "target" && stimulus.side === "left").slice(0, 10);
+    const right = trial.layout.stimuli.filter((stimulus) => stimulus.kind === "target" && stimulus.side === "right").slice(0, 10);
+    let session = started;
+    let elapsed = 400;
+    for (const stimulus of [...left, ...right]) {
+      session = services.recordClick(session, trial.id, { x: stimulus.x, y: stimulus.y }, elapsed);
+      elapsed += 500;
+    }
+    session = services.finishTrial(session, trial.id, "done", 20_000);
+    for (const lineTrial of session.trials.filter((item) => item.task === "line-bisection")) {
+      assert.ok(lineTrial.line);
+      session = services.recordClick(
+        session,
+        lineTrial.id,
+        { x: (lineTrial.line.x1 + lineTrial.line.x2) / 2, y: lineTrial.line.y },
+        800,
+      );
+      session = services.finishTrial(session, lineTrial.id, "done", 1500);
+    }
+    session = services.completeSession(session, { completedAt: "2026-11-14T16:08:00.000Z" });
+    const starryTrials = generateStarryTrials(8, 21);
+    const record = assembleAssessmentBatteryRecord(session, {
+      trials: starryTrials,
+      responses: starryTrials.map((item) => ({ trialId: item.id, rtMs: 400 })),
+    });
+    assert.equal(record.id, session.id);
+    assert.equal(record.healthyControl, true);
+    assert.equal(record.consent, true);
+    assert.ok(record.detection);
+    assert.equal(record.detection.left.hits + record.detection.right.hits, 8);
+    assert.ok(record.cancellation);
+    assert.ok(record.bisection);
+    assert.equal(record.bisection.lines.length, 5);
+    const kv = memoryStore();
+    const store = createBatteryStore(kv);
+    const saved = await saveBatterySession(
+      {
+        mode: "full",
+        hide: "none",
+        seed: 21,
+        readingDirection: null,
+        consent: true,
+        healthyControl: true,
+      },
+      {
+        scene: { taps: [] },
+        clock: { trials: [], responses: [] },
+        bisection: record.bisection ?? undefined,
+        detection: record.detection ?? undefined,
+        cancellation: record.cancellation ?? undefined,
+      },
+      { store, id: session.id, startedAt: session.startedAt, completedAt: session.completedAt },
+    );
+    const loaded = await store.load(session.id);
+    assert.ok(loaded);
+    assert.equal(loaded.detection?.left.hits, saved.detection?.left.hits);
+    assert.equal(loaded.healthyControl, true);
   });
 });

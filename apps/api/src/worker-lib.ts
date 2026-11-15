@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { parseSessionRecord, type SessionRecord } from "@neurovision/domain";
 import { ANALYSIS_VERSION, buildDerivedSummary } from "./analysis.js";
-import type { CompletionState } from "./contracts.provisional.js";
+import type { CompletionState, ProcessingState } from "./contracts.provisional.js";
 import type { Deps } from "./deps.js";
 import { asJson, many, one } from "./db.js";
 
@@ -235,6 +235,42 @@ export async function settleJob(deps: WorkerDeps, jobId: string): Promise<void> 
   );
   if (!job || job.status === "succeeded" || job.status === "cancelled") return;
   await runJob(deps, job);
+}
+
+function inlineWorker(deps: Deps): WorkerDeps {
+  return { ...deps, workerId: deps.config.host ? `inline-${deps.config.host}` : "inline-analysis" };
+}
+
+/**
+ * Run a queued analysis job for one session. Used when there is no separate
+ * worker process (the Vercel function) so processing can reach `ready` and
+ * `derived_summaries` are written in the same request that sealed the session.
+ */
+export async function settleQueuedAnalysis(deps: Deps, sessionId: string): Promise<ProcessingState | null> {
+  const worker = inlineWorker(deps);
+  await recoverExpiredLeases(worker);
+  const expires = new Date(worker.now().getTime() + worker.config.leaseMs).toISOString();
+  const job = await one<JobRow>(
+    worker.db,
+    `UPDATE jobs
+     SET status = 'leased', lease_owner = $2, lease_expires_at = $3, attempts = attempts + 1, updated_at = $4
+     WHERE id = (
+       SELECT id FROM jobs
+       WHERE session_id = $1 AND kind = 'analysis' AND status = 'queued'
+       ORDER BY created_at
+       FOR UPDATE SKIP LOCKED
+       LIMIT 1
+     )
+     RETURNING id, session_id, kind, status, session_revision, analysis_version, input_hash, attempts, max_attempts`,
+    [sessionId, worker.workerId, expires, worker.now().toISOString()],
+  );
+  if (job) await runJob(worker, job);
+  const session = await one<{ processing_state: ProcessingState }>(
+    worker.db,
+    "SELECT processing_state FROM sessions WHERE id = $1",
+    [sessionId],
+  );
+  return session?.processing_state ?? null;
 }
 
 export async function runOnce(deps: WorkerDeps): Promise<{ processed: boolean }> {

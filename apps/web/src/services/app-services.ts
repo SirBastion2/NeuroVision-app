@@ -56,7 +56,7 @@ import {
   type KeyValueStore,
   type PackageStoreFactory,
 } from "./package-store";
-import { createWebBatteryStore } from "../data/batterySession";
+import { createWebBatteryStore, shouldPersistBattery } from "../data/batterySession";
 import { deleteParticipant, exportParticipant, pollProcessingState, type PollProcessingOptions } from "./processing";
 import { readRuntimeConfig, type WebRuntimeConfig } from "./runtime-config";
 import {
@@ -127,6 +127,7 @@ export interface AppServices {
   completeSession(session: SessionRecord, input?: { completedAt?: string }): SessionRecord;
   score(session: SessionRecord): ScoringResult;
   save(session: SessionRecord): Promise<SessionRecord>;
+  saveBattery(record: BatteryRecord): Promise<BatteryRecord>;
   load(id: string): Promise<SessionRecord | null>;
   remove(id: string): Promise<void>;
   listHistory(): Promise<SessionRecord[]>;
@@ -343,6 +344,12 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       return store.save(session);
     },
 
+    async saveBattery(record) {
+      const parsed = parseBatteryRecord(record);
+      if (!shouldPersistBattery(parsed)) return parsed;
+      return createWebBatteryStore({ keyValueStore: kv, standalone }).save(parsed);
+    },
+
     load(id) {
       return store.load(id);
     },
@@ -357,6 +364,11 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
         }
       }
       await store.remove(id);
+      try {
+        await createWebBatteryStore({ keyValueStore: kv, standalone }).remove(id);
+      } catch {
+        /* battery envelope may be empty */
+      }
     },
 
     async listHistory() {
@@ -405,9 +417,12 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
 
     async uploadBattery(record) {
       const parsed = parseBatteryRecord(record);
-      if (!api.enabled) return parsed;
-      await api.putBattery(parsed.id, parsed);
-      return parsed;
+      const stored = shouldPersistBattery(parsed)
+        ? await createWebBatteryStore({ keyValueStore: kv, standalone }).save(parsed)
+        : parsed;
+      if (!api.enabled) return stored;
+      await api.putBattery(stored.id, stored);
+      return stored;
     },
 
     async sessionActivity() {

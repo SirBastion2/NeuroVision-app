@@ -3,6 +3,7 @@ import {
   CONTRACTS_VERSION,
   LINE_BISECTION_TRIAL_COUNT,
   describeViewport,
+  type BatteryRecord,
   type SessionRecord,
   type TrialRecord,
 } from "@neurovision/domain";
@@ -103,6 +104,7 @@ export function App() {
   );
   const [state, dispatch] = useReducer(flowReducer, initialFlow);
   const [stored, setStored] = useState<LoadResult>({ sessions: [], rejected: 0, error: null });
+  const [batteries, setBatteries] = useState<BatteryRecord[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [signedIn, setSignedIn] = useState<Me | null>(null);
@@ -131,7 +133,8 @@ export function App() {
   useEffect(() => {
     if (localIdentity && !signedIn) return;
     void store.load().then(setStored);
-  }, [store, localIdentity, signedIn]);
+    void services.listBatteries().then(setBatteries);
+  }, [store, services, localIdentity, signedIn]);
   useEffect(() => {
     setQueue(services.queueState());
     return services.subscribeQueue(setQueue);
@@ -196,6 +199,7 @@ export function App() {
       if (cancelled) return;
       setSaveError(result.error);
       setStored(await store.load());
+      setBatteries(await services.listBatteries());
       if (
         shouldEnqueueUpload({ ended: true, session, apiEnabled }) &&
         !enqueued.current.has(session.id)
@@ -221,6 +225,7 @@ export function App() {
   useEffect(() => {
     if (screen === "history") {
       void store.load().then(setStored);
+      void services.listBatteries().then(setBatteries);
       void services.sessionActivity().then(setActivity);
     }
   }, [screen, store, services]);
@@ -262,17 +267,26 @@ export function App() {
   const home = () => dispatch({ type: "home" });
   const go = (s: Screen) => dispatch({ type: "go", screen: s });
   const saveRun = useCallback(
-    (s: SessionRecord) => {
+    (s: SessionRecord, battery?: BatteryRecord) => {
       if (!shouldPersistSession(s)) return;
       void (async () => {
         const result = await store.save(s);
         setSaveError(result.error);
+        if (battery) {
+          try {
+            await services.saveBattery(battery);
+          } catch (error) {
+            setSaveError(error instanceof Error ? error.message : String(error));
+          }
+        }
         setStored(await store.load());
+        setBatteries(await services.listBatteries());
         if (shouldEnqueueUpload({ ended: true, session: s, apiEnabled }) && !enqueued.current.has(s.id)) {
           enqueued.current.add(s.id);
           try {
             await services.enqueueUpload({
               session: s,
+              battery,
               participantId: signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject,
               assignmentId: `assign-${signedIn?.subject ?? participantId ?? DEMO_LOCAL_IDENTITY.subject}`,
             });
@@ -368,6 +382,7 @@ export function App() {
     try {
       await services.deleteParticipant(exportId);
       setStored(await store.load());
+      setBatteries(await services.listBatteries());
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     }
@@ -581,6 +596,7 @@ export function App() {
         {screen === "history" && (
           <History
             stored={stored}
+            batteries={batteries}
             activity={activity}
             onOpen={(s) => dispatch({ type: "open", session: s })}
             onDelete={async (id) => {
@@ -589,6 +605,7 @@ export function App() {
               if (result.error) setActionError(result.error);
               setSaveError(result.error);
               setStored(await store.load());
+              setBatteries(await services.listBatteries());
               setProcessing((current) => {
                 if (!(id in current)) return current;
                 const next = { ...current };

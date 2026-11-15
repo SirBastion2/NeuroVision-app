@@ -114,6 +114,103 @@ describe("session persistence", { concurrency: false }, () => {
     const listed = await harness.app.inject({ method: "GET", url: "/api/v1/sessions", headers: authed(auth) });
     const body = listed.json() as { batteries: Array<{ id: string }> };
     assert.equal(body.batteries.some((item) => item.id === "battery-full-1"), true);
+    const summaries = await one<{ count: number }>(
+      harness.db,
+      "SELECT COUNT(*)::int AS count FROM derived_summaries WHERE session_id = $1",
+      ["battery-full-1"],
+    );
+    assert.ok(Number(summaries?.count ?? 0) >= 1);
+    const processing = await one<{ processing_state: string }>(
+      harness.db,
+      "SELECT processing_state FROM sessions WHERE id = $1",
+      ["battery-full-1"],
+    );
+    assert.equal(processing?.processing_state, "ready");
+  });
+
+  it("saves Starry Night on a completed battery, attaches battery_records, and completes processing", async () => {
+    const auth = await login(harness.app, world.participantSubject, world.orgA);
+    const uploaded = await uploadSession(harness.app, auth, "battery-roundtrip");
+    assert.ok(uploaded.finalized.jobId);
+    const pending = await one<{ processing_state: string }>(
+      harness.db,
+      "SELECT processing_state FROM sessions WHERE id = $1",
+      ["battery-roundtrip"],
+    );
+    assert.equal(pending?.processing_state, "pending");
+
+    const viewed = await harness.app.inject({
+      method: "GET",
+      url: "/api/v1/sessions/battery-roundtrip",
+      headers: authed(auth),
+    });
+    assert.equal(viewed.statusCode, 200, viewed.body);
+    assert.equal((viewed.json() as { processing: string }).processing, "ready");
+    const summaries = await one<{ count: number }>(
+      harness.db,
+      "SELECT COUNT(*)::int AS count FROM derived_summaries WHERE session_id = $1",
+      ["battery-roundtrip"],
+    );
+    assert.equal(Number(summaries?.count), 1);
+
+    const lines = generateBisectionLines(5, 21);
+    const record = parseBatteryRecord({
+      ...fullBattery("battery-roundtrip"),
+      detection: {
+        left: { hits: 6, targets: 8 },
+        right: { hits: 8, targets: 8 },
+      },
+      cancellation: {
+        left: { omissions: 2, targets: 12 },
+        right: { omissions: 0, targets: 12 },
+      },
+      bisection: {
+        lines,
+        responses: lines.map((line) => ({ lineId: line.id, x: (line.x1 + line.x2) / 2 })),
+      },
+      healthyControl: true,
+      consent: true,
+      normsUsed: {
+        ...fullBattery("battery-roundtrip").normsUsed,
+        detection: DEFAULT_NORMS.detection,
+        cancellation: DEFAULT_NORMS.cancellation,
+      },
+    });
+    const stored = await harness.app.inject({
+      method: "PUT",
+      url: "/api/v1/sessions/battery-roundtrip/battery",
+      headers: authed(auth),
+      payload: record,
+    });
+    assert.equal(stored.statusCode, 200, stored.body);
+    const batteryRow = await one<{ record: unknown }>(
+      harness.db,
+      "SELECT record FROM battery_records WHERE session_id = $1",
+      ["battery-roundtrip"],
+    );
+    assert.ok(batteryRow);
+    const persisted = parseBatteryRecord(batteryRow.record);
+    assert.equal(persisted.healthyControl, true);
+    assert.equal(persisted.consent, true);
+    assert.equal(persisted.detection?.left.hits, 6);
+    assert.equal(persisted.detection?.left.targets, 8);
+    assert.equal(persisted.detection?.right.hits, 8);
+    assert.equal(persisted.detection?.right.targets, 8);
+
+    const listed = await harness.app.inject({ method: "GET", url: "/api/v1/sessions", headers: authed(auth) });
+    assert.equal(listed.statusCode, 200, listed.body);
+    const body = listed.json() as {
+      sessions: Array<{ id: string }>;
+      batteries: Array<{ id: string; detection?: { left: { hits: number } } }>;
+    };
+    assert.equal(body.sessions.some((session) => session.id === "battery-roundtrip"), true);
+    const listedBattery = body.batteries.find((item) => item.id === "battery-roundtrip");
+    assert.ok(listedBattery);
+    assert.equal(listedBattery.detection?.left.hits, 6);
+
+    const norms = await harness.app.inject({ method: "GET", url: "/api/v1/norms", headers: authed(auth) });
+    assert.equal(norms.statusCode, 200, norms.body);
+    assert.equal((norms.json() as { n: number }).n >= 1, true);
   });
 
   it("refuses to store the hidden-scene demo", async () => {

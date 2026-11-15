@@ -186,6 +186,7 @@ export interface BatteryStore {
   save(record: BatteryRecord): Promise<BatteryRecord>;
   load(id: string): Promise<BatteryRecord | null>;
   list(): Promise<BatteryRecord[]>;
+  remove(id: string): Promise<void>;
 }
 
 export function emptyBatteryEnvelope(): BatteryEnvelope {
@@ -215,6 +216,15 @@ export function saveBatteryRecord(store: KeyValueStore, value: unknown): Battery
   return next;
 }
 
+/** Drop every stored battery with this id and write the envelope back. */
+export function removeBatteryRecord(store: KeyValueStore, id: string): BatteryEnvelope {
+  const current = loadBatteryEnvelope(store);
+  const records = current.records.filter((item) => item.id !== id);
+  const next: BatteryEnvelope = { version: 1, records };
+  store.setItem(BATTERY_KEY, JSON.stringify(next));
+  return next;
+}
+
 /**
  * Same save/load/list shape as the session history store, under `neurovision:battery:v1`.
  * Pass `memoryStore()` for the standalone in-memory backend.
@@ -233,6 +243,9 @@ export function createBatteryStore(store: KeyValueStore): BatteryStore {
     },
     async list() {
       return loadBatteryEnvelope(store).records.map((item) => structuredClone(item));
+    },
+    async remove(id) {
+      removeBatteryRecord(store, id);
     },
   };
 }

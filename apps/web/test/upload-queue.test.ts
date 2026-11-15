@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseSessionRecord } from "@neurovision/domain";
+import { assembleBatteryRecord } from "../src/data/batterySession.ts";
 import {
   ApiError,
   ApiOfflineError,
@@ -265,5 +266,66 @@ describe("offline upload queue", () => {
     assert.ok(updates.length >= 1);
     stop();
     assert.equal(services.storeKind, "package");
+  });
+
+  it("uploads the battery record after the session batch and before finalize", async () => {
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      if (url.includes("/battery") && method === "PUT") {
+        return jsonResponse(200, { sessionId: "sess-battery", sealed: false, battery: true });
+      }
+      if (url.includes("/batches/") && method === "PUT") {
+        return jsonResponse(200, { batchId: "sess-battery-batch-1", sequence: 1, idempotent: false });
+      }
+      if (url.endsWith("/finalize") && method === "POST") {
+        return jsonResponse(200, {
+          sessionId: "sess-battery",
+          sealed: true,
+          idempotent: false,
+          jobId: "job-b",
+          inputHash: "hash",
+          processing: "pending",
+        });
+      }
+      return jsonResponse(200, {
+        id: "sess-battery",
+        participantId: "local",
+        assignmentId: "assign-local",
+        assignmentRevision: 1,
+        startedAt: "2026-11-14T16:00:00.000Z",
+        completion: "complete",
+        sync: "uploading",
+        processing: "pending",
+        sealed: false,
+        sessionRevision: 0,
+        inputHash: null,
+      });
+    };
+    const queue = createUploadQueue({
+      api: createApiClient({ baseUrl: "https://api.example.test", fetch: fetchImpl }),
+      store: createMemoryKeyValueStore(),
+      sleep: async () => undefined,
+    });
+    const session = sessionRecord("sess-battery");
+    const battery = assembleBatteryRecord(
+      { mode: "full", hide: "none", seed: 7, readingDirection: null, consent: true, healthyControl: true },
+      {
+        scene: { taps: [] },
+        clock: { trials: [], responses: [] },
+        detection: { left: { hits: 6, targets: 8 }, right: { hits: 7, targets: 8 } },
+      },
+      { id: "sess-battery", startedAt: session.startedAt, completedAt: session.completedAt },
+    );
+    await queue.enqueue({ session, battery });
+    await queue.drain();
+    assert.equal(queue.peek("sess-battery")?.status, "acknowledged");
+    const batteryIdx = calls.findIndex((call) => call.includes("/battery"));
+    const batchIdx = calls.findIndex((call) => call.includes("/batches/"));
+    const finalizeIdx = calls.findIndex((call) => call.includes("/finalize"));
+    assert.ok(batteryIdx > batchIdx);
+    assert.ok(finalizeIdx > batteryIdx);
   });
 });

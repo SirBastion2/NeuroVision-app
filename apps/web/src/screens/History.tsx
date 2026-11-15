@@ -3,6 +3,7 @@ import {
   scoreSession,
   sessionSourceLabel,
   summarizeAssessmentTrend,
+  type BatteryRecord,
   type SessionRecord,
   type TrendExclusionReason,
 } from "@neurovision/domain";
@@ -16,6 +17,7 @@ import type { UploadQueueState } from "../services/upload-queue";
 
 interface Props {
   stored: LoadResult;
+  batteries?: BatteryRecord[];
   activity?: Array<{ bucket: string; count: number }>;
   onOpen: (session: SessionRecord) => void;
   onDelete: (id: string) => void;
@@ -35,8 +37,15 @@ const EXCLUDED: Record<TrendExclusionReason, string> = {
   incomparable: "Different protocol",
 };
 
+function starryCell(battery: BatteryRecord | undefined): string {
+  const detection = battery?.detection;
+  if (!detection) return "n/a";
+  return `${detection.left.hits}/${detection.left.targets} L · ${detection.right.hits}/${detection.right.targets} R`;
+}
+
 export function History({
   stored,
+  batteries = [],
   activity = [],
   onOpen,
   onDelete,
@@ -76,6 +85,7 @@ export function History({
     () => [...liveSessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     [liveSessions],
   );
+  const batteryById = useMemo(() => new Map(batteries.map((record) => [record.id, record])), [batteries]);
   const activeAlias = profiles.find(([id]) => id === activeProfile)?.[1] ?? null;
   const latest = rows.find((s) => s.profileId === activeProfile) ?? rows[0] ?? null;
 
@@ -192,6 +202,7 @@ export function History({
                 <th>Date</th>
                 <th>Participant</th>
                 <th>Source</th>
+                <th>Starry Night</th>
                 <th>Rings found</th>
                 <th>Left vs right</th>
                 <th>Pattern</th>
@@ -203,7 +214,7 @@ export function History({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={apiControls ? 9 : 8} className="empty">
+                  <td colSpan={apiControls ? 10 : 9} className="empty">
                     No sessions yet. Run an assessment from Home to build this history.
                   </td>
                 </tr>
@@ -223,6 +234,7 @@ export function History({
                         {session.status === "complete" ? "Complete" : "Incomplete"}
                       </span>
                     </td>
+                    <td>{starryCell(batteryById.get(session.id))}</td>
                     <td>{ts ? `${ts.hits}/${ts.available}` : "n/a"}</td>
                     <td>{missShareGap(ts?.omissionAsymmetry ?? null)}</td>
                     <td>{result.spatialPattern.kind.replace("-", " ")}</td>

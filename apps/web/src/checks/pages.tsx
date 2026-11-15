@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LINE_BISECTION_TRIAL_COUNT,
+  type BatteryRecord,
   type InputModality,
   STARRY_DEFAULTS,
   describeViewport,
@@ -12,6 +13,7 @@ import {
   type StarryTrial,
   type TrialRecord,
 } from "@neurovision/domain";
+import { assembleAssessmentBatteryRecord } from "../data/batterySession";
 import { Eyebrow } from "../components/Brand";
 import { ResponseOrderPlot } from "../components/ResponseOrderPlot";
 import { BalanceBar, LineDeviations, RegionGrid, Stat } from "../components/ReviewFigures";
@@ -92,8 +94,8 @@ interface BatteryProps {
   demo?: boolean;
   onHome: () => void;
   onRunning: RunningChange;
-  /** Called with the finished hollow-ring/line session (live runs only) so App can keep it in History. */
-  onSave?: (session: SessionRecord) => void;
+  /** Called with the finished session and battery (live runs only) so App can keep every test in History. Fire-and-forget; do not await. */
+  onSave?: (session: SessionRecord, battery?: BatteryRecord) => void;
   /** Signed-in participant ID; live runs store this as the session alias. */
   alias?: string;
   input?: InputModality;
@@ -130,17 +132,28 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
   sessionRef.current = session;
   const lineRef = useRef(lineIndex);
   lineRef.current = lineIndex;
+  const starryRef = useRef(starry);
+  starryRef.current = starry;
+  const starryTrialsRef = useRef(starryTrials);
+  starryTrialsRef.current = starryTrials;
 
   const onBoardTrial = useCallback(
     (trial: TrialRecord) => {
       const { session: next, finished } = recordAssessmentTrial(sessionRef.current, trial);
       setSession(next);
       if (finished) {
-        if (!demo && onSave) {
-          try {
-            onSave(next);
-          } catch {
-            /* History save / upload must not block leaving the board */
+        if (!demo) {
+          const run = starryRef.current;
+          const battery = assembleAssessmentBatteryRecord(
+            next,
+            run ? { trials: starryTrialsRef.current, responses: run.responses, presses: run.presses } : null,
+          );
+          if (onSave) {
+            try {
+              onSave(next, battery);
+            } catch {
+              /* History save / upload must not block leaving the board */
+            }
           }
         }
         toTop();
@@ -265,7 +278,7 @@ function CombinedReport({
           <p className="meta">
             {demo
               ? "Demonstration run · not saved"
-              : "Hollow rings and line bisection save to History; Starry Night is shown on this report"}{" "}
+              : "Starry Night, hollow rings, and line bisection save to History"}{" "}
             · research tool, not a diagnosis
           </p>
         </div>
