@@ -90,4 +90,14 @@ describe("battery store", () => {
     assert.equal(stored.records.find((item) => item.id === "battery-1")?.seed, 12);
     assert.equal(kv.snapshot()[ENVELOPE_KEY], undefined);
   });
+
+  it("removes a battery record by id", async () => {
+    const kv = memoryStore();
+    const store = createBatteryStore(kv);
+    await store.save(parseBatteryRecord(makeBattery({ id: "keep" })));
+    await store.save(parseBatteryRecord(makeBattery({ id: "drop" })));
+    await store.remove("drop");
+    assert.equal(await store.load("drop"), null);
+    assert.equal((await store.load("keep"))?.id, "keep");
+  });
 });

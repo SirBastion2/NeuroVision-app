@@ -7,9 +7,10 @@ import {
   CONTRACTS_VERSION,
   PROTOCOL_ID,
   SCORER_ID,
+  generateStarryTrials,
   parseSessionRecord,
 } from "@neurovision/domain";
-import { assembleBatteryRecord } from "../src/data/batterySession.ts";
+import { assembleAssessmentBatteryRecord, assembleBatteryRecord } from "../src/data/batterySession.ts";
 import {
   createApiClient,
   createAppServices,
@@ -404,5 +405,100 @@ describe("app service layer", () => {
       reloaded.some((row) => row.id === "pending-open" || row.id === "never-uploaded"),
       false,
     );
+  });
+
+  it("saves a full battery locally and uploads Starry Night on the battery record", async () => {
+    const kv = createMemoryKeyValueStore();
+    const puts: Array<{ url: string; body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "PUT" && url.includes("/battery")) {
+        puts.push({ url, body: JSON.parse(String(init?.body ?? "{}")) });
+        return new Response(JSON.stringify({ sessionId: "full-battery", sealed: true, battery: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (method === "PUT" && url.includes("/batches/")) {
+        return new Response(JSON.stringify({ batchId: "full-battery-batch-1", sequence: 1, idempotent: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (method === "POST" && url.endsWith("/finalize")) {
+        return new Response(
+          JSON.stringify({
+            sessionId: "full-battery",
+            sealed: true,
+            idempotent: false,
+            jobId: "job-full",
+            inputHash: "hash",
+            processing: "pending",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (method === "PUT") {
+        return new Response(
+          JSON.stringify({
+            id: "full-battery",
+            participantId: "local",
+            assignmentId: "assign-local",
+            assignmentRevision: 1,
+            startedAt: "2026-11-14T16:00:00.000Z",
+            completion: "complete",
+            sync: "uploading",
+            processing: "pending",
+            sealed: false,
+            sessionRevision: 0,
+            inputHash: null,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (method === "GET" && url.includes("/api/v1/sessions")) {
+        return new Response(JSON.stringify({ sessions: [], batteries: [], activity: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
+    };
+    const services = createAppServices({
+      keyValueStore: kv,
+      config: { apiBaseUrl: "https://api.example.test", standalone: false },
+      fetch: fetchImpl,
+      now: () => new Date("2026-11-14T16:00:00.000Z"),
+      createId: () => "full-battery",
+    });
+    const completed = fillHits(
+      services,
+      services.startSession({
+        id: "full-battery",
+        alias: "Full",
+        startedAt: "2026-11-14T16:00:00.000Z",
+      }),
+      10,
+      10,
+    );
+    const starryTrials = generateStarryTrials(8, 21);
+    const battery = assembleAssessmentBatteryRecord(completed, {
+      trials: starryTrials,
+      responses: starryTrials.map((item) => ({ trialId: item.id, rtMs: 350 })),
+    });
+    await services.save(completed);
+    await services.saveBattery(battery);
+    const localBatteries = await services.listBatteries();
+    assert.equal(localBatteries.some((row) => row.id === "full-battery" && row.detection), true);
+    assert.equal(localBatteries.find((row) => row.id === "full-battery")?.healthyControl, true);
+    await services.enqueueUpload({ session: completed, battery });
+    await services.drainQueue();
+    assert.equal(services.queue.peek("full-battery")?.status, "acknowledged");
+    assert.equal(puts.length, 1);
+    const uploaded = puts[0]?.body as { detection?: { left: { hits: number; targets: number } }; healthyControl?: boolean };
+    assert.equal(uploaded.healthyControl, true);
+    assert.ok(uploaded.detection);
+    assert.equal(uploaded.detection.left.hits + (uploaded as { detection: { right: { hits: number } } }).detection.right.hits, 8);
   });
 });

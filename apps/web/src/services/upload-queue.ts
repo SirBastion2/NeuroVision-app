@@ -1,4 +1,4 @@
-import type { SessionRecord } from "@neurovision/domain";
+import type { BatteryRecord, SessionRecord } from "@neurovision/domain";
 import {
   ApiError,
   ApiOfflineError,
@@ -12,7 +12,7 @@ import type { KeyValueStore } from "./package-store";
 export const UPLOAD_QUEUE_KEY = "spatial-patterns:upload-queue:v1";
 
 export type UploadJobStatus = "queued" | "uploading" | "acknowledged" | "blocked";
-export type UploadJobStep = "session" | "batch" | "trace" | "finalize" | "done";
+export type UploadJobStep = "session" | "batch" | "battery" | "trace" | "finalize" | "done";
 
 export interface QueuedTrace {
   request: TraceUploadRequest;
@@ -29,6 +29,7 @@ export interface UploadJob {
   startedAt: string;
   completion: CompletionState;
   session: SessionRecord;
+  battery: BatteryRecord | null;
   traces: QueuedTrace[];
   attempts: number;
   nextAttemptAt: number;
@@ -48,6 +49,7 @@ export interface UploadQueueState {
 
 export interface EnqueueUploadInput {
   session: SessionRecord;
+  battery?: BatteryRecord | null;
   participantId?: string;
   assignmentId?: string;
   assignmentRevision?: number;
@@ -99,7 +101,10 @@ function readQueue(store: KeyValueStore): UploadJob[] {
   try {
     const parsed = JSON.parse(raw) as Partial<QueueEnvelope>;
     if (parsed.version !== QUEUE_VERSION || !Array.isArray(parsed.jobs)) return [];
-    return parsed.jobs.map((job) => (job.status === "uploading" ? { ...job, status: "queued" as const } : job));
+    return parsed.jobs.map((job) => {
+      const next = job.status === "uploading" ? { ...job, status: "queued" as const } : job;
+      return { ...next, battery: next.battery ?? null };
+    });
   } catch {
     return [];
   }
@@ -266,6 +271,18 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
         } catch (error) {
           if (!isConflict(error)) throw error;
         }
+        current = update(current.id, {
+          step: current.battery ? "battery" : current.traces.length > 0 ? "trace" : "finalize",
+        });
+      }
+      if (current.step === "battery") {
+        if (current.battery) {
+          try {
+            await options.api.putBattery(sessionId, current.battery);
+          } catch (error) {
+            if (!isConflict(error)) throw error;
+          }
+        }
         current = update(current.id, { step: current.traces.length > 0 ? "trace" : "finalize" });
       }
       if (current.step === "trace") {
@@ -334,6 +351,7 @@ export function createUploadQueue(options: CreateUploadQueueOptions): UploadQueu
         startedAt: session.startedAt,
         completion: completionOf(session),
         session,
+        battery: input.battery ?? existing?.battery ?? null,
         traces: (input.traces ?? []).map((trace) => ({
           request: trace.request,
           bytesBase64: bytesToBase64(trace.bytes),

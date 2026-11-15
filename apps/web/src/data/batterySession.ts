@@ -4,6 +4,8 @@ import {
   DEFAULT_NORMS,
   greyscalesNormFor,
   parseBatteryRecord,
+  scoreSession,
+  scoreStarry,
   type BatteryMode,
   type BatteryRecord,
   type BisectionLine,
@@ -15,6 +17,10 @@ import {
   type HideSide,
   type ReadingDirection,
   type SceneTap,
+  type SessionRecord,
+  type StarryPress,
+  type StarryResponse,
+  type StarryTrial,
   type TestId,
   type TestNorm,
 } from "@neurovision/domain";
@@ -148,6 +154,87 @@ export function assembleBatteryRecord(
     normsUsed: normsUsedFor(config.mode, config.readingDirection),
   };
   return parseBatteryRecord(record);
+}
+
+export interface AssessmentStarryRun {
+  trials: StarryTrial[];
+  responses: StarryResponse[];
+  presses?: StarryPress[];
+}
+
+function seedFromStarry(trials: readonly StarryTrial[]): number {
+  const match = trials[0]?.id.match(/^starry-(\d+)-/);
+  if (!match) return 1;
+  const seed = Number(match[1]);
+  return Number.isFinite(seed) ? seed : 1;
+}
+
+/** Raw battery outputs from a completed Starry Night + hollow-rings + line-bisection run. */
+export function assessmentBatteryOutputs(
+  session: SessionRecord,
+  starry: AssessmentStarryRun | null,
+): BatteryTaskOutputs {
+  const scored = scoreSession(session);
+  const ts = scored.targetSelection;
+  const lineTrials = session.trials.filter((trial) => trial.task === "line-bisection" && trial.line);
+  const sky = starry ? scoreStarry(starry.trials, starry.responses, starry.presses ?? []) : null;
+  return {
+    scene: { taps: [] },
+    clock: { trials: [], responses: [] },
+    bisection: lineTrials.length
+      ? {
+          lines: lineTrials.map((trial) => ({
+            id: trial.id,
+            x1: trial.line!.x1,
+            x2: trial.line!.x2,
+            y: trial.line!.y,
+          })),
+          responses: lineTrials.map((trial) => {
+            const mark = trial.events.find((event) => event.type === "bisection");
+            return { lineId: trial.id, x: mark ? mark.x : null };
+          }),
+        }
+      : undefined,
+    cancellation:
+      ts && ts.left.available > 0 && ts.right.available > 0
+        ? {
+            left: { omissions: ts.left.omissions, targets: ts.left.available },
+            right: { omissions: ts.right.omissions, targets: ts.right.available },
+          }
+        : undefined,
+    detection:
+      sky && sky.left.n > 0 && sky.right.n > 0
+        ? {
+            left: { hits: sky.left.hits, targets: sky.left.n },
+            right: { hits: sky.right.hits, targets: sky.right.n },
+          }
+        : undefined,
+  };
+}
+
+/** Battery record for a live scored run. Same id as the session so History can join Starry Night. */
+export function assembleAssessmentBatteryRecord(
+  session: SessionRecord,
+  starry: AssessmentStarryRun | null,
+  options: AssembleBatteryOptions & { consent?: boolean; healthyControl?: boolean } = {},
+): BatteryRecord {
+  return assembleBatteryRecord(
+    {
+      mode: "full",
+      hide: "none",
+      seed: starry ? seedFromStarry(starry.trials) : 1,
+      readingDirection: null,
+      consent: options.consent ?? true,
+      healthyControl: options.healthyControl ?? (session.source === "live" && session.status === "complete"),
+    },
+    assessmentBatteryOutputs(session, starry),
+    {
+      id: options.id ?? session.id,
+      startedAt: options.startedAt ?? session.startedAt,
+      completedAt: options.completedAt ?? session.completedAt,
+      now: options.now,
+    },
+  );
 }
 
 export async function saveBatterySession(
