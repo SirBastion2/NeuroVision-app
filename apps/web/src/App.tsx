@@ -10,10 +10,12 @@ import {
 import { HiddenScenePage } from "./checks/HiddenScene";
 import { BatteryPage } from "./checks/pages";
 import { BrandMark, Wordmark } from "./components/Brand";
+import { DemoModeToggle } from "./components/DemoModeToggle";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { TaskRunner } from "./components/TaskRunner";
 import { createLocalSessionStore, type LoadResult } from "./data/sessionStore";
 import { scoredBatteryName, scoredBatteryStep } from "./lib/battery-labels";
+import { readDemoMode, writeDemoMode } from "./lib/demo-mode";
 import { flowReducer, initialFlow, type Screen } from "./lib/flow";
 import {
   TIME_LIMIT_MS,
@@ -107,6 +109,7 @@ export function App() {
   const [batteries, setBatteries] = useState<BatteryRecord[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [demoMode, setDemoMode] = useState(() => readDemoMode());
   const [signedIn, setSignedIn] = useState<Me | null>(null);
   const [authReady, setAuthReady] = useState(!apiEnabled);
   const [authBusy, setAuthBusy] = useState(false);
@@ -461,6 +464,10 @@ export function App() {
                 Sign in
               </button>
             )}
+            <DemoModeToggle
+              on={demoMode}
+              onToggle={() => setDemoMode((current) => writeDemoMode(!current))}
+            />
             <button
               className="theme-toggle"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -522,7 +529,9 @@ export function App() {
         )}
         {screen === "assessment" && (
           <BatteryPage
+            key={`assessment-${demoMode}`}
             from="starry"
+            demo={demoMode}
             alias={participantLabel}
             onHome={home}
             onRunning={setCheckRunning}
@@ -531,7 +540,9 @@ export function App() {
         )}
         {screen === "starry" && (
           <BatteryPage
+            key={`starry-${demoMode}`}
             from="starry"
+            demo={demoMode}
             alias={participantLabel}
             onHome={home}
             onRunning={setCheckRunning}
@@ -540,7 +551,9 @@ export function App() {
         )}
         {screen === "rings" && (
           <BatteryPage
+            key={`rings-${demoMode}`}
             from="rings"
+            demo={demoMode}
             alias={participantLabel}
             onHome={home}
             onRunning={setCheckRunning}
@@ -549,7 +562,9 @@ export function App() {
         )}
         {screen === "lines" && (
           <BatteryPage
+            key={`lines-${demoMode}`}
             from="lines"
+            demo={demoMode}
             alias={participantLabel}
             onHome={home}
             onRunning={setCheckRunning}

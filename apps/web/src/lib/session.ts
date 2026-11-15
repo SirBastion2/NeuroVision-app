@@ -1,9 +1,9 @@
 import {
-  LINE_BISECTION_TRIAL_COUNT,
   PROTOCOL_ID,
   SCORER_ID,
   createLineBisectionLayout,
   createTargetSelectionLayout,
+  lineBisectionTrialCount,
   scoreSession,
   suggestPractice,
   type InputModality,
@@ -73,16 +73,21 @@ function blankTrial(session: SessionRecord, id: string, viewport: Viewport): Omi
   return { id, events: [], duration: 0, end: "stop", input: session.input, viewport };
 }
 
-export function newTargetSelectionTrial(session: SessionRecord, variant: LayoutVariant, viewport: Viewport): TrialRecord {
+export function newTargetSelectionTrial(
+  session: SessionRecord,
+  variant: LayoutVariant,
+  viewport: Viewport,
+  demo = false,
+): TrialRecord {
   return {
     ...blankTrial(session, `${session.id}-ts`, viewport),
     task: "target-selection",
-    layout: createTargetSelectionLayout(variant),
+    layout: createTargetSelectionLayout(variant, "standard", { demo }),
   };
 }
 
-export function newLineTrial(session: SessionRecord, index: number, viewport: Viewport): TrialRecord {
-  const { layout, line } = createLineBisectionLayout(index);
+export function newLineTrial(session: SessionRecord, index: number, viewport: Viewport, demo = false): TrialRecord {
+  const { layout, line } = createLineBisectionLayout(index, demo);
   return { ...blankTrial(session, `${session.id}-lb-${index}`, viewport), task: "line-bisection", layout, line };
 }
 
@@ -99,11 +104,16 @@ export interface RecordResult {
  * Appends an assessment trial. The session ends after the last line or on any
  * interruption; an interrupted session stays incomplete and is excluded from trends.
  */
-export function recordAssessmentTrial(session: SessionRecord, trial: TrialRecord, now = new Date()): RecordResult {
+export function recordAssessmentTrial(
+  session: SessionRecord,
+  trial: TrialRecord,
+  now = new Date(),
+  options: { demo?: boolean } = {},
+): RecordResult {
   const trials = [...session.trials, trial];
   const lines = trials.filter((t) => t.task === "line-bisection").length;
   const interrupted = isInterruption(trial.end);
-  const finished = interrupted || lines >= LINE_BISECTION_TRIAL_COUNT;
+  const finished = interrupted || lines >= lineBisectionTrialCount(options.demo);
   if (!finished) return { session: { ...session, trials }, finished };
   const ended: SessionRecord = {
     ...session,

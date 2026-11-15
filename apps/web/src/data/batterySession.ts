@@ -218,14 +218,15 @@ export function assembleAssessmentBatteryRecord(
   starry: AssessmentStarryRun | null,
   options: AssembleBatteryOptions & { consent?: boolean; healthyControl?: boolean } = {},
 ): BatteryRecord {
+  const demo = session.source === "demonstration";
   return assembleBatteryRecord(
     {
-      mode: "full",
+      mode: demo ? "demo" : "full",
       hide: "none",
       seed: starry ? seedFromStarry(starry.trials) : 1,
       readingDirection: null,
       consent: options.consent ?? true,
-      healthyControl: options.healthyControl ?? (session.source === "live" && session.status === "complete"),
+      healthyControl: demo ? false : (options.healthyControl ?? (session.source === "live" && session.status === "complete")),
     },
     assessmentBatteryOutputs(session, starry),
     {

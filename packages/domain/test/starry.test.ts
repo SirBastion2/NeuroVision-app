@@ -33,6 +33,27 @@ test("gaps are jittered within range and the first target waits for the lead-in"
   assert.ok(new Set(t.map((x) => x.gapMs)).size > 10);
 });
 
+test("demo mode uses 5 targets split 2/3 with the extra side random", () => {
+  assert.equal(D.demoTargets, 5);
+  assert.equal(D.fullTargets, 15);
+  const extras = new Set<string>();
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    const t = generateStarryTrials(D.demoTargets, seed);
+    assert.equal(t.length, 5);
+    const left = t.filter((x) => x.side === "left").length;
+    assert.ok(left === 2 || left === 3);
+    extras.add(left === 3 ? "left" : "right");
+    let run = 1;
+    for (let i = 1; i < t.length; i++) {
+      run = t[i]!.side === t[i - 1]!.side ? run + 1 : 1;
+      assert.ok(run <= 3, `seed ${seed}: run of ${run}`);
+    }
+    assert.equal(t[0]!.gapMs, D.leadInMs);
+    for (const x of t.slice(1)) assert.ok(x.gapMs >= D.gapMinMs && x.gapMs <= D.gapMaxMs);
+  }
+  assert.equal(extras.size, 2);
+});
+
 test("15 targets split 7/8 with the extra side random, and every run differs", () => {
   const extras = new Set<string>();
   for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {

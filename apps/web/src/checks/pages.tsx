@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  LINE_BISECTION_TRIAL_COUNT,
   type BatteryRecord,
   type InputModality,
   STARRY_DEFAULTS,
   describeViewport,
   findTargetSelectionTrial,
   generateStarryTrials,
+  lineBisectionTrialCount,
   scoreSession,
   scoreStarry,
   type SessionRecord,
@@ -44,11 +44,13 @@ export type RunningChange = (running: boolean) => void;
 
 export type BatteryTest = ScoredBatteryTest;
 
-const TESTS: Record<BatteryTest, { name: string; hint: string }> = {
-  starry: { name: scoredBatteryName("starry"), hint: "Press Space or tap whenever a red dot appears." },
-  rings: { name: scoredBatteryName("rings"), hint: "Select every hollow ring, leave the solid disks, then press Done." },
-  lines: { name: scoredBatteryName("lines"), hint: `Mark the middle of each line. ${LINE_BISECTION_TRIAL_COUNT} lines, one mark each.` },
-};
+function batteryTestCopy(lineCount: number): Record<BatteryTest, { name: string; hint: string }> {
+  return {
+    starry: { name: scoredBatteryName("starry"), hint: "Press Space or tap whenever a red dot appears." },
+    rings: { name: scoredBatteryName("rings"), hint: "Select every hollow ring, leave the solid disks, then press Done." },
+    lines: { name: scoredBatteryName("lines"), hint: `Mark the middle of each line. ${lineCount} lines, one mark each.` },
+  };
+}
 const ORDER: BatteryTest[] = SCORED_BATTERY.map((test) => test.id);
 
 type Step = { kind: "intro" } | { kind: "next"; test: BatteryTest } | { kind: "run"; test: BatteryTest } | { kind: "report" };
@@ -90,7 +92,7 @@ export function NextUp({ name, hint, onGo }: { name: string; hint: string; onGo:
 interface BatteryProps {
   /** Test the run starts at; it always continues through the rest in order. */
   from: BatteryTest;
-  /** Demo: shorter Starry Night, tests start by themselves, nothing saved. */
+  /** Demo: 5 Starry Night targets, 4 hollow rings on the same board, 2 lines, nothing saved. */
   demo?: boolean;
   onHome: () => void;
   onRunning: RunningChange;
@@ -103,6 +105,8 @@ interface BatteryProps {
 
 export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, alias = "", input = "mouse-trackpad" }: BatteryProps) {
   const tests = ORDER.slice(ORDER.indexOf(from));
+  const lineCount = lineBisectionTrialCount(demo);
+  const testCopy = batteryTestCopy(lineCount);
   const [step, setStep] = useState<Step>({ kind: "intro" });
   const [starryTrials, setStarryTrials] = useState<StarryTrial[]>(() =>
     generateStarryTrials(demo ? STARRY_DEFAULTS.demoTargets : STARRY_DEFAULTS.fullTargets, newSeed()),
@@ -139,7 +143,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
 
   const onBoardTrial = useCallback(
     (trial: TrialRecord) => {
-      const { session: next, finished } = recordAssessmentTrial(sessionRef.current, trial);
+      const { session: next, finished } = recordAssessmentTrial(sessionRef.current, trial, new Date(), { demo });
       setSession(next);
       if (finished) {
         if (!demo) {
@@ -170,8 +174,8 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
   // Board trials are created once per test/line so the runner gets a stable record.
   const boardTrial = useMemo(() => {
     if (step.kind !== "run") return null;
-    if (step.test === "rings") return newTargetSelectionTrial(session, "fixed-a", viewport());
-    if (step.test === "lines") return newLineTrial(session, lineIndex, viewport());
+    if (step.test === "rings") return newTargetSelectionTrial(session, "fixed-a", viewport(), demo);
+    if (step.test === "lines") return newLineTrial(session, lineIndex, viewport(), demo);
     return null;
   }, [step, lineIndex]); // eslint-disable-line react-hooks/exhaustive-deps -- session updates mid-trial must not reset the runner
 
@@ -194,11 +198,11 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
     const first = tests[0]!;
     if (from === "starry") return <StarryIntro trials={starryTrials} step={stepLabel("starry")} onBegin={begin} onCancel={onHome} />;
     if (from === "rings") return <TargetIntro input={session.input} step={stepLabel("rings")} onBegin={begin} onCancel={onHome} />;
-    return <LineIntro input={session.input} step={stepLabel(first)} onBegin={begin} />;
+    return <LineIntro input={session.input} step={stepLabel(first)} lineCount={lineCount} onBegin={begin} />;
   }
 
   if (step.kind === "next")
-    return <NextUp key={step.test} name={TESTS[step.test].name} hint={TESTS[step.test].hint} onGo={() => setStep({ kind: "run", test: step.test })} />;
+    return <NextUp key={step.test} name={testCopy[step.test].name} hint={testCopy[step.test].hint} onGo={() => setStep({ kind: "run", test: step.test })} />;
 
   if (step.kind === "run" && step.test === "starry")
     return (
@@ -223,7 +227,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
         trial={boardTrial}
         timeLimitMs={TIME_LIMIT_MS[rings ? "target-selection" : "line-bisection"]}
         eyebrow={stepLabel(step.test)}
-        title={rings ? "Select every hollow ring" : `Mark the middle of line ${lineIndex + 1} of ${LINE_BISECTION_TRIAL_COUNT}`}
+        title={rings ? "Select every hollow ring" : `Mark the middle of line ${lineIndex + 1} of ${lineCount}`}
         instruction={rings ? "Leave the solid disks. Press Done when finished." : "One mark. No accuracy feedback."}
         onFinish={onBoardTrial}
       />
@@ -234,6 +238,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
     <CombinedReport
       demo={demo}
       tests={tests}
+      lineCount={lineCount}
       starryTrials={starryTrials}
       starry={starry}
       session={session}
@@ -248,6 +253,7 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
 function CombinedReport({
   demo,
   tests,
+  lineCount,
   starryTrials,
   starry,
   session,
@@ -256,6 +262,7 @@ function CombinedReport({
 }: {
   demo: boolean;
   tests: BatteryTest[];
+  lineCount: number;
   starryTrials: StarryTrial[];
   starry: StarryRun | null;
   session: SessionRecord;
@@ -347,10 +354,10 @@ function CombinedReport({
           <div className="card-head">
             <h3>{scoredBatteryStep("lines")}</h3>
             <span className="small">
-              Median {signedPct(lb.signedMedian)} · absolute {signedPct(lb.absoluteMedian).replace("+", "")} · {lb.validCount} of {LINE_BISECTION_TRIAL_COUNT} valid
+              Median {signedPct(lb.signedMedian)} · absolute {signedPct(lb.absoluteMedian).replace("+", "")} · {lb.validCount} of {lineCount} valid
             </span>
           </div>
-          <LineDeviations trials={lineTrials} total={LINE_BISECTION_TRIAL_COUNT} />
+          <LineDeviations trials={lineTrials} total={lineCount} />
           <p className="small dev-key">
             <i className="key centre" /> True centre <i className="key mark" /> Mark placed. Positive = right of centre.
           </p>

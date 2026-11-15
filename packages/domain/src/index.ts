@@ -28,6 +28,10 @@ export type { BoardSide, VerticalRegion, BoardRegion, Point, BoardBox } from "./
 export {
   LINE_BISECTION_LINES,
   LINE_BISECTION_TRIAL_COUNT,
+  DEMO_LINE_BISECTION_LINES,
+  DEMO_LINE_BISECTION_TRIAL_COUNT,
+  lineBisectionLines,
+  lineBisectionTrialCount,
   createTargetSelectionLayout,
   createPracticeLayout,
   createLineBisectionLayout,
@@ -45,6 +49,7 @@ export type {
   Stimulus,
   TaskLayout,
   LineSegment,
+  TargetSelectionLayoutOptions,
 } from "./layouts.js";
 
 export { RESPONSE_EVENT_TYPES, sortEvents, classifyResponse } from "./events.js";
