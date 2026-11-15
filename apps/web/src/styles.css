@@ -476,6 +476,7 @@ td { font-variant-numeric: tabular-nums; }
 .next-up .lede { margin: 8px auto 18px; }
 .next-up-bar { height: 4px; width: 220px; margin: 0 auto; border-radius: 4px; background: var(--line); overflow: hidden; }
 .next-up-bar i { display: block; height: 100%; background: var(--accent); animation: next-up 1.8s linear both; }
+.next-up .actions { justify-content: center; margin-top: 18px; }
 @keyframes next-up { from { width: 0; } to { width: 100%; } }
 .stack-auto { font-family: var(--sans); font-size: 0.9rem; color: var(--accent) !important; font-weight: 600; }
 .stack-auto::after { content: ""; display: block; height: 3px; width: 140px; margin: 10px auto 0; border-radius: 3px; background: var(--accent); animation: next-up 1.6s linear both; transform-origin: left; }
