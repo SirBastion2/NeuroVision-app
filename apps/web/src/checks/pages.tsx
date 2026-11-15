@@ -24,6 +24,7 @@ import { TIME_LIMIT_MS, createSession, newLineTrial, newTargetSelectionTrial, re
 import { LineIntro, TargetIntro } from "../screens/Intros";
 import { StarryIntro, StarryTask, type StarryRun } from "./StarryTask";
 import { StarryResult } from "./StarryResult";
+import { armNextUpAdvance } from "./next-up";
 import { downloadJson, fileStamp } from "./results";
 
 /*
@@ -53,11 +54,20 @@ const ORDER: BatteryTest[] = SCORED_BATTERY.map((test) => test.id);
 type Step = { kind: "intro" } | { kind: "next"; test: BatteryTest } | { kind: "run"; test: BatteryTest } | { kind: "report" };
 
 /** A short "up next" card between tests that moves on by itself. */
-function NextUp({ name, hint, onGo }: { name: string; hint: string; onGo: () => void }) {
+export function NextUp({ name, hint, onGo }: { name: string; hint: string; onGo: () => void }) {
+  const onGoRef = useRef(onGo);
+  onGoRef.current = onGo;
+  const [showContinue, setShowContinue] = useState(false);
+
   useEffect(() => {
-    const t = window.setTimeout(onGo, 2600);
-    return () => window.clearTimeout(t);
-  }, [onGo]);
+    // Empty deps: re-renders that pass a new `onGo` (App save/queue/auth) must
+    // not clear the timeout. StrictMode unmount still re-arms via this cleanup.
+    return armNextUpAdvance(
+      () => onGoRef.current(),
+      () => setShowContinue(true),
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- onGo is read from a ref; re-arming on identity change is the stuck-card bug
+
   return (
     <section className="intro card narrow next-up" role="status">
       <Eyebrow plain>Up next</Eyebrow>
@@ -66,6 +76,13 @@ function NextUp({ name, hint, onGo }: { name: string; hint: string; onGo: () => 
       <div className="next-up-bar" aria-hidden>
         <i />
       </div>
+      {showContinue ? (
+        <div className="actions">
+          <button type="button" className="primary" onClick={() => onGoRef.current()}>
+            Continue
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -131,7 +148,13 @@ export function BatteryPage({ from, demo = false, onHome, onRunning, onSave, ali
             next,
             run ? { trials: starryTrialsRef.current, responses: run.responses, presses: run.presses } : null,
           );
-          onSave?.(next, battery);
+          if (onSave) {
+            try {
+              onSave(next, battery);
+            } catch {
+              /* History save / upload must not block leaving the board */
+            }
+          }
         }
         toTop();
         setStep({ kind: "report" });
