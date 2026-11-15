@@ -143,7 +143,12 @@ export function History({
             min={0}
             max={1}
             format={(v) => pct(v)}
-            points={trend.points.map((p) => ({ id: p.sessionId, label: date(p.completedAt), value: p.hitRate }))}
+            points={trend.points.map((p) => ({
+              id: p.sessionId,
+              at: p.completedAt,
+              label: date(p.completedAt),
+              value: p.hitRate,
+            }))}
           />
           <TrendChart
             title={LEFT_RIGHT_MISSES_LABEL}
@@ -152,7 +157,12 @@ export function History({
             max={100}
             zeroLine
             format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`}
-            points={trend.points.map((p) => ({ id: p.sessionId, label: date(p.completedAt), value: p.omissionAsymmetry }))}
+            points={trend.points.map((p) => ({
+              id: p.sessionId,
+              at: p.completedAt,
+              label: date(p.completedAt),
+              value: p.omissionAsymmetry,
+            }))}
           />
         </section>
       ) : (

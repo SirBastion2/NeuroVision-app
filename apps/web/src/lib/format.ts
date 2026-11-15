@@ -9,6 +9,7 @@ export const signedPct = (value: number | null) =>
 export const dateTime = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 export const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+export const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { timeStyle: "short" });
 
 /** Summed tap-to-tap distance, shown as how many board widths were travelled. */
 export const SEARCH_DISTANCE_LABEL = "Search distance";
