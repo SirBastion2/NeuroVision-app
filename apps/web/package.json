@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build && vite build --config vite.standalone.config.ts",
     "build:standalone": "vite build --config vite.standalone.config.ts",
     "preview": "vite preview",
-    "test": "tsx --test test/service.test.ts test/standalone.test.ts test/web.test.ts test/api-client.test.ts test/api-auth.test.ts test/upload-queue.test.ts test/screen-wiring.test.ts test/battery-session.test.ts test/battery-labels.test.ts test/home.test.ts test/screening-metrics.test.ts test/screening-gaze.test.ts test/review.test.ts test/participant-id.test.ts test/trend-axis.test.ts",
+    "test": "tsx --test test/service.test.ts test/standalone.test.ts test/web.test.ts test/api-client.test.ts test/api-auth.test.ts test/upload-queue.test.ts test/screen-wiring.test.ts test/battery-session.test.ts test/battery-labels.test.ts test/home.test.ts test/screening-metrics.test.ts test/screening-gaze.test.ts test/review.test.ts test/participant-id.test.ts test/trend-axis.test.ts test/next-up.test.ts",
     "build:site": "tsc -p tsconfig.json && vite build",
     "test:e2e": "tsx --test test/e2e.test.ts"
   },
